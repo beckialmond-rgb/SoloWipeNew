@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Building, Loader2 } from 'lucide-react';
@@ -13,9 +13,16 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, signUp } = useAuth();
+  const { user, loading: authLoading, signIn, signUp } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate('/');
+    }
+  }, [user, authLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +60,15 @@ const Auth = () => {
       setLoading(false);
     }
   };
+
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -168,21 +184,6 @@ const Auth = () => {
             </button>
           </div>
         </motion.div>
-      </div>
-
-      {/* Demo Mode Button */}
-      <div className="px-6 pb-8 max-w-sm mx-auto w-full">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => navigate('/')}
-          className={cn(
-            "w-full h-14 rounded-xl",
-            "font-medium"
-          )}
-        >
-          Continue in Demo Mode
-        </Button>
       </div>
     </div>
   );

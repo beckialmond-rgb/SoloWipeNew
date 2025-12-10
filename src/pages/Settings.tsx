@@ -1,12 +1,21 @@
 import { motion } from 'framer-motion';
 import { User, Building, LogOut, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
-import { useDemoData } from '@/hooks/useDemoData';
+import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
 const Settings = () => {
-  const { businessName } = useDemoData();
+  const { businessName, userEmail } = useSupabaseData();
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   const settingsItems = [
     {
@@ -18,7 +27,7 @@ const Settings = () => {
     {
       icon: User,
       label: 'Account',
-      value: 'demo@solowipe.com',
+      value: userEmail,
       onClick: () => {},
     },
   ];
@@ -65,6 +74,7 @@ const Settings = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
+            onClick={handleSignOut}
             className={cn(
               "w-full bg-card rounded-xl border border-border p-4 mt-8",
               "flex items-center gap-4 text-left",
