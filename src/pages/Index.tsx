@@ -7,16 +7,19 @@ import { JobCard } from '@/components/JobCard';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
+import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import { Sparkles } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 
 const Index = () => {
-  const { pendingJobs, upcomingJobs, completeJob, isLoading } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, completeJob, rescheduleJob, isLoading } = useSupabaseData();
   const { toast } = useToast();
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
 
   // Sync local jobs with fetched pending jobs
   useEffect(() => {
@@ -58,6 +61,16 @@ const Index = () => {
     } finally {
       setCompletingJobId(null);
     }
+  };
+
+  const handleJobClick = (job: JobWithCustomer) => {
+    setSelectedJob(job);
+    setRescheduleModalOpen(true);
+  };
+
+  const handleReschedule = async (jobId: string, newDate: string) => {
+    await rescheduleJob(jobId, newDate);
+    setSelectedJob(null);
   };
 
   return (
@@ -111,10 +124,17 @@ const Index = () => {
             )}
 
             {/* Upcoming Jobs Section */}
-            <UpcomingJobsSection jobs={upcomingJobs} />
+            <UpcomingJobsSection jobs={upcomingJobs} onJobClick={handleJobClick} />
           </>
         )}
       </main>
+
+      <RescheduleJobModal
+        job={selectedJob}
+        open={rescheduleModalOpen}
+        onOpenChange={setRescheduleModalOpen}
+        onReschedule={handleReschedule}
+      />
 
       <BottomNav />
     </div>
