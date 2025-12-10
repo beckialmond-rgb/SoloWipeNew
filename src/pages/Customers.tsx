@@ -6,12 +6,13 @@ import { BottomNav } from '@/components/BottomNav';
 import { CustomerCard } from '@/components/CustomerCard';
 import { CustomerDetailModal } from '@/components/CustomerDetailModal';
 import { EmptyState } from '@/components/EmptyState';
-import { useDemoData } from '@/hooks/useDemoData';
+import { LoadingState } from '@/components/LoadingState';
+import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
 
 const Customers = () => {
-  const { customers, businessName } = useDemoData();
+  const { customers, businessName, isLoading } = useSupabaseData();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
@@ -26,54 +27,60 @@ const Customers = () => {
       <Header showLogo={false} title="Customers" />
 
       <main className="px-4 py-6 max-w-lg mx-auto">
-        {/* Search */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-6"
-        >
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search customers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={cn(
-                "w-full h-12 pl-12 pr-4 rounded-xl",
-                "bg-muted border-0",
-                "text-foreground placeholder:text-muted-foreground",
-                "focus:outline-none focus:ring-2 focus:ring-primary"
-              )}
-            />
-          </div>
-        </motion.div>
+        {isLoading ? (
+          <LoadingState message="Loading customers..." />
+        ) : (
+          <>
+            {/* Search */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6"
+            >
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search customers..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className={cn(
+                    "w-full h-12 pl-12 pr-4 rounded-xl",
+                    "bg-muted border-0",
+                    "text-foreground placeholder:text-muted-foreground",
+                    "focus:outline-none focus:ring-2 focus:ring-primary"
+                  )}
+                />
+              </div>
+            </motion.div>
 
-        {/* Customer count */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-          <Users className="w-4 h-4" />
-          <span>{filteredCustomers.length} customers</span>
-        </div>
+            {/* Customer count */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+              <Users className="w-4 h-4" />
+              <span>{filteredCustomers.length} customers</span>
+            </div>
 
-        {/* Customer list */}
-        <div className="space-y-3">
-          {filteredCustomers.map((customer, index) => (
-            <CustomerCard
-              key={customer.id}
-              customer={customer}
-              onClick={() => setSelectedCustomer(customer)}
-              index={index}
-            />
-          ))}
-        </div>
+            {/* Customer list */}
+            <div className="space-y-3">
+              {filteredCustomers.map((customer, index) => (
+                <CustomerCard
+                  key={customer.id}
+                  customer={customer}
+                  onClick={() => setSelectedCustomer(customer)}
+                  index={index}
+                />
+              ))}
+            </div>
 
-        {/* Empty state */}
-        {filteredCustomers.length === 0 && (
-          <EmptyState
-            title="No customers found"
-            description={searchQuery ? "Try a different search term" : "Add your first customer to get started"}
-            icon={<Users className="w-8 h-8 text-primary" />}
-          />
+            {/* Empty state */}
+            {filteredCustomers.length === 0 && (
+              <EmptyState
+                title="No customers found"
+                description={searchQuery ? "Try a different search term" : "Add your first customer to get started"}
+                icon={<Users className="w-8 h-8 text-primary" />}
+              />
+            )}
+          </>
         )}
       </main>
 
