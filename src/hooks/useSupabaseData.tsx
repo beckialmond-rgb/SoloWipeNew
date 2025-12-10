@@ -9,6 +9,7 @@ export function useSupabaseData() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const today = format(new Date(), 'yyyy-MM-dd');
+  const fourWeeksFromNow = format(addWeeks(new Date(), 4), 'yyyy-MM-dd');
 
   // Fetch customers
   const { data: customers = [], isLoading: customersLoading } = useQuery({
@@ -97,6 +98,33 @@ export function useSupabaseData() {
     enabled: !!user,
   });
 
+  // Fetch upcoming jobs (next 4 weeks, after today)
+  const { data: upcomingJobs = [], isLoading: upcomingLoading } = useQuery({
+    queryKey: ['upcomingJobs', user?.id, today],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          customer:customers(*)
+        `)
+        .eq('status', 'pending')
+        .gt('scheduled_date', today)
+        .lte('scheduled_date', fourWeeksFromNow)
+        .order('scheduled_date');
+      
+      if (error) throw error;
+      
+      return (data || []).map(job => ({
+        ...job,
+        customer: job.customer as Customer,
+      })) as JobWithCustomer[];
+    },
+    enabled: !!user,
+  });
+
   // Calculate today's earnings
   const todayEarnings = completedToday.reduce(
     (sum, job) => sum + (job.amount_collected || 0),
@@ -147,6 +175,7 @@ export function useSupabaseData() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
       queryClient.invalidateQueries({ queryKey: ['completedToday'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
     },
   });
 
@@ -195,6 +224,7 @@ export function useSupabaseData() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
       toast({
         title: 'Customer added!',
         description: 'First job scheduled.',
@@ -267,6 +297,7 @@ export function useSupabaseData() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
       toast({
         title: 'Customer archived',
         description: 'All pending jobs cancelled.',
@@ -342,11 +373,12 @@ export function useSupabaseData() {
   };
 
   const businessName = profile?.business_name || 'My Window Cleaning';
-  const isLoading = customersLoading || jobsLoading || completedLoading;
+  const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading;
 
   return {
     customers,
     pendingJobs,
+    upcomingJobs,
     completedToday,
     todayEarnings,
     businessName,
