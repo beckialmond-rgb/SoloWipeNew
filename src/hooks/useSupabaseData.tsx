@@ -247,6 +247,16 @@ export function useSupabaseData() {
   // Archive customer mutation
   const archiveCustomerMutation = useMutation({
     mutationFn: async (id: string) => {
+      // 1. Delete all pending jobs for this customer first
+      const { error: jobsError } = await supabase
+        .from('jobs')
+        .delete()
+        .eq('customer_id', id)
+        .eq('status', 'pending');
+
+      if (jobsError) throw jobsError;
+
+      // 2. Then archive the customer
       const { error } = await supabase
         .from('customers')
         .update({ status: 'inactive' })
@@ -259,6 +269,7 @@ export function useSupabaseData() {
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
       toast({
         title: 'Customer archived',
+        description: 'All pending jobs cancelled.',
       });
     },
     onError: (error) => {
