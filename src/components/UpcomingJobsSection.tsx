@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { format, isToday, isTomorrow, isThisWeek, addWeeks } from 'date-fns';
+import { format, isTomorrow, isThisWeek } from 'date-fns';
 import { Calendar, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 import { JobWithCustomer } from '@/types/database';
@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 
 interface UpcomingJobsSectionProps {
   jobs: JobWithCustomer[];
+  onJobClick?: (job: JobWithCustomer) => void;
 }
 
 interface GroupedJobs {
@@ -15,7 +16,7 @@ interface GroupedJobs {
   later: JobWithCustomer[];
 }
 
-export function UpcomingJobsSection({ jobs }: UpcomingJobsSectionProps) {
+export function UpcomingJobsSection({ jobs, onJobClick }: UpcomingJobsSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Group jobs by date category
@@ -76,17 +77,17 @@ export function UpcomingJobsSection({ jobs }: UpcomingJobsSectionProps) {
           >
             {/* Tomorrow */}
             {groupedJobs.tomorrow.length > 0 && (
-              <JobGroup title="Tomorrow" jobs={groupedJobs.tomorrow} />
+              <JobGroup title="Tomorrow" jobs={groupedJobs.tomorrow} onJobClick={onJobClick} />
             )}
 
             {/* This Week */}
             {groupedJobs.thisWeek.length > 0 && (
-              <JobGroup title="This Week" jobs={groupedJobs.thisWeek} />
+              <JobGroup title="This Week" jobs={groupedJobs.thisWeek} onJobClick={onJobClick} />
             )}
 
             {/* Later */}
             {groupedJobs.later.length > 0 && (
-              <JobGroup title="Later" jobs={groupedJobs.later} />
+              <JobGroup title="Later" jobs={groupedJobs.later} onJobClick={onJobClick} />
             )}
           </motion.div>
         )}
@@ -98,15 +99,16 @@ export function UpcomingJobsSection({ jobs }: UpcomingJobsSectionProps) {
 interface JobGroupProps {
   title: string;
   jobs: JobWithCustomer[];
+  onJobClick?: (job: JobWithCustomer) => void;
 }
 
-function JobGroup({ title, jobs }: JobGroupProps) {
+function JobGroup({ title, jobs, onJobClick }: JobGroupProps) {
   return (
     <div>
       <h3 className="text-sm font-medium text-muted-foreground mb-2">{title}</h3>
       <div className="space-y-2">
         {jobs.map((job) => (
-          <UpcomingJobCard key={job.id} job={job} />
+          <UpcomingJobCard key={job.id} job={job} onClick={onJobClick} />
         ))}
       </div>
     </div>
@@ -115,23 +117,27 @@ function JobGroup({ title, jobs }: JobGroupProps) {
 
 interface UpcomingJobCardProps {
   job: JobWithCustomer;
+  onClick?: (job: JobWithCustomer) => void;
 }
 
-function UpcomingJobCard({ job }: UpcomingJobCardProps) {
+function UpcomingJobCard({ job, onClick }: UpcomingJobCardProps) {
   const jobDate = new Date(job.scheduled_date);
   const formattedDate = isTomorrow(jobDate)
     ? 'Tomorrow'
     : format(jobDate, 'EEE, d MMM');
 
   return (
-    <motion.div
+    <motion.button
       layout
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
+      onClick={() => onClick?.(job)}
       className={cn(
-        "flex items-center justify-between",
+        "w-full flex items-center justify-between text-left",
         "p-4 rounded-xl bg-muted/50",
-        "border border-border/50"
+        "border border-border/50",
+        "hover:bg-muted transition-colors",
+        "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
       )}
     >
       <div className="flex-1 min-w-0">
@@ -154,6 +160,6 @@ function UpcomingJobCard({ job }: UpcomingJobCardProps) {
           £{job.customer.price}
         </p>
       </div>
-    </motion.div>
+    </motion.button>
   );
 }
