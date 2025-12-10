@@ -14,7 +14,109 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      customers: {
+        Row: {
+          address: string
+          created_at: string
+          frequency_weeks: number
+          gocardless_id: string | null
+          id: string
+          mobile_phone: string | null
+          name: string
+          price: number
+          profile_id: string
+          status: string
+        }
+        Insert: {
+          address: string
+          created_at?: string
+          frequency_weeks?: number
+          gocardless_id?: string | null
+          id?: string
+          mobile_phone?: string | null
+          name: string
+          price?: number
+          profile_id: string
+          status?: string
+        }
+        Update: {
+          address?: string
+          created_at?: string
+          frequency_weeks?: number
+          gocardless_id?: string | null
+          id?: string
+          mobile_phone?: string | null
+          name?: string
+          price?: number
+          profile_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          amount_collected: number | null
+          completed_at: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          scheduled_date: string
+          status: string
+        }
+        Insert: {
+          amount_collected?: number | null
+          completed_at?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          scheduled_date: string
+          status?: string
+        }
+        Update: {
+          amount_collected?: number | null
+          completed_at?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          scheduled_date?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          business_name: string
+          created_at: string
+          id: string
+        }
+        Insert: {
+          business_name?: string
+          created_at?: string
+          id: string
+        }
+        Update: {
+          business_name?: string
+          created_at?: string
+          id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
