@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Building, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -171,8 +171,20 @@ const Auth = () => {
             </Button>
           </form>
 
+          {/* Forgot Password Link (only show on login) */}
+          {isLogin && (
+            <div className="mt-4 text-center">
+              <Link
+                to="/forgot-password"
+                className="text-muted-foreground hover:text-primary text-sm"
+              >
+                Forgot your password?
+              </Link>
+            </div>
+          )}
+
           {/* Toggle */}
-          <div className="mt-8 text-center">
+          <div className="mt-6 text-center">
             <button
               type="button"
               onClick={() => setIsLogin(!isLogin)}
