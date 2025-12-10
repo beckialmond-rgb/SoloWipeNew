@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Customer, JobWithCustomer } from '@/types/database';
 import { format, addWeeks } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
 
 export function useSupabaseData() {
   const { user } = useAuth();
@@ -144,14 +145,189 @@ export function useSupabaseData() {
       };
     },
     onSuccess: () => {
-      // Invalidate queries to refresh data
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
       queryClient.invalidateQueries({ queryKey: ['completedToday'] });
     },
   });
 
+  // Add customer mutation
+  const addCustomerMutation = useMutation({
+    mutationFn: async (data: {
+      name: string;
+      address: string;
+      mobile_phone: string;
+      price: number;
+      frequency_weeks: number;
+      first_clean_date: string;
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      // 1. Insert customer
+      const { data: newCustomer, error: customerError } = await supabase
+        .from('customers')
+        .insert({
+          profile_id: user.id,
+          name: data.name,
+          address: data.address,
+          mobile_phone: data.mobile_phone || null,
+          price: data.price,
+          frequency_weeks: data.frequency_weeks,
+          status: 'active',
+        })
+        .select()
+        .single();
+
+      if (customerError) throw customerError;
+
+      // 2. Create first job with user-selected date
+      const { error: jobError } = await supabase
+        .from('jobs')
+        .insert({
+          customer_id: newCustomer.id,
+          scheduled_date: data.first_clean_date,
+          status: 'pending',
+        });
+
+      if (jobError) throw jobError;
+
+      return newCustomer;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      toast({
+        title: 'Customer added!',
+        description: 'First job scheduled.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Update customer mutation
+  const updateCustomerMutation = useMutation({
+    mutationFn: async ({ id, data }: {
+      id: string;
+      data: {
+        name: string;
+        address: string;
+        mobile_phone: string | null;
+        price: number;
+        frequency_weeks: number;
+      };
+    }) => {
+      const { error } = await supabase
+        .from('customers')
+        .update(data)
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      toast({
+        title: 'Customer updated!',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Archive customer mutation
+  const archiveCustomerMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('customers')
+        .update({ status: 'inactive' })
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      toast({
+        title: 'Customer archived',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Update business name mutation
+  const updateBusinessNameMutation = useMutation({
+    mutationFn: async (newName: string) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ business_name: newName })
+        .eq('id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast({
+        title: 'Business name updated!',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const completeJob = (jobId: string) => {
     return completeJobMutation.mutateAsync(jobId);
+  };
+
+  const addCustomer = (data: {
+    name: string;
+    address: string;
+    mobile_phone: string;
+    price: number;
+    frequency_weeks: number;
+    first_clean_date: string;
+  }) => {
+    return addCustomerMutation.mutateAsync(data);
+  };
+
+  const updateCustomer = (id: string, data: {
+    name: string;
+    address: string;
+    mobile_phone: string | null;
+    price: number;
+    frequency_weeks: number;
+  }) => {
+    return updateCustomerMutation.mutateAsync({ id, data });
+  };
+
+  const archiveCustomer = (id: string) => {
+    return archiveCustomerMutation.mutateAsync(id);
+  };
+
+  const updateBusinessName = (newName: string) => {
+    return updateBusinessNameMutation.mutateAsync(newName);
   };
 
   const businessName = profile?.business_name || 'My Window Cleaning';
@@ -164,6 +340,10 @@ export function useSupabaseData() {
     todayEarnings,
     businessName,
     completeJob,
+    addCustomer,
+    updateCustomer,
+    archiveCustomer,
+    updateBusinessName,
     isLoading,
     userEmail: user?.email || '',
   };
