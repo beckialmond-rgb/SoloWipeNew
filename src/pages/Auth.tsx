@@ -1,0 +1,191 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Mail, Lock, Building, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+const Auth = () => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { signIn, signUp } = useAuth();
+  const { toast } = useToast();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (isLogin) {
+        const { error } = await signIn(email, password);
+        if (error) {
+          toast({
+            title: 'Sign in failed',
+            description: error.message,
+            variant: 'destructive',
+          });
+        } else {
+          navigate('/');
+        }
+      } else {
+        const { error } = await signUp(email, password, businessName);
+        if (error) {
+          toast({
+            title: 'Sign up failed',
+            description: error.message,
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Welcome to SoloWipe!',
+            description: 'Your account has been created.',
+          });
+          navigate('/');
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm"
+        >
+          {/* Logo */}
+          <div className="text-center mb-10">
+            <img 
+              src="/logo.png" 
+              alt="SoloWipe" 
+              className="h-12 mx-auto mb-4"
+            />
+            <h1 className="text-2xl font-bold text-foreground">
+              {isLogin ? 'Welcome back' : 'Create account'}
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              {isLogin 
+                ? 'Sign in to manage your rounds' 
+                : 'Start managing your window cleaning business'}
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <div className="relative">
+                <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Business Name"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  required={!isLogin}
+                  className={cn(
+                    "w-full h-14 pl-12 pr-4 rounded-xl",
+                    "bg-muted border-0",
+                    "text-foreground placeholder:text-muted-foreground",
+                    "focus:outline-none focus:ring-2 focus:ring-primary"
+                  )}
+                />
+              </div>
+            )}
+
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className={cn(
+                  "w-full h-14 pl-12 pr-4 rounded-xl",
+                  "bg-muted border-0",
+                  "text-foreground placeholder:text-muted-foreground",
+                  "focus:outline-none focus:ring-2 focus:ring-primary"
+                )}
+              />
+            </div>
+
+            <div className="relative">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className={cn(
+                  "w-full h-14 pl-12 pr-4 rounded-xl",
+                  "bg-muted border-0",
+                  "text-foreground placeholder:text-muted-foreground",
+                  "focus:outline-none focus:ring-2 focus:ring-primary"
+                )}
+              />
+            </div>
+
+            <Button
+              type="submit"
+              disabled={loading}
+              className={cn(
+                "w-full h-14 rounded-xl",
+                "bg-primary hover:bg-primary/90 text-primary-foreground",
+                "font-semibold text-base"
+              )}
+            >
+              {loading ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : isLogin ? (
+                'Sign In'
+              ) : (
+                'Create Account'
+              )}
+            </Button>
+          </form>
+
+          {/* Toggle */}
+          <div className="mt-8 text-center">
+            <button
+              type="button"
+              onClick={() => setIsLogin(!isLogin)}
+              className="text-primary font-medium hover:underline"
+            >
+              {isLogin 
+                ? "Don't have an account? Sign up" 
+                : 'Already have an account? Sign in'}
+            </button>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Demo Mode Button */}
+      <div className="px-6 pb-8 max-w-sm mx-auto w-full">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => navigate('/')}
+          className={cn(
+            "w-full h-14 rounded-xl",
+            "font-medium"
+          )}
+        >
+          Continue in Demo Mode
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default Auth;
