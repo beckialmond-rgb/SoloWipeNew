@@ -339,6 +339,32 @@ export function useSupabaseData() {
     },
   });
 
+  // Reschedule job mutation
+  const rescheduleJobMutation = useMutation({
+    mutationFn: async ({ jobId, newDate }: { jobId: string; newDate: string }) => {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ scheduled_date: newDate })
+        .eq('id', jobId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      toast({
+        title: 'Job rescheduled',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const completeJob = (jobId: string) => {
     return completeJobMutation.mutateAsync(jobId);
   };
@@ -372,6 +398,10 @@ export function useSupabaseData() {
     return updateBusinessNameMutation.mutateAsync(newName);
   };
 
+  const rescheduleJob = (jobId: string, newDate: string) => {
+    return rescheduleJobMutation.mutateAsync({ jobId, newDate });
+  };
+
   const businessName = profile?.business_name || 'My Window Cleaning';
   const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading;
 
@@ -387,6 +417,7 @@ export function useSupabaseData() {
     updateCustomer,
     archiveCustomer,
     updateBusinessName,
+    rescheduleJob,
     isLoading,
     userEmail: user?.email || '',
   };
