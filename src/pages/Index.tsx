@@ -6,13 +6,14 @@ import { BottomNav } from '@/components/BottomNav';
 import { JobCard } from '@/components/JobCard';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
+import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import { Sparkles } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 
 const Index = () => {
-  const { pendingJobs, completeJob, isLoading } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, completeJob, isLoading } = useSupabaseData();
   const { toast } = useToast();
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
@@ -100,7 +101,7 @@ const Index = () => {
               </AnimatePresence>
             </div>
 
-            {/* Empty state */}
+            {/* Empty state for today */}
             {localJobs.length === 0 && (
               <EmptyState
                 title="All done for today!"
@@ -108,6 +109,9 @@ const Index = () => {
                 icon={<Sparkles className="w-8 h-8 text-accent" />}
               />
             )}
+
+            {/* Upcoming Jobs Section */}
+            <UpcomingJobsSection jobs={upcomingJobs} />
           </>
         )}
       </main>
