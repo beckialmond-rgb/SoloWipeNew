@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { EditBusinessNameModal } from '@/components/EditBusinessNameModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
+import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { cn } from '@/lib/utils';
 
 const Settings = () => {
   const { businessName, userEmail, updateBusinessName } = useSupabaseData();
   const { signOut } = useAuth();
   const navigate = useNavigate();
+  const { isInstalled } = useInstallPrompt();
   const [isEditBusinessNameOpen, setIsEditBusinessNameOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -74,6 +76,33 @@ const Settings = () => {
               <p className="font-medium text-foreground truncate">{userEmail}</p>
             </div>
           </motion.div>
+
+          {/* Install App - Only show if not installed */}
+          {!isInstalled && (
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              onClick={() => navigate('/install')}
+              className={cn(
+                "w-full bg-card rounded-xl border border-border p-4",
+                "flex items-center gap-4 text-left",
+                "hover:bg-muted/50 transition-colors",
+                "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              )}
+            >
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <Download className="w-5 h-5 text-primary" />
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-muted-foreground">Get the App</p>
+                <p className="font-medium text-foreground">Install on Home Screen</p>
+              </div>
+
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </motion.button>
+          )}
 
           {/* Sign Out Button */}
           <motion.button

@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Customers from "./pages/Customers";
 import Earnings from "./pages/Earnings";
 import Settings from "./pages/Settings";
+import Install from "./pages/Install";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -55,6 +56,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route path="/install" element={<Install />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
