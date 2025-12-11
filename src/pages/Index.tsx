@@ -12,6 +12,16 @@ import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import { Sparkles } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const Index = () => {
   const { pendingJobs, upcomingJobs, completeJob, rescheduleJob, skipJob, isLoading } = useSupabaseData();
@@ -20,6 +30,8 @@ const Index = () => {
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
+  const [skipConfirmOpen, setSkipConfirmOpen] = useState(false);
+  const [jobToSkip, setJobToSkip] = useState<JobWithCustomer | null>(null);
 
   // Sync local jobs with fetched pending jobs
   useEffect(() => {
@@ -63,7 +75,20 @@ const Index = () => {
     }
   };
 
-  const handleSkipJob = async (jobId: string) => {
+  const handleSkipRequest = (jobId: string) => {
+    const job = localJobs.find(j => j.id === jobId);
+    if (job) {
+      setJobToSkip(job);
+      setSkipConfirmOpen(true);
+    }
+  };
+
+  const handleConfirmSkip = async () => {
+    if (!jobToSkip) return;
+    
+    const jobId = jobToSkip.id;
+    setSkipConfirmOpen(false);
+    
     // Optimistically remove from local state
     setLocalJobs(prev => prev.filter(job => job.id !== jobId));
     
@@ -72,6 +97,8 @@ const Index = () => {
     } catch (error) {
       // Rollback on error
       setLocalJobs(pendingJobs);
+    } finally {
+      setJobToSkip(null);
     }
   };
 
@@ -120,7 +147,7 @@ const Index = () => {
                     key={job.id}
                     job={job}
                     onComplete={handleCompleteJob}
-                    onSkip={handleSkipJob}
+                    onSkip={handleSkipRequest}
                     index={index}
                   />
                 ))}
@@ -148,6 +175,27 @@ const Index = () => {
         onOpenChange={setRescheduleModalOpen}
         onReschedule={handleReschedule}
       />
+
+      <AlertDialog open={skipConfirmOpen} onOpenChange={setSkipConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Skip this job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {jobToSkip && (
+                <>
+                  This will reschedule <strong>{jobToSkip.customer.name}</strong> at{' '}
+                  <strong>{jobToSkip.customer.address}</strong> to the next scheduled interval 
+                  ({jobToSkip.customer.frequency_weeks} weeks from today).
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSkip}>Skip Job</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <BottomNav />
     </div>
