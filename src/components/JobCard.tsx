@@ -1,4 +1,4 @@
-import { Check, MapPin } from 'lucide-react';
+import { Check, MapPin, SkipForward } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -6,12 +6,17 @@ import { cn } from '@/lib/utils';
 interface JobCardProps {
   job: JobWithCustomer;
   onComplete: (jobId: string) => void;
+  onSkip: (jobId: string) => void;
   index: number;
 }
 
-export function JobCard({ job, onComplete, index }: JobCardProps) {
+export function JobCard({ job, onComplete, onSkip, index }: JobCardProps) {
   const handleComplete = () => {
     onComplete(job.id);
+  };
+
+  const handleSkip = () => {
+    onSkip(job.id);
   };
 
   return (
@@ -45,12 +50,26 @@ export function JobCard({ job, onComplete, index }: JobCardProps) {
         </div>
       </div>
 
+      {/* Skip Button */}
+      <motion.button
+        whileTap={{ scale: 0.95 }}
+        onClick={handleSkip}
+        className={cn(
+          "w-16 flex items-center justify-center",
+          "bg-muted hover:bg-muted/80 transition-colors border-r border-border",
+          "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
+        )}
+        aria-label={`Skip ${job.customer.name}`}
+      >
+        <SkipForward className="w-6 h-6 text-muted-foreground" />
+      </motion.button>
+
       {/* Complete Button */}
       <motion.button
         whileTap={{ scale: 0.95 }}
         onClick={handleComplete}
         className={cn(
-          "w-24 flex items-center justify-center",
+          "w-20 flex items-center justify-center",
           "bg-accent hover:bg-accent/90 transition-colors",
           "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
         )}

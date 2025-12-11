@@ -365,6 +365,45 @@ export function useSupabaseData() {
     },
   });
 
+  // Skip job mutation - reschedules to next frequency interval without marking complete
+  const skipJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      // Try to find in pending jobs first, then upcoming jobs
+      const job = pendingJobs.find(j => j.id === jobId) || upcomingJobs.find(j => j.id === jobId);
+      if (!job) throw new Error('Job not found');
+
+      const now = new Date();
+      const nextDate = addWeeks(now, job.customer.frequency_weeks);
+      const nextScheduledDate = format(nextDate, 'yyyy-MM-dd');
+
+      const { error } = await supabase
+        .from('jobs')
+        .update({ scheduled_date: nextScheduledDate })
+        .eq('id', jobId);
+
+      if (error) throw error;
+
+      return {
+        nextDate: format(nextDate, 'dd MMM yyyy'),
+      };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      toast({
+        title: 'Job skipped',
+        description: `Rescheduled to ${result.nextDate}`,
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const completeJob = (jobId: string) => {
     return completeJobMutation.mutateAsync(jobId);
   };
@@ -402,6 +441,10 @@ export function useSupabaseData() {
     return rescheduleJobMutation.mutateAsync({ jobId, newDate });
   };
 
+  const skipJob = (jobId: string) => {
+    return skipJobMutation.mutateAsync(jobId);
+  };
+
   const businessName = profile?.business_name || 'My Window Cleaning';
   const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading;
 
@@ -418,6 +461,7 @@ export function useSupabaseData() {
     archiveCustomer,
     updateBusinessName,
     rescheduleJob,
+    skipJob,
     isLoading,
     userEmail: user?.email || '',
   };
