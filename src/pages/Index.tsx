@@ -14,7 +14,7 @@ import { Sparkles } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 
 const Index = () => {
-  const { pendingJobs, upcomingJobs, completeJob, rescheduleJob, isLoading } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, completeJob, rescheduleJob, skipJob, isLoading } = useSupabaseData();
   const { toast } = useToast();
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
@@ -63,6 +63,18 @@ const Index = () => {
     }
   };
 
+  const handleSkipJob = async (jobId: string) => {
+    // Optimistically remove from local state
+    setLocalJobs(prev => prev.filter(job => job.id !== jobId));
+    
+    try {
+      await skipJob(jobId);
+    } catch (error) {
+      // Rollback on error
+      setLocalJobs(pendingJobs);
+    }
+  };
+
   const handleJobClick = (job: JobWithCustomer) => {
     setSelectedJob(job);
     setRescheduleModalOpen(true);
@@ -108,6 +120,7 @@ const Index = () => {
                     key={job.id}
                     job={job}
                     onComplete={handleCompleteJob}
+                    onSkip={handleSkipJob}
                     index={index}
                   />
                 ))}
