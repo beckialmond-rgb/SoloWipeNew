@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Customer, JobWithCustomer } from '@/types/database';
-import { format, addWeeks } from 'date-fns';
+import { format, addWeeks, startOfWeek, subWeeks } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 
 export function useSupabaseData() {
@@ -124,6 +124,68 @@ export function useSupabaseData() {
     },
     enabled: !!user,
   });
+
+  // Fetch weekly earnings (last 8 weeks of completed jobs)
+  const eightWeeksAgo = format(subWeeks(new Date(), 8), 'yyyy-MM-dd');
+  
+  const { data: weeklyEarningsData = [], isLoading: weeklyLoading } = useQuery({
+    queryKey: ['weeklyEarnings', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          customer:customers(*)
+        `)
+        .eq('status', 'completed')
+        .gte('completed_at', `${eightWeeksAgo}T00:00:00`)
+        .order('completed_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      return (data || []).map(job => ({
+        ...job,
+        customer: job.customer as Customer,
+      })) as JobWithCustomer[];
+    },
+    enabled: !!user,
+  });
+
+  // Group jobs by week and calculate totals
+  const weeklyEarnings = (() => {
+    const weeks: { weekStart: Date; weekLabel: string; total: number; jobCount: number }[] = [];
+    
+    // Create last 8 weeks
+    for (let i = 0; i < 8; i++) {
+      const weekStart = startOfWeek(subWeeks(new Date(), i), { weekStartsOn: 1 });
+      weeks.push({
+        weekStart,
+        weekLabel: i === 0 ? 'This Week' : i === 1 ? 'Last Week' : format(weekStart, 'd MMM'),
+        total: 0,
+        jobCount: 0,
+      });
+    }
+    
+    // Assign jobs to weeks
+    weeklyEarningsData.forEach(job => {
+      if (!job.completed_at) return;
+      const jobDate = new Date(job.completed_at);
+      const jobWeekStart = startOfWeek(jobDate, { weekStartsOn: 1 });
+      
+      const week = weeks.find(w => 
+        format(w.weekStart, 'yyyy-MM-dd') === format(jobWeekStart, 'yyyy-MM-dd')
+      );
+      
+      if (week) {
+        week.total += job.amount_collected || 0;
+        week.jobCount += 1;
+      }
+    });
+    
+    return weeks;
+  })();
 
   // Calculate today's earnings
   const todayEarnings = completedToday.reduce(
@@ -446,7 +508,7 @@ export function useSupabaseData() {
   };
 
   const businessName = profile?.business_name || 'My Window Cleaning';
-  const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading;
+  const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading;
 
   return {
     customers,
@@ -454,6 +516,7 @@ export function useSupabaseData() {
     upcomingJobs,
     completedToday,
     todayEarnings,
+    weeklyEarnings,
     businessName,
     completeJob,
     addCustomer,
