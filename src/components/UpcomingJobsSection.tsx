@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, isTomorrow, isThisWeek } from 'date-fns';
-import { Calendar, MapPin, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calendar, MapPin, ChevronDown, ChevronUp, SkipForward } from 'lucide-react';
 import { useState } from 'react';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 interface UpcomingJobsSectionProps {
   jobs: JobWithCustomer[];
   onJobClick?: (job: JobWithCustomer) => void;
+  onSkip?: (job: JobWithCustomer) => void;
 }
 
 interface GroupedJobs {
@@ -16,7 +17,7 @@ interface GroupedJobs {
   later: JobWithCustomer[];
 }
 
-export function UpcomingJobsSection({ jobs, onJobClick }: UpcomingJobsSectionProps) {
+export function UpcomingJobsSection({ jobs, onJobClick, onSkip }: UpcomingJobsSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Group jobs by date category
@@ -77,17 +78,17 @@ export function UpcomingJobsSection({ jobs, onJobClick }: UpcomingJobsSectionPro
           >
             {/* Tomorrow */}
             {groupedJobs.tomorrow.length > 0 && (
-              <JobGroup title="Tomorrow" jobs={groupedJobs.tomorrow} onJobClick={onJobClick} />
+              <JobGroup title="Tomorrow" jobs={groupedJobs.tomorrow} onJobClick={onJobClick} onSkip={onSkip} />
             )}
 
             {/* This Week */}
             {groupedJobs.thisWeek.length > 0 && (
-              <JobGroup title="This Week" jobs={groupedJobs.thisWeek} onJobClick={onJobClick} />
+              <JobGroup title="This Week" jobs={groupedJobs.thisWeek} onJobClick={onJobClick} onSkip={onSkip} />
             )}
 
             {/* Later */}
             {groupedJobs.later.length > 0 && (
-              <JobGroup title="Later" jobs={groupedJobs.later} onJobClick={onJobClick} />
+              <JobGroup title="Later" jobs={groupedJobs.later} onJobClick={onJobClick} onSkip={onSkip} />
             )}
           </motion.div>
         )}
@@ -100,15 +101,16 @@ interface JobGroupProps {
   title: string;
   jobs: JobWithCustomer[];
   onJobClick?: (job: JobWithCustomer) => void;
+  onSkip?: (job: JobWithCustomer) => void;
 }
 
-function JobGroup({ title, jobs, onJobClick }: JobGroupProps) {
+function JobGroup({ title, jobs, onJobClick, onSkip }: JobGroupProps) {
   return (
     <div>
       <h3 className="text-sm font-medium text-muted-foreground mb-2">{title}</h3>
       <div className="space-y-2">
         {jobs.map((job) => (
-          <UpcomingJobCard key={job.id} job={job} onClick={onJobClick} />
+          <UpcomingJobCard key={job.id} job={job} onClick={onJobClick} onSkip={onSkip} />
         ))}
       </div>
     </div>
@@ -118,48 +120,72 @@ function JobGroup({ title, jobs, onJobClick }: JobGroupProps) {
 interface UpcomingJobCardProps {
   job: JobWithCustomer;
   onClick?: (job: JobWithCustomer) => void;
+  onSkip?: (job: JobWithCustomer) => void;
 }
 
-function UpcomingJobCard({ job, onClick }: UpcomingJobCardProps) {
+function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
   const jobDate = new Date(job.scheduled_date);
   const formattedDate = isTomorrow(jobDate)
     ? 'Tomorrow'
     : format(jobDate, 'EEE, d MMM');
 
+  const handleSkip = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSkip?.(job);
+  };
+
   return (
-    <motion.button
+    <motion.div
       layout
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
-      onClick={() => onClick?.(job)}
       className={cn(
-        "w-full flex items-center justify-between text-left",
-        "p-4 rounded-xl bg-muted/50",
-        "border border-border/50",
-        "hover:bg-muted transition-colors",
-        "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        "flex items-stretch rounded-xl bg-muted/50",
+        "border border-border/50 overflow-hidden"
       )}
     >
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-foreground truncate">
-          {job.customer.name}
-        </p>
-        <div className="flex items-center gap-1 mt-1">
-          <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-          <p className="text-sm text-muted-foreground truncate">
-            {job.customer.address}
+      <button
+        onClick={() => onClick?.(job)}
+        className={cn(
+          "flex-1 flex items-center justify-between text-left p-4",
+          "hover:bg-muted transition-colors",
+          "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+        )}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-foreground truncate">
+            {job.customer.name}
+          </p>
+          <div className="flex items-center gap-1 mt-1">
+            <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+            <p className="text-sm text-muted-foreground truncate">
+              {job.customer.address}
+            </p>
+          </div>
+        </div>
+        
+        <div className="text-right ml-4 flex-shrink-0">
+          <p className="text-sm font-medium text-primary">
+            {formattedDate}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            £{job.customer.price}
           </p>
         </div>
-      </div>
-      
-      <div className="text-right ml-4 flex-shrink-0">
-        <p className="text-sm font-medium text-primary">
-          {formattedDate}
-        </p>
-        <p className="text-sm text-muted-foreground">
-          £{job.customer.price}
-        </p>
-      </div>
-    </motion.button>
+      </button>
+
+      {/* Skip Button */}
+      <button
+        onClick={handleSkip}
+        className={cn(
+          "w-12 flex items-center justify-center",
+          "bg-muted hover:bg-muted/80 transition-colors border-l border-border/50",
+          "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
+        )}
+        aria-label={`Skip ${job.customer.name}`}
+      >
+        <SkipForward className="w-4 h-4 text-muted-foreground" />
+      </button>
+    </motion.div>
   );
 }
