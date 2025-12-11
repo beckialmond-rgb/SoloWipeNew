@@ -75,11 +75,15 @@ const Index = () => {
     }
   };
 
-  const handleSkipRequest = (jobId: string) => {
+  const handleSkipRequest = (job: JobWithCustomer) => {
+    setJobToSkip(job);
+    setSkipConfirmOpen(true);
+  };
+
+  const handleSkipRequestById = (jobId: string) => {
     const job = localJobs.find(j => j.id === jobId);
     if (job) {
-      setJobToSkip(job);
-      setSkipConfirmOpen(true);
+      handleSkipRequest(job);
     }
   };
 
@@ -147,7 +151,7 @@ const Index = () => {
                     key={job.id}
                     job={job}
                     onComplete={handleCompleteJob}
-                    onSkip={handleSkipRequest}
+                    onSkip={handleSkipRequestById}
                     index={index}
                   />
                 ))}
@@ -164,7 +168,7 @@ const Index = () => {
             )}
 
             {/* Upcoming Jobs Section */}
-            <UpcomingJobsSection jobs={upcomingJobs} onJobClick={handleJobClick} />
+            <UpcomingJobsSection jobs={upcomingJobs} onJobClick={handleJobClick} onSkip={handleSkipRequest} />
           </>
         )}
       </main>
