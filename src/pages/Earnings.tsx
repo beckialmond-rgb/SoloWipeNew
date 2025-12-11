@@ -3,12 +3,13 @@ import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { EarningsCard } from '@/components/EarningsCard';
 import { CompletedJobItem } from '@/components/CompletedJobItem';
+import { WeeklyEarningsSummary } from '@/components/WeeklyEarningsSummary';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 
 const Earnings = () => {
-  const { completedToday, todayEarnings, isLoading } = useSupabaseData();
+  const { completedToday, todayEarnings, weeklyEarnings, isLoading } = useSupabaseData();
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -21,6 +22,11 @@ const Earnings = () => {
           <>
             {/* Total Earnings Card */}
             <EarningsCard amount={todayEarnings} label="Total Earned Today" />
+
+            {/* Weekly Summary */}
+            <div className="mt-8">
+              <WeeklyEarningsSummary weeks={weeklyEarnings} />
+            </div>
 
             {/* Recent Completions */}
             <div className="mt-8">
