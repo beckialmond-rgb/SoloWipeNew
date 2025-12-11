@@ -10,7 +10,7 @@ import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, SkipForward } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import {
   AlertDialog,
@@ -22,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
   const { pendingJobs, upcomingJobs, completeJob, rescheduleJob, skipJob, isLoading } = useSupabaseData();
@@ -32,6 +33,8 @@ const Index = () => {
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
   const [skipConfirmOpen, setSkipConfirmOpen] = useState(false);
   const [jobToSkip, setJobToSkip] = useState<JobWithCustomer | null>(null);
+  const [skipAllConfirmOpen, setSkipAllConfirmOpen] = useState(false);
+  const [isSkippingAll, setIsSkippingAll] = useState(false);
 
   // Sync local jobs with fetched pending jobs
   useEffect(() => {
@@ -106,6 +109,46 @@ const Index = () => {
     }
   };
 
+  const handleSkipAllRequest = () => {
+    if (localJobs.length > 0) {
+      setSkipAllConfirmOpen(true);
+    }
+  };
+
+  const handleConfirmSkipAll = async () => {
+    if (localJobs.length === 0) return;
+    
+    setSkipAllConfirmOpen(false);
+    setIsSkippingAll(true);
+    
+    const jobsToSkip = [...localJobs];
+    
+    // Optimistically clear local state
+    setLocalJobs([]);
+    
+    try {
+      // Skip all jobs in sequence
+      for (const job of jobsToSkip) {
+        await skipJob(job.id);
+      }
+      
+      toast({
+        title: 'All jobs skipped',
+        description: `${jobsToSkip.length} jobs rescheduled to their next intervals.`,
+      });
+    } catch (error) {
+      // Rollback on error
+      setLocalJobs(pendingJobs);
+      toast({
+        title: 'Error',
+        description: 'Failed to skip some jobs. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSkippingAll(false);
+    }
+  };
+
   const handleJobClick = (job: JobWithCustomer) => {
     setSelectedJob(job);
     setRescheduleModalOpen(true);
@@ -125,12 +168,12 @@ const Index = () => {
           <LoadingState message="Loading your jobs..." />
         ) : (
           <>
-            {/* Jobs count badge */}
+            {/* Jobs count badge and Skip All button */}
             {localJobs.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6"
+                className="mb-6 flex items-center justify-between"
               >
                 <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full">
                   <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
@@ -140,6 +183,17 @@ const Index = () => {
                     {localJobs.length === 1 ? 'job' : 'jobs'} today
                   </span>
                 </div>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSkipAllRequest}
+                  disabled={isSkippingAll}
+                  className="gap-1.5"
+                >
+                  <SkipForward className="w-4 h-4" />
+                  Skip All
+                </Button>
               </motion.div>
             )}
 
@@ -197,6 +251,22 @@ const Index = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmSkip}>Skip Job</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={skipAllConfirmOpen} onOpenChange={setSkipAllConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Skip all jobs for today?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reschedule all {localJobs.length} pending {localJobs.length === 1 ? 'job' : 'jobs'} to their 
+              next scheduled intervals based on each customer's frequency.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSkipAll}>Skip All Jobs</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
