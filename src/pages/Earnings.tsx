@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { PoundSterling } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -5,12 +6,28 @@ import { EarningsCard } from '@/components/EarningsCard';
 import { CompletedJobItem } from '@/components/CompletedJobItem';
 import { WeeklyEarningsSummary } from '@/components/WeeklyEarningsSummary';
 import { MonthlyEarningsChart } from '@/components/MonthlyEarningsChart';
+import { MarkPaidModal } from '@/components/MarkPaidModal';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { JobWithCustomer } from '@/types/database';
 
 const Earnings = () => {
-  const { completedToday, todayEarnings, weeklyEarnings, isLoading } = useSupabaseData();
+  const { completedToday, todayEarnings, weeklyEarnings, markJobPaid, isLoading } = useSupabaseData();
+  const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
+  const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
+
+  const handleMarkPaid = (job: JobWithCustomer) => {
+    setSelectedJob(job);
+    setIsMarkPaidOpen(true);
+  };
+
+  const handleConfirmPaid = async (method: 'cash' | 'transfer') => {
+    if (!selectedJob) return;
+    await markJobPaid(selectedJob.id, method);
+    setIsMarkPaidOpen(false);
+    setSelectedJob(null);
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -43,7 +60,12 @@ const Earnings = () => {
               {completedToday.length > 0 ? (
                 <div className="space-y-3">
                   {completedToday.map((job, index) => (
-                    <CompletedJobItem key={job.id} job={job} index={index} />
+                    <CompletedJobItem 
+                      key={job.id} 
+                      job={job} 
+                      index={index}
+                      onMarkPaid={handleMarkPaid}
+                    />
                   ))}
                 </div>
               ) : (
@@ -59,6 +81,13 @@ const Earnings = () => {
       </main>
 
       <BottomNav />
+
+      <MarkPaidModal
+        isOpen={isMarkPaidOpen}
+        job={selectedJob}
+        onClose={() => setIsMarkPaidOpen(false)}
+        onConfirm={handleConfirmPaid}
+      />
     </div>
   );
 };
