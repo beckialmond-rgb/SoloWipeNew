@@ -10,7 +10,8 @@ import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
-import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock } from 'lucide-react';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import {
   AlertDialog,
@@ -25,7 +26,7 @@ import {
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
-  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, completeJob, rescheduleJob, skipJob, isLoading } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, completeJob, rescheduleJob, skipJob, refetchAll, isLoading } = useSupabaseData();
   const { toast } = useToast();
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
@@ -35,6 +36,18 @@ const Index = () => {
   const [jobToSkip, setJobToSkip] = useState<JobWithCustomer | null>(null);
   const [skipAllConfirmOpen, setSkipAllConfirmOpen] = useState(false);
   const [isSkippingAll, setIsSkippingAll] = useState(false);
+
+  // Pull to refresh
+  const { isPulling, isRefreshing, pullDistance, handlers } = usePullToRefresh({
+    onRefresh: async () => {
+      await refetchAll();
+      toast({
+        title: 'Refreshed',
+        description: 'Jobs updated',
+        duration: 2000,
+      });
+    },
+  });
 
   // Sync local jobs with fetched pending jobs
   useEffect(() => {
@@ -160,8 +173,32 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div 
+      className="min-h-screen bg-background pb-20"
+      {...handlers}
+    >
       <Header showLogo />
+
+      {/* Pull to refresh indicator */}
+      <motion.div
+        className="flex items-center justify-center overflow-hidden"
+        style={{ height: pullDistance }}
+        animate={{ height: isRefreshing ? 60 : pullDistance }}
+      >
+        <motion.div
+          animate={{ rotate: isRefreshing ? 360 : 0 }}
+          transition={{ duration: 1, repeat: isRefreshing ? Infinity : 0, ease: 'linear' }}
+        >
+          <RefreshCw 
+            className={`w-6 h-6 ${pullDistance >= 80 || isRefreshing ? 'text-primary' : 'text-muted-foreground'}`} 
+          />
+        </motion.div>
+        {(isPulling || isRefreshing) && (
+          <span className="ml-2 text-sm text-muted-foreground">
+            {isRefreshing ? 'Refreshing...' : pullDistance >= 80 ? 'Release to refresh' : 'Pull to refresh'}
+          </span>
+        )}
+      </motion.div>
 
       <main className="px-4 py-6 max-w-lg mx-auto">
         {isLoading ? (
