@@ -416,6 +416,7 @@ export function useSupabaseData() {
         mobile_phone: string | null;
         price: number;
         frequency_weeks: number;
+        notes?: string | null;
       };
     }) => {
       const { error } = await supabase

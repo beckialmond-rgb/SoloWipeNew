@@ -14,6 +14,7 @@ const generateDemoCustomers = (): Customer[] => [
     frequency_weeks: 4,
     status: 'active',
     gocardless_id: null,
+    notes: 'Gate code: 1234. Friendly dog.',
     created_at: new Date().toISOString(),
   },
   {
@@ -26,6 +27,7 @@ const generateDemoCustomers = (): Customer[] => [
     frequency_weeks: 4,
     status: 'active',
     gocardless_id: null,
+    notes: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -38,6 +40,7 @@ const generateDemoCustomers = (): Customer[] => [
     frequency_weeks: 2,
     status: 'active',
     gocardless_id: null,
+    notes: 'Back garden access via side gate.',
     created_at: new Date().toISOString(),
   },
   {
@@ -50,6 +53,7 @@ const generateDemoCustomers = (): Customer[] => [
     frequency_weeks: 4,
     status: 'active',
     gocardless_id: null,
+    notes: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -62,6 +66,7 @@ const generateDemoCustomers = (): Customer[] => [
     frequency_weeks: 3,
     status: 'active',
     gocardless_id: null,
+    notes: 'Ring doorbell. Conservatory at back.',
     created_at: new Date().toISOString(),
   },
 ];

@@ -7,6 +7,7 @@ import { CustomerCard } from '@/components/CustomerCard';
 import { CustomerDetailModal } from '@/components/CustomerDetailModal';
 import { AddCustomerModal } from '@/components/AddCustomerModal';
 import { EditCustomerModal } from '@/components/EditCustomerModal';
+import { CustomerHistoryModal } from '@/components/CustomerHistoryModal';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
@@ -19,6 +20,7 @@ const Customers = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
 
   const filteredCustomers = customers.filter(
     customer =>
@@ -34,6 +36,11 @@ const Customers = () => {
   const handleArchiveCustomer = async (customerId: string) => {
     await archiveCustomer(customerId);
     setSelectedCustomer(null);
+  };
+
+  const handleViewHistory = (customer: Customer) => {
+    setSelectedCustomer(null);
+    setHistoryCustomer(customer);
   };
 
   return (
@@ -155,6 +162,7 @@ const Customers = () => {
           onClose={() => setSelectedCustomer(null)}
           onEdit={handleEditCustomer}
           onArchive={handleArchiveCustomer}
+          onViewHistory={handleViewHistory}
         />
       )}
 
@@ -171,6 +179,13 @@ const Customers = () => {
         isOpen={!!editingCustomer}
         onClose={() => setEditingCustomer(null)}
         onSubmit={updateCustomer}
+      />
+
+      {/* Customer History Modal */}
+      <CustomerHistoryModal
+        customer={historyCustomer}
+        isOpen={!!historyCustomer}
+        onClose={() => setHistoryCustomer(null)}
       />
     </div>
   );
