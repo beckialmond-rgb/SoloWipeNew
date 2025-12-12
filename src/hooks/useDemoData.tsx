@@ -15,6 +15,7 @@ const generateDemoCustomers = (): Customer[] => [
     status: 'active',
     gocardless_id: null,
     notes: 'Gate code: 1234. Friendly dog.',
+    archived_at: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -28,6 +29,7 @@ const generateDemoCustomers = (): Customer[] => [
     status: 'active',
     gocardless_id: null,
     notes: null,
+    archived_at: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -41,6 +43,7 @@ const generateDemoCustomers = (): Customer[] => [
     status: 'active',
     gocardless_id: null,
     notes: 'Back garden access via side gate.',
+    archived_at: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -54,6 +57,7 @@ const generateDemoCustomers = (): Customer[] => [
     status: 'active',
     gocardless_id: null,
     notes: null,
+    archived_at: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -66,7 +70,8 @@ const generateDemoCustomers = (): Customer[] => [
     frequency_weeks: 3,
     status: 'active',
     gocardless_id: null,
-    notes: 'Ring doorbell. Conservatory at back.',
+    notes: 'Conservatory at back.',
+    archived_at: null,
     created_at: new Date().toISOString(),
   },
 ];
@@ -86,6 +91,7 @@ const generateDemoJobs = (customers: Customer[]): JobWithCustomer[] =>
     payment_date: null,
     invoice_number: null,
     notes: null,
+    cancelled_at: null,
     created_at: new Date().toISOString(),
     customer,
   }));
@@ -124,6 +130,7 @@ export function useDemoData() {
       payment_date: null,
       invoice_number: null,
       notes: null,
+      cancelled_at: null,
       created_at: new Date().toISOString(),
       customer: job.customer,
     };
