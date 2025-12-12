@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Check, Clock } from 'lucide-react';
+import { Check, Clock, CheckCircle, Circle } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,8 @@ export function CompletedJobItem({ job, index }: CompletedJobItemProps) {
   const completedTime = job.completed_at 
     ? format(new Date(job.completed_at), 'HH:mm')
     : '';
+
+  const isPaid = job.payment_status === 'paid';
 
   return (
     <motion.div
@@ -37,12 +39,22 @@ export function CompletedJobItem({ job, index }: CompletedJobItemProps) {
       </div>
 
       <div className="text-right">
-        <p className="font-bold text-accent">
-          £{job.amount_collected}
-        </p>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <div className="flex items-center justify-end gap-1.5">
+          <p className="font-bold text-accent">
+            £{job.amount_collected}
+          </p>
+          {isPaid ? (
+            <CheckCircle className="w-4 h-4 text-green-500" />
+          ) : (
+            <Circle className="w-4 h-4 text-amber-500 fill-amber-500" />
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground mt-0.5">
           <Clock className="w-3 h-3" />
           {completedTime}
+          {isPaid && job.payment_method && (
+            <span className="capitalize ml-1">• {job.payment_method}</span>
+          )}
         </div>
       </div>
     </motion.div>
