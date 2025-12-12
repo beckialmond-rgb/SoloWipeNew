@@ -58,6 +58,7 @@ export function useSupabaseData() {
           customer:customers(*)
         `)
         .eq('status', 'pending')
+        .is('cancelled_at', null)
         .lte('scheduled_date', today)
         .order('scheduled_date');
       
@@ -111,6 +112,7 @@ export function useSupabaseData() {
           customer:customers(*)
         `)
         .eq('status', 'pending')
+        .is('cancelled_at', null)
         .gt('scheduled_date', today)
         .lte('scheduled_date', fourWeeksFromNow)
         .order('scheduled_date');
@@ -622,6 +624,33 @@ export function useSupabaseData() {
     },
   });
 
+  // Update Google Review Link mutation
+  const updateGoogleReviewLinkMutation = useMutation({
+    mutationFn: async (link: string | null) => {
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase
+        .from('profiles')
+        .update({ google_review_link: link })
+        .eq('id', user.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      toast({
+        title: 'Google review link updated!',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   // Reschedule job mutation
   const rescheduleJobMutation = useMutation({
     mutationFn: async ({ jobId, newDate }: { jobId: string; newDate: string }) => {
@@ -862,7 +891,12 @@ export function useSupabaseData() {
     return rescheduleJobMutation.mutateAsync({ jobId, newDate: originalDate });
   };
 
+  const updateGoogleReviewLink = (link: string | null) => {
+    return updateGoogleReviewLinkMutation.mutateAsync(link);
+  };
+
   const businessName = profile?.business_name || 'My Window Cleaning';
+  const googleReviewLink = profile?.google_review_link;
   const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading || archivedLoading;
 
   const refetchAll = async () => {
@@ -885,12 +919,14 @@ export function useSupabaseData() {
     totalOutstanding,
     recentlyArchivedCustomers,
     businessName,
+    profile,
     completeJob,
     addCustomer,
     updateCustomer,
     archiveCustomer,
     unarchiveCustomer,
     updateBusinessName,
+    updateGoogleReviewLink,
     rescheduleJob,
     skipJob,
     markJobPaid,

@@ -4,6 +4,7 @@ import { CalendarIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -57,6 +58,7 @@ export function RescheduleJobModal({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Reschedule Job</DialogTitle>
+          <DialogDescription className="sr-only">Select a new date for this job</DialogDescription>
         </DialogHeader>
         
         {job && (
