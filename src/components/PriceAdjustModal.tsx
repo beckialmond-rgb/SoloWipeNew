@@ -25,10 +25,17 @@ export const PriceAdjustModal = ({
   const [amount, setAmount] = useState(0);
 
   useEffect(() => {
-    if (job) {
+    if (job && isOpen) {
       setAmount(job.customer.price);
     }
-  }, [job]);
+  }, [job, isOpen]);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setAmount(0);
+    }
+  }, [isOpen]);
 
   if (!isOpen || !job) return null;
 
