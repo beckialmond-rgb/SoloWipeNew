@@ -4,10 +4,13 @@ import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { format } from 'date-fns';
 
 export function BottomNav() {
   const { user } = useAuth();
+  const today = format(new Date(), 'yyyy-MM-dd');
 
+  // Count unpaid jobs
   const { data: unpaidCount = 0 } = useQuery({
     queryKey: ['unpaidCount', user?.id],
     queryFn: async () => {
@@ -23,21 +26,40 @@ export function BottomNav() {
       return count || 0;
     },
     enabled: !!user,
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
+  });
+
+  // Count today's pending jobs
+  const { data: pendingTodayCount = 0 } = useQuery({
+    queryKey: ['pendingTodayCount', user?.id, today],
+    queryFn: async () => {
+      if (!user) return 0;
+      
+      const { count, error } = await supabase
+        .from('jobs')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .lte('scheduled_date', today);
+      
+      if (error) return 0;
+      return count || 0;
+    },
+    enabled: !!user,
+    refetchInterval: 30000,
   });
 
   const navItems = [
-    { to: '/', icon: Home, label: 'Today', badge: 0 },
-    { to: '/customers', icon: Users, label: 'Customers', badge: 0 },
-    { to: '/money', icon: Wallet, label: 'Money', badge: unpaidCount },
-    { to: '/earnings', icon: TrendingUp, label: 'Earnings', badge: 0 },
-    { to: '/settings', icon: Settings, label: 'Settings', badge: 0 },
+    { to: '/', icon: Home, label: 'Today', badge: pendingTodayCount, badgeColor: 'bg-primary' },
+    { to: '/customers', icon: Users, label: 'Customers', badge: 0, badgeColor: '' },
+    { to: '/money', icon: Wallet, label: 'Money', badge: unpaidCount, badgeColor: 'bg-amber-500' },
+    { to: '/earnings', icon: TrendingUp, label: 'Earnings', badge: 0, badgeColor: '' },
+    { to: '/settings', icon: Settings, label: 'Settings', badge: 0, badgeColor: '' },
   ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-bottom">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
-        {navItems.map(({ to, icon: Icon, label, badge }) => (
+        {navItems.map(({ to, icon: Icon, label, badge, badgeColor }) => (
           <NavLink
             key={to}
             to={to}
@@ -50,7 +72,10 @@ export function BottomNav() {
             <div className="relative">
               <Icon className="w-6 h-6" />
               {badge > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold text-white bg-amber-500 rounded-full px-1">
+                <span className={cn(
+                  "absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold text-white rounded-full px-1",
+                  badgeColor || 'bg-primary'
+                )}>
                   {badge > 99 ? '99+' : badge}
                 </span>
               )}
