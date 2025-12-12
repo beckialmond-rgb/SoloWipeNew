@@ -16,6 +16,8 @@ const generateDemoCustomers = (): Customer[] => [
     gocardless_id: null,
     notes: 'Gate code: 1234. Friendly dog.',
     archived_at: null,
+    latitude: null,
+    longitude: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -30,6 +32,8 @@ const generateDemoCustomers = (): Customer[] => [
     gocardless_id: null,
     notes: null,
     archived_at: null,
+    latitude: null,
+    longitude: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -44,6 +48,8 @@ const generateDemoCustomers = (): Customer[] => [
     gocardless_id: null,
     notes: 'Back garden access via side gate.',
     archived_at: null,
+    latitude: null,
+    longitude: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -58,6 +64,8 @@ const generateDemoCustomers = (): Customer[] => [
     gocardless_id: null,
     notes: null,
     archived_at: null,
+    latitude: null,
+    longitude: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -72,6 +80,8 @@ const generateDemoCustomers = (): Customer[] => [
     gocardless_id: null,
     notes: 'Conservatory at back.',
     archived_at: null,
+    latitude: null,
+    longitude: null,
     created_at: new Date().toISOString(),
   },
 ];
@@ -92,6 +102,7 @@ const generateDemoJobs = (customers: Customer[]): JobWithCustomer[] =>
     invoice_number: null,
     notes: null,
     cancelled_at: null,
+    photo_url: null,
     created_at: new Date().toISOString(),
     customer,
   }));
@@ -131,6 +142,7 @@ export function useDemoData() {
       invoice_number: null,
       notes: null,
       cancelled_at: null,
+      photo_url: null,
       created_at: new Date().toISOString(),
       customer: job.customer,
     };
