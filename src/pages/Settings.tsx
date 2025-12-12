@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Header } from '@/components/Header';
@@ -122,11 +122,36 @@ const Settings = () => {
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </motion.button>
 
-          {/* Export to Xero */}
+          {/* Earnings Report */}
           <motion.button
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
+            onClick={() => navigate('/earnings')}
+            className={cn(
+              "w-full bg-card rounded-xl border border-border p-4",
+              "flex items-center gap-4 text-left",
+              "hover:bg-muted/50 transition-colors",
+              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            )}
+          >
+            <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
+              <TrendingUp className="w-5 h-5 text-accent" />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-muted-foreground">Reports</p>
+              <p className="font-medium text-foreground">Earnings & Stats</p>
+            </div>
+
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </motion.button>
+
+          {/* Export to Xero */}
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
             onClick={() => setIsExportOpen(true)}
             className={cn(
               "w-full bg-card rounded-xl border border-border p-4",

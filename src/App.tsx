@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Customers from "./pages/Customers";
 import Money from "./pages/Money";
 import Earnings from "./pages/Earnings";
+import Calendar from "./pages/Calendar";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
 import Auth from "./pages/Auth";
@@ -60,6 +61,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Earnings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/calendar"
+                element={
+                  <ProtectedRoute>
+                    <Calendar />
                   </ProtectedRoute>
                 }
               />

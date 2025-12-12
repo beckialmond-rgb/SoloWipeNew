@@ -1,4 +1,4 @@
-import { Home, Users, Wallet, TrendingUp, Settings } from 'lucide-react';
+import { Home, Users, Wallet, CalendarDays, Settings } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
@@ -52,7 +52,7 @@ export function BottomNav() {
     { to: '/', icon: Home, label: 'Today', badge: pendingTodayCount, badgeColor: 'bg-primary' },
     { to: '/customers', icon: Users, label: 'Customers', badge: 0, badgeColor: '' },
     { to: '/money', icon: Wallet, label: 'Money', badge: unpaidCount, badgeColor: 'bg-amber-500' },
-    { to: '/earnings', icon: TrendingUp, label: 'Earnings', badge: 0, badgeColor: '' },
+    { to: '/calendar', icon: CalendarDays, label: 'Calendar', badge: 0, badgeColor: '' },
     { to: '/settings', icon: Settings, label: 'Settings', badge: 0, badgeColor: '' },
   ];
 
