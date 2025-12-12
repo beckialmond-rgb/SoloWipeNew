@@ -1,0 +1,144 @@
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Wallet, CheckCircle, Clock } from 'lucide-react';
+import { Header } from '@/components/Header';
+import { BottomNav } from '@/components/BottomNav';
+import { LoadingState } from '@/components/LoadingState';
+import { EmptyState } from '@/components/EmptyState';
+import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { UnpaidJobCard } from '@/components/UnpaidJobCard';
+import { MarkPaidModal } from '@/components/MarkPaidModal';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { JobWithCustomer } from '@/types/database';
+
+const Money = () => {
+  const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, isLoading } = useSupabaseData();
+  const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
+  const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
+
+  const handleMarkPaid = (job: JobWithCustomer) => {
+    setSelectedJob(job);
+    setIsMarkPaidOpen(true);
+  };
+
+  const handleConfirmPaid = async (method: 'cash' | 'transfer') => {
+    if (!selectedJob) return;
+    await markJobPaid(selectedJob.id, method);
+    setIsMarkPaidOpen(false);
+    setSelectedJob(null);
+  };
+
+  if (isLoading) {
+    return <LoadingState />;
+  }
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      <Header showLogo />
+
+      <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
+        {/* Outstanding Balance Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <Wallet className="w-6 h-6" />
+            <span className="text-white/80 text-sm font-medium">Outstanding Balance</span>
+          </div>
+          <p className="text-4xl font-bold">
+            £{totalOutstanding.toFixed(2)}
+          </p>
+          <p className="text-white/70 text-sm mt-1">
+            {unpaidJobs.length} unpaid {unpaidJobs.length === 1 ? 'job' : 'jobs'}
+          </p>
+        </motion.div>
+
+        {/* Tabs */}
+        <Tabs defaultValue="unpaid" className="w-full">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="unpaid" className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Unpaid ({unpaidJobs.length})
+            </TabsTrigger>
+            <TabsTrigger value="paid" className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              Paid This Week
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="unpaid" className="mt-4 space-y-3">
+            {unpaidJobs.length === 0 ? (
+              <EmptyState
+                icon={<CheckCircle className="w-12 h-12 text-green-500" />}
+                title="All Caught Up!"
+                description="No unpaid jobs to chase."
+              />
+            ) : (
+              unpaidJobs.map((job, index) => (
+                <UnpaidJobCard
+                  key={job.id}
+                  job={job}
+                  index={index}
+                  onMarkPaid={() => handleMarkPaid(job)}
+                />
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="paid" className="mt-4 space-y-3">
+            {paidThisWeek.length === 0 ? (
+              <EmptyState
+                icon={<Wallet className="w-12 h-12 text-muted-foreground" />}
+                title="No Payments This Week"
+                description="Completed payments will appear here."
+              />
+            ) : (
+              paidThisWeek.map((job, index) => (
+                <motion.div
+                  key={job.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  className="bg-card rounded-xl border border-border p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-foreground truncate">
+                        {job.customer.name}
+                      </p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {job.customer.address}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 capitalize">
+                        {job.payment_method} • {job.payment_date ? new Date(job.payment_date).toLocaleDateString() : ''}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-green-600">
+                        £{(job.amount_collected || 0).toFixed(2)}
+                      </p>
+                      <CheckCircle className="w-5 h-5 text-green-500 ml-auto mt-1" />
+                    </div>
+                  </div>
+                </motion.div>
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
+      </main>
+
+      <BottomNav />
+
+      <MarkPaidModal
+        isOpen={isMarkPaidOpen}
+        job={selectedJob}
+        onClose={() => setIsMarkPaidOpen(false)}
+        onConfirm={handleConfirmPaid}
+      />
+    </div>
+  );
+};
+
+export default Money;

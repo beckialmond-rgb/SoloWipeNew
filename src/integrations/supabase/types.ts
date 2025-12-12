@@ -68,6 +68,10 @@ export type Database = {
           created_at: string
           customer_id: string
           id: string
+          invoice_number: string | null
+          payment_date: string | null
+          payment_method: string | null
+          payment_status: string
           scheduled_date: string
           status: string
         }
@@ -77,6 +81,10 @@ export type Database = {
           created_at?: string
           customer_id: string
           id?: string
+          invoice_number?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_status?: string
           scheduled_date: string
           status?: string
         }
@@ -86,6 +94,10 @@ export type Database = {
           created_at?: string
           customer_id?: string
           id?: string
+          invoice_number?: string | null
+          payment_date?: string | null
+          payment_method?: string | null
+          payment_status?: string
           scheduled_date?: string
           status?: string
         }

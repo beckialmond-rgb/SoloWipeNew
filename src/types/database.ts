@@ -24,6 +24,10 @@ export interface Job {
   status: 'pending' | 'completed';
   completed_at: string | null;
   amount_collected: number | null;
+  payment_status: 'unpaid' | 'paid';
+  payment_method: 'gocardless' | 'cash' | 'transfer' | null;
+  payment_date: string | null;
+  invoice_number: string | null;
   created_at: string;
 }
 

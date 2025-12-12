@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { EditBusinessNameModal } from '@/components/EditBusinessNameModal';
+import { ExportEarningsModal } from '@/components/ExportEarningsModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
@@ -16,6 +17,7 @@ const Settings = () => {
   const navigate = useNavigate();
   const { isInstalled } = useInstallPrompt();
   const [isEditBusinessNameOpen, setIsEditBusinessNameOpen] = useState(false);
+  const [isExportOpen, setIsExportOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -76,6 +78,31 @@ const Settings = () => {
               <p className="font-medium text-foreground truncate">{userEmail}</p>
             </div>
           </motion.div>
+
+          {/* Export to Xero */}
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            onClick={() => setIsExportOpen(true)}
+            className={cn(
+              "w-full bg-card rounded-xl border border-border p-4",
+              "flex items-center gap-4 text-left",
+              "hover:bg-muted/50 transition-colors",
+              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            )}
+          >
+            <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
+              <FileSpreadsheet className="w-5 h-5 text-green-600" />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-muted-foreground">Accountant Export</p>
+              <p className="font-medium text-foreground">Export for Xero</p>
+            </div>
+
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </motion.button>
 
           {/* Install App - Only show if not installed */}
           {!isInstalled && (
@@ -139,6 +166,13 @@ const Settings = () => {
         currentName={businessName}
         onClose={() => setIsEditBusinessNameOpen(false)}
         onSubmit={updateBusinessName}
+      />
+
+      {/* Export Earnings Modal */}
+      <ExportEarningsModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        businessName={businessName}
       />
     </div>
   );
