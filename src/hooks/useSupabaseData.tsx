@@ -355,6 +355,7 @@ export function useSupabaseData() {
       price: number;
       frequency_weeks: number;
       first_clean_date: string;
+      notes?: string;
     }) => {
       if (!user) throw new Error('Not authenticated');
 
@@ -369,6 +370,7 @@ export function useSupabaseData() {
           price: data.price,
           frequency_weeks: data.frequency_weeks,
           status: 'active',
+          notes: data.notes || null,
         })
         .select()
         .single();

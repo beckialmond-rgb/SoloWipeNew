@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, MapPin, Phone, PoundSterling, Calendar, Repeat } from 'lucide-react';
+import { X, User, MapPin, Phone, PoundSterling, Calendar, Repeat, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -15,6 +15,7 @@ interface AddCustomerModalProps {
     price: number;
     frequency_weeks: number;
     first_clean_date: string;
+    notes?: string;
   }) => Promise<unknown>;
 }
 
@@ -25,6 +26,7 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
   const [price, setPrice] = useState('20');
   const [frequencyWeeks, setFrequencyWeeks] = useState('4');
   const [firstCleanDate, setFirstCleanDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,6 +42,7 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
         price: parseFloat(price) || 20,
         frequency_weeks: parseInt(frequencyWeeks) || 4,
         first_clean_date: firstCleanDate,
+        notes: notes.trim() || undefined,
       });
       // Reset form
       setName('');
@@ -48,6 +51,7 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
       setPrice('20');
       setFrequencyWeeks('4');
       setFirstCleanDate(format(new Date(), 'yyyy-MM-dd'));
+      setNotes('');
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -214,6 +218,26 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
                     "w-full h-14 px-4 rounded-xl",
                     "bg-muted border-0",
                     "text-foreground",
+                    "focus:outline-none focus:ring-2 focus:ring-primary"
+                  )}
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <FileText className="w-4 h-4" />
+                  Notes
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Gate code, pet warnings, special instructions..."
+                  rows={3}
+                  className={cn(
+                    "w-full px-4 py-3 rounded-xl resize-none",
+                    "bg-muted border-0",
+                    "text-foreground placeholder:text-muted-foreground",
                     "focus:outline-none focus:ring-2 focus:ring-primary"
                   )}
                 />
