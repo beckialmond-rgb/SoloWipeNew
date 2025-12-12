@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from 'next-themes';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { EditBusinessNameModal } from '@/components/EditBusinessNameModal';
@@ -16,6 +17,7 @@ const Settings = () => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const { isInstalled } = useInstallPrompt();
+  const { theme, setTheme } = useTheme();
   const [isEditBusinessNameOpen, setIsEditBusinessNameOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
 
@@ -23,6 +25,22 @@ const Settings = () => {
     await signOut();
     navigate('/auth');
   };
+
+  const getThemeLabel = () => {
+    switch (theme) {
+      case 'light': return 'Light';
+      case 'dark': return 'Dark';
+      default: return 'System';
+    }
+  };
+
+  const cycleTheme = () => {
+    if (theme === 'system') setTheme('light');
+    else if (theme === 'light') setTheme('dark');
+    else setTheme('system');
+  };
+
+  const ThemeIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -78,6 +96,31 @@ const Settings = () => {
               <p className="font-medium text-foreground truncate">{userEmail}</p>
             </div>
           </motion.div>
+
+          {/* Theme Toggle */}
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.12 }}
+            onClick={cycleTheme}
+            className={cn(
+              "w-full bg-card rounded-xl border border-border p-4",
+              "flex items-center gap-4 text-left",
+              "hover:bg-muted/50 transition-colors",
+              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            )}
+          >
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <ThemeIcon className="w-5 h-5 text-primary" />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-muted-foreground">Appearance</p>
+              <p className="font-medium text-foreground">{getThemeLabel()}</p>
+            </div>
+
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </motion.button>
 
           {/* Export to Xero */}
           <motion.button
