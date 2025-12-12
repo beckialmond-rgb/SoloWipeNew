@@ -6,13 +6,16 @@ import { BottomNav } from '@/components/BottomNav';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { useToast } from '@/hooks/use-toast';
 import { UnpaidJobCard } from '@/components/UnpaidJobCard';
 import { MarkPaidModal } from '@/components/MarkPaidModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ToastAction } from '@/components/ui/toast';
 import { JobWithCustomer } from '@/types/database';
 
 const Money = () => {
-  const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, isLoading } = useSupabaseData();
+  const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, undoMarkPaid, isLoading } = useSupabaseData();
+  const { toast, dismiss } = useToast();
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
   const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
 
@@ -23,9 +26,38 @@ const Money = () => {
 
   const handleConfirmPaid = async (method: 'cash' | 'transfer') => {
     if (!selectedJob) return;
-    await markJobPaid(selectedJob.id, method);
+    const jobId = selectedJob.id;
+    const customerName = selectedJob.customer.name;
+    const amount = selectedJob.amount_collected || selectedJob.customer.price;
+    
+    await markJobPaid(jobId, method);
     setIsMarkPaidOpen(false);
     setSelectedJob(null);
+    
+    const { id: toastId } = toast({
+      title: 'Payment recorded!',
+      description: `£${amount} from ${customerName} (${method})`,
+      duration: 5000,
+      action: (
+        <ToastAction
+          altText="Undo"
+          onClick={async () => {
+            dismiss(toastId);
+            try {
+              await undoMarkPaid(jobId);
+            } catch {
+              toast({
+                title: 'Error',
+                description: 'Failed to undo payment',
+                variant: 'destructive',
+              });
+            }
+          }}
+        >
+          Undo
+        </ToastAction>
+      ),
+    });
   };
 
   if (isLoading) {
