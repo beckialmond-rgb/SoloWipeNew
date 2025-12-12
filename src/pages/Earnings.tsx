@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { PoundSterling, Filter, Calendar, Users, List } from 'lucide-react';
+import { PoundSterling, Filter, Calendar, Users, List, Download } from 'lucide-react';
 import { format, startOfWeek, startOfMonth, subMonths } from 'date-fns';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -13,6 +13,7 @@ import { LoadingState } from '@/components/LoadingState';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { JobWithCustomer } from '@/types/database';
 import { Toggle } from '@/components/ui/toggle';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -32,6 +33,8 @@ import {
 import { ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { downloadCSV } from '@/utils/exportCSV';
+import { toast } from '@/hooks/use-toast';
 
 type DateRange = 'today' | 'week' | 'month' | '3months';
 
@@ -183,6 +186,35 @@ const Earnings = () => {
     });
   };
 
+  const handleExportCSV = () => {
+    if (filteredJobs.length === 0) return;
+
+    const headers = ['Customer', 'Address', 'Date', 'Amount', 'Payment Status', 'Payment Method'];
+    const rows = filteredJobs.map(job => [
+      job.customer.name,
+      job.customer.address,
+      job.completed_at ? format(new Date(job.completed_at), 'dd/MM/yyyy') : '',
+      (job.amount_collected || 0).toFixed(2),
+      job.payment_status,
+      job.payment_method || '',
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const rangeLabel = dateRangeOptions.find(o => o.value === dateRange)?.label || dateRange;
+    const filename = `Completed_Jobs_${rangeLabel.replace(/\s/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    
+    downloadCSV(csvContent, filename);
+    
+    toast({
+      title: 'Export complete',
+      description: `Exported ${filteredJobs.length} jobs to CSV.`,
+    });
+  };
+
   const isLoading = baseLoading || jobsLoading;
 
   return (
@@ -293,9 +325,16 @@ const Earnings = () => {
                   </Toggle>
                 )}
 
-                <div className="ml-auto text-sm text-muted-foreground">
-                  £{periodEarnings.toFixed(2)}
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto h-9 gap-1.5"
+                  onClick={() => handleExportCSV()}
+                  disabled={filteredJobs.length === 0}
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export
+                </Button>
               </div>
 
               {filteredJobs.length > 0 ? (
