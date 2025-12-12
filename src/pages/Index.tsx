@@ -4,14 +4,16 @@ import confetti from 'canvas-confetti';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { JobCard } from '@/components/JobCard';
+import { CompletedJobItem } from '@/components/CompletedJobItem';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
+import { JobNotesModal } from '@/components/JobNotesModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
-import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw } from 'lucide-react';
+import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import {
   AlertDialog,
@@ -24,9 +26,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const Index = () => {
-  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, completeJob, rescheduleJob, skipJob, refetchAll, isLoading } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, completeJob, rescheduleJob, skipJob, updateJobNotes, refetchAll, isLoading } = useSupabaseData();
   const { toast } = useToast();
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
@@ -36,6 +39,8 @@ const Index = () => {
   const [jobToSkip, setJobToSkip] = useState<JobWithCustomer | null>(null);
   const [skipAllConfirmOpen, setSkipAllConfirmOpen] = useState(false);
   const [isSkippingAll, setIsSkippingAll] = useState(false);
+  const [notesJob, setNotesJob] = useState<JobWithCustomer | null>(null);
+  const [completedOpen, setCompletedOpen] = useState(true);
 
   // Pull to refresh
   const { isPulling, isRefreshing, pullDistance, handlers } = usePullToRefresh({
@@ -172,6 +177,10 @@ const Index = () => {
     setSelectedJob(null);
   };
 
+  const handleSaveNotes = async (jobId: string, notes: string | null) => {
+    await updateJobNotes(jobId, notes);
+  };
+
   return (
     <div 
       className="min-h-screen bg-background pb-20"
@@ -280,12 +289,34 @@ const Index = () => {
             </div>
 
             {/* Empty state for today */}
-            {localJobs.length === 0 && (
+            {localJobs.length === 0 && completedToday.length === 0 && (
               <EmptyState
                 title="All done for today!"
                 description="Great work! You've completed all your scheduled jobs."
                 icon={<Sparkles className="w-8 h-8 text-accent" />}
               />
+            )}
+
+            {/* Completed Today Section */}
+            {completedToday.length > 0 && (
+              <Collapsible open={completedOpen} onOpenChange={setCompletedOpen} className="mt-8">
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-2">
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Completed Today ({completedToday.length})
+                  </h2>
+                  <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${completedOpen ? 'rotate-180' : ''}`} />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-3 mt-3">
+                  {completedToday.map((job, index) => (
+                    <CompletedJobItem
+                      key={job.id}
+                      job={job}
+                      index={index}
+                      onAddNote={(job) => setNotesJob(job)}
+                    />
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
             )}
 
             {/* Upcoming Jobs Section */}
@@ -299,6 +330,13 @@ const Index = () => {
         open={rescheduleModalOpen}
         onOpenChange={setRescheduleModalOpen}
         onReschedule={handleReschedule}
+      />
+
+      <JobNotesModal
+        job={notesJob}
+        isOpen={!!notesJob}
+        onClose={() => setNotesJob(null)}
+        onSave={handleSaveNotes}
       />
 
       <AlertDialog open={skipConfirmOpen} onOpenChange={setSkipConfirmOpen}>

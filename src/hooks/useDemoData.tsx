@@ -85,6 +85,7 @@ const generateDemoJobs = (customers: Customer[]): JobWithCustomer[] =>
     payment_method: null,
     payment_date: null,
     invoice_number: null,
+    notes: null,
     created_at: new Date().toISOString(),
     customer,
   }));
@@ -122,6 +123,7 @@ export function useDemoData() {
       payment_method: null,
       payment_date: null,
       invoice_number: null,
+      notes: null,
       created_at: new Date().toISOString(),
       customer: job.customer,
     };
