@@ -14,6 +14,7 @@ export interface Customer {
   frequency_weeks: number;
   status: 'active' | 'inactive';
   gocardless_id: string | null;
+  notes: string | null;
   created_at: string;
 }
 
