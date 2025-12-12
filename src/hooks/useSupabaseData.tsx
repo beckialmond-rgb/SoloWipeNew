@@ -289,19 +289,24 @@ export function useSupabaseData() {
       if (updateError) throw updateError;
 
       // 2. Create new job for the future
-      const { error: insertError } = await supabase
+      const { data: newJob, error: insertError } = await supabase
         .from('jobs')
         .insert({
           customer_id: job.customer_id,
           scheduled_date: nextScheduledDate,
           status: 'pending',
-        });
+        })
+        .select()
+        .single();
 
       if (insertError) throw insertError;
 
       return {
+        jobId,
+        newJobId: newJob.id,
         collectedAmount: job.customer.price,
         nextDate: format(nextDate, 'dd MMM yyyy'),
+        customerName: job.customer.name,
       };
     },
     onSuccess: () => {
@@ -328,14 +333,13 @@ export function useSupabaseData() {
         .eq('id', jobId);
 
       if (error) throw error;
+      
+      return { jobId, method };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
       queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
       queryClient.invalidateQueries({ queryKey: ['weeklyEarnings'] });
-      toast({
-        title: 'Payment recorded!',
-      });
     },
     onError: (error) => {
       toast({
@@ -542,6 +546,7 @@ export function useSupabaseData() {
       const job = pendingJobs.find(j => j.id === jobId) || upcomingJobs.find(j => j.id === jobId);
       if (!job) throw new Error('Job not found');
 
+      const originalDate = job.scheduled_date;
       const now = new Date();
       const nextDate = addWeeks(now, job.customer.frequency_weeks);
       const nextScheduledDate = format(nextDate, 'yyyy-MM-dd');
@@ -554,15 +559,90 @@ export function useSupabaseData() {
       if (error) throw error;
 
       return {
+        jobId,
+        originalDate,
         nextDate: format(nextDate, 'dd MMM yyyy'),
+        customerName: job.customer.name,
       };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
       queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+    },
+    onError: (error) => {
       toast({
-        title: 'Job skipped',
-        description: `Rescheduled to ${result.nextDate}`,
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Undo complete job mutation
+  const undoCompleteJobMutation = useMutation({
+    mutationFn: async ({ jobId, newJobId }: { jobId: string; newJobId: string }) => {
+      // 1. Delete the newly created future job
+      const { error: deleteError } = await supabase
+        .from('jobs')
+        .delete()
+        .eq('id', newJobId);
+
+      if (deleteError) throw deleteError;
+
+      // 2. Reset the original job back to pending
+      const { error: updateError } = await supabase
+        .from('jobs')
+        .update({
+          status: 'pending',
+          completed_at: null,
+          amount_collected: null,
+          payment_status: 'unpaid',
+          payment_method: null,
+          payment_date: null,
+        })
+        .eq('id', jobId);
+
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['completedToday'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
+      toast({
+        title: 'Job completion undone',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Undo mark paid mutation
+  const undoMarkPaidMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const { error } = await supabase
+        .from('jobs')
+        .update({
+          payment_status: 'unpaid',
+          payment_method: null,
+          payment_date: null,
+        })
+        .eq('id', jobId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
+      queryClient.invalidateQueries({ queryKey: ['weeklyEarnings'] });
+      toast({
+        title: 'Payment undone',
       });
     },
     onError: (error) => {
@@ -653,6 +733,18 @@ export function useSupabaseData() {
     return updateJobNotesMutation.mutateAsync({ jobId, notes });
   };
 
+  const undoCompleteJob = (jobId: string, newJobId: string) => {
+    return undoCompleteJobMutation.mutateAsync({ jobId, newJobId });
+  };
+
+  const undoMarkPaid = (jobId: string) => {
+    return undoMarkPaidMutation.mutateAsync(jobId);
+  };
+
+  const undoSkipJob = (jobId: string, originalDate: string) => {
+    return rescheduleJobMutation.mutateAsync({ jobId, newDate: originalDate });
+  };
+
   const businessName = profile?.business_name || 'My Window Cleaning';
   const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading;
 
@@ -684,6 +776,9 @@ export function useSupabaseData() {
     skipJob,
     markJobPaid,
     updateJobNotes,
+    undoCompleteJob,
+    undoMarkPaid,
+    undoSkipJob,
     refetchAll,
     isLoading,
     userEmail: user?.email || '',

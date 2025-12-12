@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
+import { ToastAction } from '@/components/ui/toast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,8 +30,8 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const Index = () => {
-  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, completeJob, rescheduleJob, skipJob, updateJobNotes, refetchAll, isLoading } = useSupabaseData();
-  const { toast } = useToast();
+  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, refetchAll, isLoading } = useSupabaseData();
+  const { toast, dismiss } = useToast();
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
@@ -70,6 +71,7 @@ const Index = () => {
     if (!jobToComplete || completingJobId) return;
     
     const jobId = jobToComplete.id;
+    const customerName = jobToComplete.customer.name;
     setCompleteConfirmOpen(false);
     setCompletingJobId(jobId);
 
@@ -87,10 +89,29 @@ const Index = () => {
     try {
       const result = await completeJob(jobId);
       
-      toast({
+      const { id: toastId } = toast({
         title: `£${result.collectedAmount} Collected!`,
         description: `Next clean: ${result.nextDate}`,
-        duration: 3000,
+        duration: 5000,
+        action: (
+          <ToastAction
+            altText="Undo"
+            onClick={async () => {
+              dismiss(toastId);
+              try {
+                await undoCompleteJob(result.jobId, result.newJobId);
+              } catch {
+                toast({
+                  title: 'Error',
+                  description: 'Failed to undo completion',
+                  variant: 'destructive',
+                });
+              }
+            }}
+          >
+            Undo
+          </ToastAction>
+        ),
       });
     } catch (error) {
       // Rollback on error
@@ -122,13 +143,43 @@ const Index = () => {
     if (!jobToSkip) return;
     
     const jobId = jobToSkip.id;
+    const customerName = jobToSkip.customer.name;
     setSkipConfirmOpen(false);
     
     // Optimistically remove from local state
     setLocalJobs(prev => prev.filter(job => job.id !== jobId));
     
     try {
-      await skipJob(jobId);
+      const result = await skipJob(jobId);
+      
+      const { id: toastId } = toast({
+        title: 'Job skipped',
+        description: `${result.customerName} rescheduled to ${result.nextDate}`,
+        duration: 5000,
+        action: (
+          <ToastAction
+            altText="Undo"
+            onClick={async () => {
+              dismiss(toastId);
+              try {
+                await undoSkipJob(result.jobId, result.originalDate);
+                toast({
+                  title: 'Skip undone',
+                  description: `${result.customerName} restored to original date`,
+                });
+              } catch {
+                toast({
+                  title: 'Error',
+                  description: 'Failed to undo skip',
+                  variant: 'destructive',
+                });
+              }
+            }}
+          >
+            Undo
+          </ToastAction>
+        ),
+      });
     } catch (error) {
       // Rollback on error
       setLocalJobs(pendingJobs);
