@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, MapPin, Phone, PoundSterling, Repeat } from 'lucide-react';
+import { X, User, MapPin, Phone, PoundSterling, Repeat, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ interface EditCustomerModalProps {
     mobile_phone: string | null;
     price: number;
     frequency_weeks: number;
+    notes: string | null;
   }) => Promise<void>;
 }
 
@@ -24,6 +25,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
   const [mobilePhone, setMobilePhone] = useState('');
   const [price, setPrice] = useState('20');
   const [frequencyWeeks, setFrequencyWeeks] = useState('4');
+  const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -33,6 +35,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
       setMobilePhone(customer.mobile_phone || '');
       setPrice(customer.price.toString());
       setFrequencyWeeks(customer.frequency_weeks.toString());
+      setNotes(customer.notes || '');
     }
   }, [customer]);
 
@@ -48,6 +51,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
         mobile_phone: mobilePhone.trim() || null,
         price: parseFloat(price) || 20,
         frequency_weeks: parseInt(frequencyWeeks) || 4,
+        notes: notes.trim() || null,
       });
       onClose();
     } finally {
@@ -198,6 +202,26 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
                     <option value="8">8 weeks</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                  <FileText className="w-4 h-4" />
+                  Notes
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Gate code, pet warnings, special instructions..."
+                  rows={3}
+                  className={cn(
+                    "w-full px-4 py-3 rounded-xl resize-none",
+                    "bg-muted border-0",
+                    "text-foreground placeholder:text-muted-foreground",
+                    "focus:outline-none focus:ring-2 focus:ring-primary"
+                  )}
+                />
               </div>
             </div>
 

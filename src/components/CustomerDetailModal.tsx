@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MessageSquare, MapPin, Phone, Repeat, Pencil, Trash2 } from 'lucide-react';
+import { X, MessageSquare, MapPin, Phone, Repeat, Pencil, Trash2, FileText, History } from 'lucide-react';
 import { Customer } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,9 +21,10 @@ interface CustomerDetailModalProps {
   onClose: () => void;
   onEdit?: (customer: Customer) => void;
   onArchive?: (customerId: string) => Promise<void>;
+  onViewHistory?: (customer: Customer) => void;
 }
 
-export function CustomerDetailModal({ customer, businessName, onClose, onEdit, onArchive }: CustomerDetailModalProps) {
+export function CustomerDetailModal({ customer, businessName, onClose, onEdit, onArchive, onViewHistory }: CustomerDetailModalProps) {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
 
@@ -126,10 +127,38 @@ export function CustomerDetailModal({ customer, businessName, onClose, onEdit, o
                     </p>
                   </div>
                 </div>
+
+                {/* Notes Section */}
+                {customer.notes && (
+                  <div className="flex items-start gap-3 p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                    <FileText className="w-5 h-5 text-amber-600 mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Notes</p>
+                      <p className="font-medium text-foreground whitespace-pre-wrap">{customer.notes}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
               <div className="space-y-3">
+                {/* View History Button */}
+                {onViewHistory && (
+                  <Button
+                    onClick={() => onViewHistory(customer)}
+                    variant="outline"
+                    className={cn(
+                      "w-full fat-button rounded-xl",
+                      "border-primary text-primary",
+                      "hover:bg-primary/10",
+                      "font-semibold text-base"
+                    )}
+                  >
+                    <History className="w-5 h-5 mr-2" />
+                    View Job History
+                  </Button>
+                )}
+
                 {/* SMS Button */}
                 {customer.mobile_phone && (
                   <Button

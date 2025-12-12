@@ -23,6 +23,7 @@ export type Database = {
           id: string
           mobile_phone: string | null
           name: string
+          notes: string | null
           price: number
           profile_id: string
           status: string
@@ -35,6 +36,7 @@ export type Database = {
           id?: string
           mobile_phone?: string | null
           name: string
+          notes?: string | null
           price?: number
           profile_id: string
           status?: string
@@ -47,6 +49,7 @@ export type Database = {
           id?: string
           mobile_phone?: string | null
           name?: string
+          notes?: string | null
           price?: number
           profile_id?: string
           status?: string
