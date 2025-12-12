@@ -100,6 +100,20 @@ const Earnings = () => {
     [completedJobs]
   );
 
+  const paidTotal = useMemo(() => 
+    completedJobs
+      .filter(job => job.payment_status === 'paid')
+      .reduce((sum, job) => sum + (job.amount_collected || 0), 0),
+    [completedJobs]
+  );
+
+  const unpaidTotal = useMemo(() => 
+    completedJobs
+      .filter(job => job.payment_status === 'unpaid')
+      .reduce((sum, job) => sum + (job.amount_collected || 0), 0),
+    [completedJobs]
+  );
+
   const handleMarkPaid = (job: JobWithCustomer) => {
     setSelectedJob(job);
     setIsMarkPaidOpen(true);
@@ -123,8 +137,36 @@ const Earnings = () => {
           <LoadingState message="Loading earnings..." />
         ) : (
           <>
-            {/* Total Earnings Card */}
+            {/* Today's Earnings Card */}
             <EarningsCard amount={todayEarnings} label="Total Earned Today" />
+
+            {/* Paid vs Unpaid Summary */}
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="bg-card rounded-xl border border-border p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-2 h-2 rounded-full bg-green-500" />
+                  <span className="text-xs text-muted-foreground">Paid</span>
+                </div>
+                <p className="text-xl font-bold text-green-600">
+                  £{paidTotal.toFixed(2)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {completedJobs.filter(j => j.payment_status === 'paid').length} jobs
+                </p>
+              </div>
+              <div className="bg-card rounded-xl border border-border p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span className="text-xs text-muted-foreground">Unpaid</span>
+                </div>
+                <p className="text-xl font-bold text-amber-600">
+                  £{unpaidTotal.toFixed(2)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {unpaidCount} jobs
+                </p>
+              </div>
+            </div>
 
             {/* Monthly Chart */}
             <div className="mt-6">
