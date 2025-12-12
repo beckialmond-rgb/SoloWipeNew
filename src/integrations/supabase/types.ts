@@ -17,6 +17,7 @@ export type Database = {
       customers: {
         Row: {
           address: string
+          archived_at: string | null
           created_at: string
           frequency_weeks: number
           gocardless_id: string | null
@@ -30,6 +31,7 @@ export type Database = {
         }
         Insert: {
           address: string
+          archived_at?: string | null
           created_at?: string
           frequency_weeks?: number
           gocardless_id?: string | null
@@ -43,6 +45,7 @@ export type Database = {
         }
         Update: {
           address?: string
+          archived_at?: string | null
           created_at?: string
           frequency_weeks?: number
           gocardless_id?: string | null
@@ -67,6 +70,7 @@ export type Database = {
       jobs: {
         Row: {
           amount_collected: number | null
+          cancelled_at: string | null
           completed_at: string | null
           created_at: string
           customer_id: string
@@ -81,6 +85,7 @@ export type Database = {
         }
         Insert: {
           amount_collected?: number | null
+          cancelled_at?: string | null
           completed_at?: string | null
           created_at?: string
           customer_id: string
@@ -95,6 +100,7 @@ export type Database = {
         }
         Update: {
           amount_collected?: number | null
+          cancelled_at?: string | null
           completed_at?: string | null
           created_at?: string
           customer_id?: string
