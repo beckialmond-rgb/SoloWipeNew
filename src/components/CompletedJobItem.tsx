@@ -3,13 +3,15 @@ import { Check, Clock, CheckCircle, Circle } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface CompletedJobItemProps {
   job: JobWithCustomer;
   index: number;
+  onMarkPaid?: (job: JobWithCustomer) => void;
 }
 
-export function CompletedJobItem({ job, index }: CompletedJobItemProps) {
+export function CompletedJobItem({ job, index, onMarkPaid }: CompletedJobItemProps) {
   const completedTime = job.completed_at 
     ? format(new Date(job.completed_at), 'HH:mm')
     : '';
@@ -38,8 +40,8 @@ export function CompletedJobItem({ job, index }: CompletedJobItemProps) {
         </p>
       </div>
 
-      <div className="text-right">
-        <div className="flex items-center justify-end gap-1.5">
+      <div className="text-right flex flex-col items-end gap-1">
+        <div className="flex items-center gap-1.5">
           <p className="font-bold text-accent">
             £{job.amount_collected}
           </p>
@@ -49,13 +51,23 @@ export function CompletedJobItem({ job, index }: CompletedJobItemProps) {
             <Circle className="w-4 h-4 text-amber-500 fill-amber-500" />
           )}
         </div>
-        <div className="flex items-center justify-end gap-1 text-xs text-muted-foreground mt-0.5">
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Clock className="w-3 h-3" />
           {completedTime}
           {isPaid && job.payment_method && (
             <span className="capitalize ml-1">• {job.payment_method}</span>
           )}
         </div>
+        {!isPaid && onMarkPaid && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs mt-1 text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
+            onClick={() => onMarkPaid(job)}
+          >
+            Mark Paid
+          </Button>
+        )}
       </div>
     </motion.div>
   );
