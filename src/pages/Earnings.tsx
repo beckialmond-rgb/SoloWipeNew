@@ -198,30 +198,42 @@ const Earnings = () => {
             <EarningsCard amount={todayEarnings} label="Total Earned Today" />
 
             {/* Paid vs Unpaid Summary */}
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <div className="bg-card rounded-xl border border-border p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="text-xs text-muted-foreground">Paid</span>
-                </div>
-                <p className="text-xl font-bold text-green-600">
-                  £{paidTotal.toFixed(2)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {completedJobs.filter(j => j.payment_status === 'paid').length} jobs
-                </p>
+            <div className="mt-4 bg-card rounded-xl border border-border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-foreground">Collection Progress</span>
+                <span className="text-sm text-muted-foreground">
+                  {periodEarnings > 0 ? Math.round((paidTotal / periodEarnings) * 100) : 0}% collected
+                </span>
               </div>
-              <div className="bg-card rounded-xl border border-border p-4">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span className="text-xs text-muted-foreground">Unpaid</span>
+              
+              {/* Progress Bar */}
+              <div className="h-3 bg-muted rounded-full overflow-hidden mb-4">
+                <div 
+                  className="h-full bg-gradient-to-r from-green-500 to-green-400 rounded-full transition-all duration-500"
+                  style={{ width: periodEarnings > 0 ? `${(paidTotal / periodEarnings) * 100}%` : '0%' }}
+                />
+              </div>
+
+              {/* Summary Row */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-green-500" />
+                  <div>
+                    <p className="text-lg font-bold text-green-600">£{paidTotal.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {completedJobs.filter(j => j.payment_status === 'paid').length} paid
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xl font-bold text-amber-600">
-                  £{unpaidTotal.toFixed(2)}
-                </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {unpaidCount} jobs
-                </p>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-amber-500" />
+                  <div>
+                    <p className="text-lg font-bold text-amber-600">£{unpaidTotal.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {unpaidCount} unpaid
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
