@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { ChevronRight, MapPin } from 'lucide-react';
+import { ChevronRight, MapPin, StickyNote } from 'lucide-react';
 import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
 
@@ -25,9 +25,14 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
       )}
     >
       <div className="flex-1 min-w-0">
-        <h3 className="font-semibold text-foreground truncate">
-          {customer.name}
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-foreground truncate">
+            {customer.name}
+          </h3>
+          {customer.notes && (
+            <StickyNote className="w-4 h-4 text-amber-500 flex-shrink-0" />
+          )}
+        </div>
         <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
           <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
           <span className="truncate">{customer.address}</span>
