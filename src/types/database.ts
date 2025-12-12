@@ -29,6 +29,7 @@ export interface Job {
   payment_method: 'gocardless' | 'cash' | 'transfer' | null;
   payment_date: string | null;
   invoice_number: string | null;
+  notes: string | null;
   created_at: string;
 }
 

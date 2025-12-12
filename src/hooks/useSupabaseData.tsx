@@ -574,6 +574,34 @@ export function useSupabaseData() {
     },
   });
 
+  // Update job notes mutation
+  const updateJobNotesMutation = useMutation({
+    mutationFn: async ({ jobId, notes }: { jobId: string; notes: string | null }) => {
+      const { error } = await supabase
+        .from('jobs')
+        .update({ notes })
+        .eq('id', jobId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['completedToday'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+      toast({
+        title: 'Notes saved!',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const completeJob = (jobId: string) => {
     return completeJobMutation.mutateAsync(jobId);
   };
@@ -585,6 +613,7 @@ export function useSupabaseData() {
     price: number;
     frequency_weeks: number;
     first_clean_date: string;
+    notes?: string;
   }) => {
     return addCustomerMutation.mutateAsync(data);
   };
@@ -595,6 +624,7 @@ export function useSupabaseData() {
     mobile_phone: string | null;
     price: number;
     frequency_weeks: number;
+    notes?: string | null;
   }) => {
     return updateCustomerMutation.mutateAsync({ id, data });
   };
@@ -617,6 +647,10 @@ export function useSupabaseData() {
 
   const markJobPaid = (jobId: string, method: 'cash' | 'transfer') => {
     return markJobPaidMutation.mutateAsync({ jobId, method });
+  };
+
+  const updateJobNotes = (jobId: string, notes: string | null) => {
+    return updateJobNotesMutation.mutateAsync({ jobId, notes });
   };
 
   const businessName = profile?.business_name || 'My Window Cleaning';
@@ -649,6 +683,7 @@ export function useSupabaseData() {
     rescheduleJob,
     skipJob,
     markJobPaid,
+    updateJobNotes,
     refetchAll,
     isLoading,
     userEmail: user?.email || '',
