@@ -4,6 +4,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { EarningsCard } from '@/components/EarningsCard';
 import { CompletedJobItem } from '@/components/CompletedJobItem';
 import { WeeklyEarningsSummary } from '@/components/WeeklyEarningsSummary';
+import { MonthlyEarningsChart } from '@/components/MonthlyEarningsChart';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
@@ -23,8 +24,13 @@ const Earnings = () => {
             {/* Total Earnings Card */}
             <EarningsCard amount={todayEarnings} label="Total Earned Today" />
 
+            {/* Monthly Chart */}
+            <div className="mt-6">
+              <MonthlyEarningsChart />
+            </div>
+
             {/* Weekly Summary */}
-            <div className="mt-8">
+            <div className="mt-6">
               <WeeklyEarningsSummary weeks={weeklyEarnings} />
             </div>
 
