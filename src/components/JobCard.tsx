@@ -1,19 +1,21 @@
-import { Check, MapPin, SkipForward } from 'lucide-react';
+import { Check, MapPin, SkipForward, Navigation, Phone, StickyNote } from 'lucide-react';
 import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { CustomerNotesPreview } from './CustomerNotesPreview';
 
 interface JobCardProps {
   job: JobWithCustomer;
   onComplete: (job: JobWithCustomer) => void;
   onSkip: (jobId: string) => void;
   index: number;
+  isNextUp?: boolean;
 }
 
 const SWIPE_THRESHOLD = 100;
 
-export function JobCard({ job, onComplete, onSkip, index }: JobCardProps) {
+export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: JobCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const x = useMotionValue(0);
   
@@ -49,14 +51,48 @@ export function JobCard({ job, onComplete, onSkip, index }: JobCardProps) {
     onSkip(job.id);
   };
 
+  const handleNavigate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Encode the address for URL
+    const encodedAddress = encodeURIComponent(job.customer.address);
+    
+    // Try to detect if user is on iOS or Android for best map experience
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    if (isIOS) {
+      // Apple Maps
+      window.open(`maps://maps.apple.com/?daddr=${encodedAddress}`, '_blank');
+    } else {
+      // Google Maps (works on Android and web)
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, '_blank');
+    }
+  };
+
+  const handleCall = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (job.customer.mobile_phone) {
+      window.open(`tel:${job.customer.mobile_phone.replace(/\s/g, '')}`, '_self');
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -100, scale: 0.9 }}
       transition={{ delay: index * 0.1, duration: 0.3 }}
-      className="relative rounded-2xl overflow-hidden fat-card"
+      className={cn(
+        "relative rounded-2xl overflow-hidden fat-card",
+        isNextUp && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+      )}
     >
+      {/* Next Up Badge */}
+      {isNextUp && (
+        <div className="absolute -top-2 left-4 z-10 px-2 py-0.5 bg-primary text-primary-foreground text-xs font-bold rounded-full">
+          NEXT UP
+        </div>
+      )}
+
       {/* Swipe action backgrounds */}
       <motion.div 
         className="absolute inset-0 rounded-2xl"
@@ -93,7 +129,8 @@ export function JobCard({ job, onComplete, onSkip, index }: JobCardProps) {
           "bg-card rounded-2xl shadow-sm border border-border",
           "border-l-4 border-l-primary",
           "flex items-stretch overflow-hidden relative",
-          isDragging && "cursor-grabbing"
+          isDragging && "cursor-grabbing",
+          isNextUp && "mt-2"
         )}
       >
         {/* Content */}
@@ -111,6 +148,34 @@ export function JobCard({ job, onComplete, onSkip, index }: JobCardProps) {
             <span className="text-sm text-muted-foreground">
               {job.customer.name}
             </span>
+          </div>
+
+          {/* Quick action buttons */}
+          <div className="flex items-center gap-2 mt-3">
+            {/* Navigate */}
+            <button
+              onClick={handleNavigate}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20 transition-colors"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              Navigate
+            </button>
+            
+            {/* Call */}
+            {job.customer.mobile_phone && (
+              <button
+                onClick={handleCall}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 text-accent rounded-lg text-xs font-medium hover:bg-accent/20 transition-colors"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                Call
+              </button>
+            )}
+            
+            {/* Notes preview */}
+            {job.customer.notes && (
+              <CustomerNotesPreview notes={job.customer.notes} customerName={job.customer.name} />
+            )}
           </div>
         </div>
 
