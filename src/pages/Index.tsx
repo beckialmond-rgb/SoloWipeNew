@@ -10,10 +10,14 @@ import { LoadingState } from '@/components/LoadingState';
 import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { JobNotesModal } from '@/components/JobNotesModal';
+import { OnMyWayButton } from '@/components/OnMyWayButton';
+import { QuickAddCustomerModal } from '@/components/QuickAddCustomerModal';
+import { WelcomeFlow } from '@/components/WelcomeFlow';
+import { AskForReviewButton } from '@/components/AskForReviewButton';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
-import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown } from 'lucide-react';
+import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import { ToastAction } from '@/components/ui/toast';
 import {
@@ -30,7 +34,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const Index = () => {
-  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, refetchAll, isLoading } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading } = useSupabaseData();
   const { toast, dismiss } = useToast();
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
@@ -44,6 +48,11 @@ const Index = () => {
   const [completedOpen, setCompletedOpen] = useState(true);
   const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
   const [jobToComplete, setJobToComplete] = useState<JobWithCustomer | null>(null);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
+    return localStorage.getItem('solowipe_welcome_dismissed') === 'true';
+  });
 
   // Pull to refresh
   const { isPulling, isRefreshing, pullDistance, handlers } = usePullToRefresh({
@@ -61,6 +70,24 @@ const Index = () => {
   useEffect(() => {
     setLocalJobs(pendingJobs);
   }, [pendingJobs]);
+
+  // Show welcome flow for new users
+  useEffect(() => {
+    if (!isLoading && customers.length === 0 && !welcomeDismissed) {
+      setShowWelcome(true);
+    }
+  }, [isLoading, customers.length, welcomeDismissed]);
+
+  const handleDismissWelcome = () => {
+    setShowWelcome(false);
+    setWelcomeDismissed(true);
+    localStorage.setItem('solowipe_welcome_dismissed', 'true');
+  };
+
+  const handleAddFirstCustomer = () => {
+    setShowWelcome(false);
+    setQuickAddOpen(true);
+  };
 
   const handleCompleteRequest = (job: JobWithCustomer) => {
     setJobToComplete(job);
@@ -242,12 +269,14 @@ const Index = () => {
     await updateJobNotes(jobId, notes);
   };
 
+  const nextJob = localJobs[0];
+
   return (
     <div 
       className="min-h-screen bg-background pb-20"
       {...handlers}
     >
-      <Header showLogo />
+      <Header showLogo showWeather />
 
       {/* Pull to refresh indicator */}
       <motion.div
@@ -273,6 +302,12 @@ const Index = () => {
       <main className="px-4 py-6 max-w-lg mx-auto">
         {isLoading ? (
           <LoadingState message="Loading your jobs..." />
+        ) : showWelcome ? (
+          <WelcomeFlow 
+            businessName={businessName}
+            onAddFirstCustomer={handleAddFirstCustomer}
+            onDismiss={handleDismissWelcome}
+          />
         ) : (
           <>
             {/* Today's Stats Summary */}
@@ -305,6 +340,22 @@ const Index = () => {
                 </div>
               </div>
             </motion.div>
+
+            {/* On My Way Button - shows only if there's a next job with phone */}
+            {nextJob && nextJob.customer.mobile_phone && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4"
+              >
+                <OnMyWayButton 
+                  job={nextJob} 
+                  businessName={businessName}
+                  className="w-full"
+                />
+              </motion.div>
+            )}
+
             {/* Jobs count badge and Skip All button */}
             {localJobs.length > 0 && (
               <motion.div
@@ -321,16 +372,27 @@ const Index = () => {
                   </span>
                 </div>
                 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSkipAllRequest}
-                  disabled={isSkippingAll}
-                  className="gap-1.5"
-                >
-                  <SkipForward className="w-4 h-4" />
-                  Skip All
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setQuickAddOpen(true)}
+                    className="gap-1.5"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Quick Add
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleSkipAllRequest}
+                    disabled={isSkippingAll}
+                    className="gap-1.5"
+                  >
+                    <SkipForward className="w-4 h-4" />
+                    Skip All
+                  </Button>
+                </div>
               </motion.div>
             )}
 
@@ -344,18 +406,32 @@ const Index = () => {
                     onComplete={handleCompleteRequest}
                     onSkip={handleSkipRequestById}
                     index={index}
+                    isNextUp={index === 0}
                   />
                 ))}
               </AnimatePresence>
             </div>
 
             {/* Empty state for today */}
-            {localJobs.length === 0 && completedToday.length === 0 && (
+            {localJobs.length === 0 && completedToday.length === 0 && customers.length > 0 && (
               <EmptyState
                 title="All done for today!"
                 description="Great work! You've completed all your scheduled jobs."
                 icon={<Sparkles className="w-8 h-8 text-accent" />}
               />
+            )}
+
+            {/* Empty state for new users without welcome */}
+            {localJobs.length === 0 && customers.length === 0 && !showWelcome && (
+              <div className="text-center py-12">
+                <Button
+                  onClick={() => setQuickAddOpen(true)}
+                  className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
+                >
+                  <UserPlus className="w-5 h-5 mr-2" />
+                  Add Your First Customer
+                </Button>
+              </div>
             )}
 
             {/* Completed Today Section */}
@@ -369,12 +445,23 @@ const Index = () => {
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-3 mt-3">
                   {completedToday.map((job, index) => (
-                    <CompletedJobItem
-                      key={job.id}
-                      job={job}
-                      index={index}
-                      onAddNote={(job) => setNotesJob(job)}
-                    />
+                    <div key={job.id}>
+                      <CompletedJobItem
+                        job={job}
+                        index={index}
+                        onAddNote={(job) => setNotesJob(job)}
+                      />
+                      {/* Ask for Review button after completion */}
+                      {job.customer.mobile_phone && (
+                        <div className="mt-2 flex justify-end">
+                          <AskForReviewButton
+                            customerName={job.customer.name}
+                            customerPhone={job.customer.mobile_phone}
+                            businessName={businessName}
+                          />
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </CollapsibleContent>
               </Collapsible>
@@ -398,6 +485,12 @@ const Index = () => {
         isOpen={!!notesJob}
         onClose={() => setNotesJob(null)}
         onSave={handleSaveNotes}
+      />
+
+      <QuickAddCustomerModal
+        isOpen={quickAddOpen}
+        onClose={() => setQuickAddOpen(false)}
+        onSubmit={addCustomer}
       />
 
       <AlertDialog open={skipConfirmOpen} onOpenChange={setSkipConfirmOpen}>
