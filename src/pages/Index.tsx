@@ -10,7 +10,7 @@ import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
-import { Sparkles, SkipForward } from 'lucide-react';
+import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import {
   AlertDialog,
@@ -25,7 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 
 const Index = () => {
-  const { pendingJobs, upcomingJobs, completeJob, rescheduleJob, skipJob, isLoading } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, completeJob, rescheduleJob, skipJob, isLoading } = useSupabaseData();
   const { toast } = useToast();
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
@@ -168,6 +168,36 @@ const Index = () => {
           <LoadingState message="Loading your jobs..." />
         ) : (
           <>
+            {/* Today's Stats Summary */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-card rounded-xl border border-border p-4 mb-6"
+            >
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <div className="w-10 h-10 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                    <Clock className="w-5 h-5 text-primary" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{localJobs.length}</p>
+                  <p className="text-xs text-muted-foreground">Pending</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-10 h-10 mx-auto rounded-full bg-green-500/10 flex items-center justify-center mb-2">
+                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{completedToday.length}</p>
+                  <p className="text-xs text-muted-foreground">Completed</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-10 h-10 mx-auto rounded-full bg-accent/10 flex items-center justify-center mb-2">
+                    <PoundSterling className="w-5 h-5 text-accent" />
+                  </div>
+                  <p className="text-2xl font-bold text-accent">£{todayEarnings}</p>
+                  <p className="text-xs text-muted-foreground">Earned</p>
+                </div>
+              </div>
+            </motion.div>
             {/* Jobs count badge and Skip All button */}
             {localJobs.length > 0 && (
               <motion.div
