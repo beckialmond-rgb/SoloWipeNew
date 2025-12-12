@@ -24,11 +24,19 @@ export function JobCard({ job, onComplete, onSkip, index }: JobCardProps) {
     ['hsl(var(--accent))', 'hsl(var(--card))', 'hsl(var(--muted))']
   );
 
+  const triggerHaptic = (type: 'light' | 'medium') => {
+    if ('vibrate' in navigator) {
+      navigator.vibrate(type === 'light' ? 10 : 25);
+    }
+  };
+
   const handleDragEnd = (_: any, info: PanInfo) => {
     setIsDragging(false);
     if (info.offset.x < -SWIPE_THRESHOLD) {
+      triggerHaptic('medium');
       onComplete(job.id);
     } else if (info.offset.x > SWIPE_THRESHOLD) {
+      triggerHaptic('light');
       onSkip(job.id);
     }
   };
