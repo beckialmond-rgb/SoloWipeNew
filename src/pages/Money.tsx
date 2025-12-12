@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, CheckCircle, Clock } from 'lucide-react';
+import { Wallet, CheckCircle, Clock, CheckSquare, Square } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingState } from '@/components/LoadingState';
@@ -9,15 +9,20 @@ import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import { UnpaidJobCard } from '@/components/UnpaidJobCard';
 import { MarkPaidModal } from '@/components/MarkPaidModal';
+import { BatchPaymentModal } from '@/components/BatchPaymentModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { ToastAction } from '@/components/ui/toast';
 import { JobWithCustomer } from '@/types/database';
 
 const Money = () => {
-  const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, undoMarkPaid, isLoading } = useSupabaseData();
+  const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, batchMarkPaid, undoMarkPaid, isLoading } = useSupabaseData();
   const { toast, dismiss } = useToast();
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
   const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
 
   const handleMarkPaid = (job: JobWithCustomer) => {
     setSelectedJob(job);
@@ -59,6 +64,33 @@ const Money = () => {
       ),
     });
   };
+
+  const toggleSelectMode = () => {
+    setSelectMode(!selectMode);
+    setSelectedJobIds(new Set());
+  };
+
+  const toggleJobSelection = (jobId: string) => {
+    const newSet = new Set(selectedJobIds);
+    if (newSet.has(jobId)) {
+      newSet.delete(jobId);
+    } else {
+      newSet.add(jobId);
+    }
+    setSelectedJobIds(newSet);
+  };
+
+  const selectAllJobs = () => {
+    setSelectedJobIds(new Set(unpaidJobs.map(j => j.id)));
+  };
+
+  const handleBatchConfirm = async (jobIds: string[], method: 'cash' | 'transfer') => {
+    await batchMarkPaid(jobIds, method);
+    setSelectMode(false);
+    setSelectedJobIds(new Set());
+  };
+
+  const selectedJobsForBatch = unpaidJobs.filter(j => selectedJobIds.has(j.id));
 
   if (isLoading) {
     return <LoadingState />;
@@ -108,14 +140,72 @@ const Money = () => {
                 description="No unpaid jobs to chase."
               />
             ) : (
-              unpaidJobs.map((job, index) => (
-                <UnpaidJobCard
-                  key={job.id}
-                  job={job}
-                  index={index}
-                  onMarkPaid={() => handleMarkPaid(job)}
-                />
-              ))
+              <>
+                {/* Batch selection controls */}
+                <div className="flex items-center justify-between mb-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleSelectMode}
+                    className="gap-2"
+                  >
+                    {selectMode ? (
+                      <>
+                        <Square className="w-4 h-4" />
+                        Cancel
+                      </>
+                    ) : (
+                      <>
+                        <CheckSquare className="w-4 h-4" />
+                        Select Multiple
+                      </>
+                    )}
+                  </Button>
+                  {selectMode && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={selectAllJobs}
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => setBatchModalOpen(true)}
+                        disabled={selectedJobIds.size === 0}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        Mark {selectedJobIds.size} Paid
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {unpaidJobs.map((job, index) => (
+                  <div key={job.id} className="relative">
+                    {selectMode && (
+                      <button
+                        onClick={() => toggleJobSelection(job.id)}
+                        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-10 p-2"
+                      >
+                        {selectedJobIds.has(job.id) ? (
+                          <CheckSquare className="w-6 h-6 text-primary" />
+                        ) : (
+                          <Square className="w-6 h-6 text-muted-foreground" />
+                        )}
+                      </button>
+                    )}
+                    <div className={selectMode ? 'ml-8' : ''}>
+                      <UnpaidJobCard
+                        job={job}
+                        index={index}
+                        onMarkPaid={() => !selectMode && handleMarkPaid(job)}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </>
             )}
           </TabsContent>
 
@@ -168,6 +258,13 @@ const Money = () => {
         job={selectedJob}
         onClose={() => setIsMarkPaidOpen(false)}
         onConfirm={handleConfirmPaid}
+      />
+
+      <BatchPaymentModal
+        isOpen={batchModalOpen}
+        selectedJobs={selectedJobsForBatch}
+        onClose={() => setBatchModalOpen(false)}
+        onConfirm={handleBatchConfirm}
       />
     </div>
   );
