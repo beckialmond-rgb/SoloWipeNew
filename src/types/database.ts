@@ -15,6 +15,7 @@ export interface Customer {
   status: 'active' | 'inactive';
   gocardless_id: string | null;
   notes: string | null;
+  archived_at: string | null;
   created_at: string;
 }
 
@@ -30,6 +31,7 @@ export interface Job {
   payment_date: string | null;
   invoice_number: string | null;
   notes: string | null;
+  cancelled_at: string | null;
   created_at: string;
 }
 

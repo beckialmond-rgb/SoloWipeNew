@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Header } from '@/components/Header';
@@ -11,19 +11,31 @@ import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
 
 const Settings = () => {
-  const { businessName, userEmail, updateBusinessName } = useSupabaseData();
+  const { businessName, userEmail, updateBusinessName, recentlyArchivedCustomers, unarchiveCustomer } = useSupabaseData();
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const { isInstalled } = useInstallPrompt();
   const { theme, setTheme } = useTheme();
   const [isEditBusinessNameOpen, setIsEditBusinessNameOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const handleSignOut = async () => {
     await signOut();
     navigate('/auth');
+  };
+
+  const handleRestore = async (customerId: string) => {
+    setRestoringId(customerId);
+    try {
+      await unarchiveCustomer(customerId);
+    } finally {
+      setRestoringId(null);
+    }
   };
 
   const getThemeLabel = () => {
@@ -197,6 +209,58 @@ const Settings = () => {
 
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </motion.button>
+          )}
+
+          {/* Recently Deleted Section */}
+          {recentlyArchivedCustomers.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+              className="mt-8"
+            >
+              <div className="flex items-center gap-2 mb-3">
+                <Trash2 className="w-4 h-4 text-muted-foreground" />
+                <h3 className="text-sm font-medium text-muted-foreground">Recently Deleted</h3>
+                <span className="text-xs text-muted-foreground/70">(expires after 7 days)</span>
+              </div>
+              
+              <div className="space-y-2">
+                <AnimatePresence mode="popLayout">
+                  {recentlyArchivedCustomers.map((customer) => (
+                    <motion.div
+                      key={customer.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 20 }}
+                      className="bg-card rounded-xl border border-border p-4"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground truncate">{customer.name}</p>
+                          <p className="text-sm text-muted-foreground truncate">{customer.address}</p>
+                          {customer.archived_at && (
+                            <p className="text-xs text-muted-foreground/70 mt-1">
+                              Deleted {format(new Date(customer.archived_at), 'd MMM')}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRestore(customer.id)}
+                          disabled={restoringId === customer.id}
+                          className="gap-1.5 shrink-0"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          {restoringId === customer.id ? 'Restoring...' : 'Restore'}
+                        </Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </motion.div>
           )}
 
           {/* Sign Out Button */}

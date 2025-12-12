@@ -254,6 +254,26 @@ export function useSupabaseData() {
     0
   );
 
+  // Fetch recently archived customers (within last 7 days)
+  const sevenDaysAgoDate = format(subWeeks(new Date(), 1), 'yyyy-MM-dd');
+  const { data: recentlyArchivedCustomers = [], isLoading: archivedLoading } = useQuery({
+    queryKey: ['recentlyArchived', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('status', 'inactive')
+        .not('archived_at', 'is', null)
+        .gte('archived_at', `${sevenDaysAgoDate}T00:00:00`)
+        .order('archived_at', { ascending: false });
+      
+      if (error) throw error;
+      return data as Customer[];
+    },
+    enabled: !!user,
+  });
+
   // Complete job mutation
   const completeJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
@@ -448,33 +468,82 @@ export function useSupabaseData() {
     },
   });
 
-  // Archive customer mutation
+  // Archive customer mutation (soft-delete jobs instead of hard delete)
   const archiveCustomerMutation = useMutation({
     mutationFn: async (id: string) => {
-      // 1. Delete all pending jobs for this customer first
+      const now = new Date().toISOString();
+      
+      // 1. Soft-delete all pending jobs for this customer (set cancelled_at)
       const { error: jobsError } = await supabase
         .from('jobs')
-        .delete()
+        .update({ cancelled_at: now })
         .eq('customer_id', id)
         .eq('status', 'pending');
 
       if (jobsError) throw jobsError;
 
-      // 2. Then archive the customer
+      // 2. Archive the customer with timestamp
       const { error } = await supabase
         .from('customers')
-        .update({ status: 'inactive' })
+        .update({ status: 'inactive', archived_at: now })
         .eq('id', id);
 
       if (error) throw error;
+      
+      return { customerId: id };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
       queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['recentlyArchived'] });
       toast({
         title: 'Customer archived',
-        description: 'All pending jobs cancelled.',
+        description: 'You can restore them from Settings within 7 days.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Unarchive customer mutation
+  const unarchiveCustomerMutation = useMutation({
+    mutationFn: async (id: string) => {
+      // 1. Restore the customer
+      const { error: customerError } = await supabase
+        .from('customers')
+        .update({ status: 'active', archived_at: null })
+        .eq('id', id);
+
+      if (customerError) throw customerError;
+
+      // 2. Restore cancelled pending jobs (clear cancelled_at)
+      const { error: jobsError } = await supabase
+        .from('jobs')
+        .update({ cancelled_at: null })
+        .eq('customer_id', id)
+        .eq('status', 'pending')
+        .not('cancelled_at', 'is', null);
+
+      if (jobsError) throw jobsError;
+      
+      // Get the customer name for the toast
+      const customer = recentlyArchivedCustomers.find(c => c.id === id);
+      return { customerName: customer?.name || 'Customer' };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['recentlyArchived'] });
+      toast({
+        title: 'Customer restored',
+        description: `${result.customerName} and their pending jobs have been restored.`,
       });
     },
     onError: (error) => {
@@ -713,6 +782,10 @@ export function useSupabaseData() {
     return archiveCustomerMutation.mutateAsync(id);
   };
 
+  const unarchiveCustomer = (id: string) => {
+    return unarchiveCustomerMutation.mutateAsync(id);
+  };
+
   const updateBusinessName = (newName: string) => {
     return updateBusinessNameMutation.mutateAsync(newName);
   };
@@ -746,7 +819,7 @@ export function useSupabaseData() {
   };
 
   const businessName = profile?.business_name || 'My Window Cleaning';
-  const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading;
+  const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading || archivedLoading;
 
   const refetchAll = async () => {
     await Promise.all([
@@ -766,11 +839,13 @@ export function useSupabaseData() {
     unpaidJobs,
     paidThisWeek,
     totalOutstanding,
+    recentlyArchivedCustomers,
     businessName,
     completeJob,
     addCustomer,
     updateCustomer,
     archiveCustomer,
+    unarchiveCustomer,
     updateBusinessName,
     rescheduleJob,
     skipJob,
