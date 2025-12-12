@@ -17,6 +17,7 @@ import { AskForReviewButton } from '@/components/AskForReviewButton';
 import { PriceAdjustModal } from '@/components/PriceAdjustModal';
 import { PhotoCaptureModal } from '@/components/PhotoCaptureModal';
 import { OptimizeRouteButton } from '@/components/OptimizeRouteButton';
+import { MarkPaidModal } from '@/components/MarkPaidModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -37,7 +38,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const Index = () => {
-  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading, markJobPaid, profile } = useSupabaseData();
   const { toast, dismiss } = useToast();
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
@@ -56,6 +57,8 @@ const Index = () => {
   const [priceAdjustOpen, setPriceAdjustOpen] = useState(false);
   const [photoCaptureOpen, setPhotoCaptureOpen] = useState(false);
   const [capturedPhotoUrl, setCapturedPhotoUrl] = useState<string | null>(null);
+  const [markPaidModalOpen, setMarkPaidModalOpen] = useState(false);
+  const [jobToMarkPaid, setJobToMarkPaid] = useState<JobWithCustomer | null>(null);
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     return localStorage.getItem('solowipe_welcome_dismissed') === 'true';
   });
@@ -168,6 +171,31 @@ const Index = () => {
   const handlePhotoCapture = (url: string) => {
     setCapturedPhotoUrl(url);
     setPhotoCaptureOpen(false);
+  };
+
+  const handleMarkPaidRequest = (job: JobWithCustomer) => {
+    setJobToMarkPaid(job);
+    setMarkPaidModalOpen(true);
+  };
+
+  const handleConfirmMarkPaid = async (method: 'cash' | 'transfer') => {
+    if (!jobToMarkPaid) return;
+    try {
+      await markJobPaid(jobToMarkPaid.id, method);
+      toast({
+        title: 'Payment recorded',
+        description: `${jobToMarkPaid.customer.name} marked as paid via ${method}`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to record payment',
+        variant: 'destructive',
+      });
+    } finally {
+      setMarkPaidModalOpen(false);
+      setJobToMarkPaid(null);
+    }
   };
 
   const handleSkipRequest = (job: JobWithCustomer) => {
@@ -473,14 +501,16 @@ const Index = () => {
                         job={job}
                         index={index}
                         onAddNote={(job) => setNotesJob(job)}
+                        onMarkPaid={(job) => handleMarkPaidRequest(job)}
                       />
-                      {/* Ask for Review button after completion */}
-                      {job.customer.mobile_phone && (
+                      {/* Ask for Review button after completion - only if google review link is configured */}
+                      {job.customer.mobile_phone && profile?.google_review_link && (
                         <div className="mt-2 flex justify-end">
                           <AskForReviewButton
                             customerName={job.customer.name}
                             customerPhone={job.customer.mobile_phone}
                             businessName={businessName}
+                            googleReviewLink={profile.google_review_link}
                           />
                         </div>
                       )}
@@ -571,6 +601,16 @@ const Index = () => {
         onClose={() => setPhotoCaptureOpen(false)}
         onCapture={handlePhotoCapture}
         jobId={jobToComplete?.id}
+      />
+
+      <MarkPaidModal
+        isOpen={markPaidModalOpen}
+        job={jobToMarkPaid}
+        onClose={() => {
+          setMarkPaidModalOpen(false);
+          setJobToMarkPaid(null);
+        }}
+        onConfirm={handleConfirmMarkPaid}
       />
 
       <BottomNav />

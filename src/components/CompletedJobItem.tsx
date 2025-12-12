@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion';
-import { Check, Clock, CheckCircle, Circle, StickyNote } from 'lucide-react';
+import { Check, Clock, CheckCircle, Circle, StickyNote, Image } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { useState } from 'react';
 
 interface CompletedJobItemProps {
   job: JobWithCustomer;
@@ -13,6 +14,7 @@ interface CompletedJobItemProps {
 }
 
 export function CompletedJobItem({ job, index, onMarkPaid, onAddNote }: CompletedJobItemProps) {
+  const [showPhoto, setShowPhoto] = useState(false);
   const completedTime = job.completed_at 
     ? format(new Date(job.completed_at), 'HH:mm')
     : '';
@@ -62,6 +64,30 @@ export function CompletedJobItem({ job, index, onMarkPaid, onAddNote }: Complete
           </div>
         </div>
       </div>
+
+      {/* Photo evidence */}
+      {job.photo_url && (
+        <div className="mt-3">
+          {showPhoto ? (
+            <div className="relative">
+              <img 
+                src={job.photo_url} 
+                alt="Job evidence" 
+                className="w-full h-48 object-cover rounded-lg cursor-pointer"
+                onClick={() => setShowPhoto(false)}
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowPhoto(true)}
+              className="flex items-center gap-2 text-xs text-primary hover:underline"
+            >
+              <Image className="w-3.5 h-3.5" />
+              View photo evidence
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Notes section */}
       {job.notes && (
