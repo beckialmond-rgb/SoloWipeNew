@@ -619,6 +619,14 @@ export function useSupabaseData() {
   const businessName = profile?.business_name || 'My Window Cleaning';
   const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading;
 
+  const refetchAll = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] }),
+      queryClient.invalidateQueries({ queryKey: ['completedToday'] }),
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] }),
+    ]);
+  };
+
   return {
     customers,
     pendingJobs,
@@ -638,6 +646,7 @@ export function useSupabaseData() {
     rescheduleJob,
     skipJob,
     markJobPaid,
+    refetchAll,
     isLoading,
     userEmail: user?.email || '',
   };
