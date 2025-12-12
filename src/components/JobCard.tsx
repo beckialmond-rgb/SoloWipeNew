@@ -6,7 +6,7 @@ import { useState } from 'react';
 
 interface JobCardProps {
   job: JobWithCustomer;
-  onComplete: (jobId: string) => void;
+  onComplete: (job: JobWithCustomer) => void;
   onSkip: (jobId: string) => void;
   index: number;
 }
@@ -34,7 +34,7 @@ export function JobCard({ job, onComplete, onSkip, index }: JobCardProps) {
     setIsDragging(false);
     if (info.offset.x < -SWIPE_THRESHOLD) {
       triggerHaptic('medium');
-      onComplete(job.id);
+      onComplete(job);
     } else if (info.offset.x > SWIPE_THRESHOLD) {
       triggerHaptic('light');
       onSkip(job.id);
@@ -42,7 +42,7 @@ export function JobCard({ job, onComplete, onSkip, index }: JobCardProps) {
   };
 
   const handleComplete = () => {
-    onComplete(job.id);
+    onComplete(job);
   };
 
   const handleSkip = () => {
