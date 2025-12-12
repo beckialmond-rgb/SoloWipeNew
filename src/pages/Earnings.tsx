@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { PoundSterling, Filter, Calendar, Users, List, Download } from 'lucide-react';
+import { PoundSterling, Filter, Calendar, Users, List, Download, Search, X } from 'lucide-react';
 import { format, startOfWeek, startOfMonth, subMonths } from 'date-fns';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -14,6 +14,7 @@ import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { JobWithCustomer } from '@/types/database';
 import { Toggle } from '@/components/ui/toggle';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -79,6 +80,7 @@ const Earnings = () => {
   const [dateRange, setDateRange] = useState<DateRange>('today');
   const [groupByCustomer, setGroupByCustomer] = useState(false);
   const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
 
   const startDate = getDateRangeStart(dateRange);
 
@@ -108,9 +110,24 @@ const Earnings = () => {
   });
 
   const filteredJobs = useMemo(() => {
-    if (!showUnpaidOnly) return completedJobs;
-    return completedJobs.filter(job => job.payment_status === 'unpaid');
-  }, [completedJobs, showUnpaidOnly]);
+    let jobs = completedJobs;
+    
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      jobs = jobs.filter(job => 
+        job.customer.name.toLowerCase().includes(query) ||
+        job.customer.address.toLowerCase().includes(query)
+      );
+    }
+    
+    // Filter by payment status
+    if (showUnpaidOnly) {
+      jobs = jobs.filter(job => job.payment_status === 'unpaid');
+    }
+    
+    return jobs;
+  }, [completedJobs, showUnpaidOnly, searchQuery]);
 
   const groupedByCustomer = useMemo((): GroupedCustomer[] => {
     const groups: Map<string, GroupedCustomer> = new Map();
@@ -285,6 +302,25 @@ const Earnings = () => {
                 <h2 className="text-lg font-semibold text-foreground">
                   Completed Jobs
                 </h2>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by customer name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-9 h-10"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
 
               {/* Filters Row */}
