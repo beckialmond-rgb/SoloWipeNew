@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { PoundSterling, Filter, Calendar } from 'lucide-react';
-import { format, subDays, startOfWeek, startOfMonth, subMonths } from 'date-fns';
+import { PoundSterling, Filter, Calendar, Users, List } from 'lucide-react';
+import { format, startOfWeek, startOfMonth, subMonths } from 'date-fns';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { EarningsCard } from '@/components/EarningsCard';
@@ -24,6 +24,14 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Customer } from '@/types/database';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { ChevronDown } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
 
 type DateRange = 'today' | 'week' | 'month' | '3months';
 
@@ -50,6 +58,15 @@ const getDateRangeStart = (range: DateRange): string => {
   }
 };
 
+interface GroupedCustomer {
+  customerId: string;
+  customerName: string;
+  customerAddress: string;
+  jobs: JobWithCustomer[];
+  totalAmount: number;
+  unpaidAmount: number;
+}
+
 const Earnings = () => {
   const { user } = useAuth();
   const { todayEarnings, weeklyEarnings, markJobPaid, isLoading: baseLoading } = useSupabaseData();
@@ -57,6 +74,8 @@ const Earnings = () => {
   const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
   const [showUnpaidOnly, setShowUnpaidOnly] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange>('today');
+  const [groupByCustomer, setGroupByCustomer] = useState(false);
+  const [expandedCustomers, setExpandedCustomers] = useState<Set<string>>(new Set());
 
   const startDate = getDateRangeStart(dateRange);
 
@@ -89,6 +108,32 @@ const Earnings = () => {
     if (!showUnpaidOnly) return completedJobs;
     return completedJobs.filter(job => job.payment_status === 'unpaid');
   }, [completedJobs, showUnpaidOnly]);
+
+  const groupedByCustomer = useMemo((): GroupedCustomer[] => {
+    const groups: Map<string, GroupedCustomer> = new Map();
+    
+    filteredJobs.forEach(job => {
+      const existing = groups.get(job.customer_id);
+      if (existing) {
+        existing.jobs.push(job);
+        existing.totalAmount += job.amount_collected || 0;
+        if (job.payment_status === 'unpaid') {
+          existing.unpaidAmount += job.amount_collected || 0;
+        }
+      } else {
+        groups.set(job.customer_id, {
+          customerId: job.customer_id,
+          customerName: job.customer.name,
+          customerAddress: job.customer.address,
+          jobs: [job],
+          totalAmount: job.amount_collected || 0,
+          unpaidAmount: job.payment_status === 'unpaid' ? (job.amount_collected || 0) : 0,
+        });
+      }
+    });
+    
+    return Array.from(groups.values()).sort((a, b) => b.totalAmount - a.totalAmount);
+  }, [filteredJobs]);
 
   const unpaidCount = useMemo(() => 
     completedJobs.filter(job => job.payment_status === 'unpaid').length,
@@ -124,6 +169,18 @@ const Earnings = () => {
     await markJobPaid(selectedJob.id, method);
     setIsMarkPaidOpen(false);
     setSelectedJob(null);
+  };
+
+  const toggleCustomerExpanded = (customerId: string) => {
+    setExpandedCustomers(prev => {
+      const next = new Set(prev);
+      if (next.has(customerId)) {
+        next.delete(customerId);
+      } else {
+        next.add(customerId);
+      }
+      return next;
+    });
   };
 
   const isLoading = baseLoading || jobsLoading;
@@ -187,7 +244,7 @@ const Earnings = () => {
               </div>
 
               {/* Filters Row */}
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
                 <Select value={dateRange} onValueChange={(v) => setDateRange(v as DateRange)}>
                   <SelectTrigger className="w-[140px] h-9">
                     <Calendar className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
@@ -202,6 +259,16 @@ const Earnings = () => {
                   </SelectContent>
                 </Select>
 
+                <Toggle
+                  pressed={groupByCustomer}
+                  onPressedChange={setGroupByCustomer}
+                  size="sm"
+                  className="gap-1.5 h-9 data-[state=on]:bg-primary/10 data-[state=on]:text-primary"
+                >
+                  {groupByCustomer ? <Users className="w-3.5 h-3.5" /> : <List className="w-3.5 h-3.5" />}
+                  {groupByCustomer ? 'Grouped' : 'List'}
+                </Toggle>
+
                 {unpaidCount > 0 && (
                   <Toggle
                     pressed={showUnpaidOnly}
@@ -210,7 +277,7 @@ const Earnings = () => {
                     className="gap-1.5 h-9 data-[state=on]:bg-amber-100 data-[state=on]:text-amber-700"
                   >
                     <Filter className="w-3.5 h-3.5" />
-                    Unpaid ({unpaidCount})
+                    Unpaid
                   </Toggle>
                 )}
 
@@ -220,16 +287,75 @@ const Earnings = () => {
               </div>
 
               {filteredJobs.length > 0 ? (
-                <div className="space-y-3">
-                  {filteredJobs.map((job, index) => (
-                    <CompletedJobItem 
-                      key={job.id} 
-                      job={job} 
-                      index={index}
-                      onMarkPaid={handleMarkPaid}
-                    />
-                  ))}
-                </div>
+                groupByCustomer ? (
+                  <div className="space-y-3">
+                    {groupedByCustomer.map((group, groupIndex) => (
+                      <Collapsible
+                        key={group.customerId}
+                        open={expandedCustomers.has(group.customerId)}
+                        onOpenChange={() => toggleCustomerExpanded(group.customerId)}
+                      >
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: groupIndex * 0.05 }}
+                          className="bg-card rounded-xl border border-border overflow-hidden"
+                        >
+                          <CollapsibleTrigger className="w-full p-4 flex items-center gap-3 hover:bg-muted/50 transition-colors">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <Users className="w-5 h-5 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0 text-left">
+                              <p className="font-medium text-foreground truncate">
+                                {group.customerName}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {group.jobs.length} {group.jobs.length === 1 ? 'job' : 'jobs'}
+                                {group.unpaidAmount > 0 && (
+                                  <span className="text-amber-600 ml-2">
+                                    (£{group.unpaidAmount.toFixed(2)} unpaid)
+                                  </span>
+                                )}
+                              </p>
+                            </div>
+                            <div className="text-right flex items-center gap-2">
+                              <p className="font-bold text-accent">
+                                £{group.totalAmount.toFixed(2)}
+                              </p>
+                              <ChevronDown className={cn(
+                                "w-4 h-4 text-muted-foreground transition-transform",
+                                expandedCustomers.has(group.customerId) && "rotate-180"
+                              )} />
+                            </div>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <div className="border-t border-border px-4 py-3 space-y-2 bg-muted/30">
+                              {group.jobs.map((job, index) => (
+                                <CompletedJobItem 
+                                  key={job.id} 
+                                  job={job} 
+                                  index={index}
+                                  onMarkPaid={handleMarkPaid}
+                                />
+                              ))}
+                            </div>
+                          </CollapsibleContent>
+                        </motion.div>
+                      </Collapsible>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredJobs.map((job, index) => (
+                      <CompletedJobItem 
+                        key={job.id} 
+                        job={job} 
+                        index={index}
+                        onMarkPaid={handleMarkPaid}
+                      />
+                    ))}
+                  </div>
+                )
               ) : (
                 <EmptyState
                   title={showUnpaidOnly ? "No unpaid jobs" : "No jobs completed"}
