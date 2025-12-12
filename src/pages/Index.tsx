@@ -41,6 +41,8 @@ const Index = () => {
   const [isSkippingAll, setIsSkippingAll] = useState(false);
   const [notesJob, setNotesJob] = useState<JobWithCustomer | null>(null);
   const [completedOpen, setCompletedOpen] = useState(true);
+  const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
+  const [jobToComplete, setJobToComplete] = useState<JobWithCustomer | null>(null);
 
   // Pull to refresh
   const { isPulling, isRefreshing, pullDistance, handlers } = usePullToRefresh({
@@ -59,9 +61,16 @@ const Index = () => {
     setLocalJobs(pendingJobs);
   }, [pendingJobs]);
 
-  const handleCompleteJob = async (jobId: string) => {
-    if (completingJobId) return; // Prevent double-clicks
+  const handleCompleteRequest = (job: JobWithCustomer) => {
+    setJobToComplete(job);
+    setCompleteConfirmOpen(true);
+  };
+
+  const handleConfirmComplete = async () => {
+    if (!jobToComplete || completingJobId) return;
     
+    const jobId = jobToComplete.id;
+    setCompleteConfirmOpen(false);
     setCompletingJobId(jobId);
 
     // Fire confetti immediately for responsiveness
@@ -93,6 +102,7 @@ const Index = () => {
       });
     } finally {
       setCompletingJobId(null);
+      setJobToComplete(null);
     }
   };
 
@@ -280,7 +290,7 @@ const Index = () => {
                   <JobCard
                     key={job.id}
                     job={job}
-                    onComplete={handleCompleteJob}
+                    onComplete={handleCompleteRequest}
                     onSkip={handleSkipRequestById}
                     index={index}
                   />
@@ -372,6 +382,29 @@ const Index = () => {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleConfirmSkipAll}>Skip All Jobs</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={completeConfirmOpen} onOpenChange={setCompleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Mark job complete?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {jobToComplete && (
+                <>
+                  This will mark <strong>{jobToComplete.customer.name}</strong> at{' '}
+                  <strong>{jobToComplete.customer.address}</strong> as complete and collect{' '}
+                  <strong>£{jobToComplete.customer.price}</strong>.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmComplete} className="bg-accent hover:bg-accent/90">
+              Mark Complete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
