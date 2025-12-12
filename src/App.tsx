@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Customers from "./pages/Customers";
+import Money from "./pages/Money";
 import Earnings from "./pages/Earnings";
 import Settings from "./pages/Settings";
 import Install from "./pages/Install";
@@ -41,6 +42,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Customers />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/money"
+              element={
+                <ProtectedRoute>
+                  <Money />
                 </ProtectedRoute>
               }
             />
