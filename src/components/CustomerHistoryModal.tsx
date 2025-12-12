@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, History, TrendingUp, CheckCircle, Clock, PoundSterling } from 'lucide-react';
+import { X, History, TrendingUp, CheckCircle, Clock, PoundSterling, StickyNote } from 'lucide-react';
 import { Customer, JobWithCustomer } from '@/types/database';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -185,16 +185,26 @@ export function CustomerHistoryModal({ customer, isOpen, onClose }: CustomerHist
                           ) : (
                             <Clock className="w-5 h-5 text-primary" />
                           )}
-                          <div>
-                            <p className="font-medium text-foreground">
-                              {format(new Date(job.scheduled_date), 'd MMM yyyy')}
-                            </p>
+                          <div className="flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-medium text-foreground">
+                                {format(new Date(job.scheduled_date), 'd MMM yyyy')}
+                              </p>
+                              {job.notes && (
+                                <StickyNote className="w-3.5 h-3.5 text-amber-500" />
+                              )}
+                            </div>
                             <p className="text-sm text-muted-foreground">
                               {job.status === 'completed' 
                                 ? `Completed${job.completed_at ? ` • ${format(new Date(job.completed_at), 'd MMM')}` : ''}`
                                 : 'Scheduled'
                               }
                             </p>
+                            {job.notes && (
+                              <p className="text-xs text-muted-foreground mt-1 italic line-clamp-2">
+                                {job.notes}
+                              </p>
+                            )}
                           </div>
                         </div>
                         <div className="text-right">
