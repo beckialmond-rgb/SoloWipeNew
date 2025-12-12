@@ -22,6 +22,8 @@ export type Database = {
           frequency_weeks: number
           gocardless_id: string | null
           id: string
+          latitude: number | null
+          longitude: number | null
           mobile_phone: string | null
           name: string
           notes: string | null
@@ -36,6 +38,8 @@ export type Database = {
           frequency_weeks?: number
           gocardless_id?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           mobile_phone?: string | null
           name: string
           notes?: string | null
@@ -50,6 +54,8 @@ export type Database = {
           frequency_weeks?: number
           gocardless_id?: string | null
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           mobile_phone?: string | null
           name?: string
           notes?: string | null
@@ -80,6 +86,7 @@ export type Database = {
           payment_date: string | null
           payment_method: string | null
           payment_status: string
+          photo_url: string | null
           scheduled_date: string
           status: string
         }
@@ -95,6 +102,7 @@ export type Database = {
           payment_date?: string | null
           payment_method?: string | null
           payment_status?: string
+          photo_url?: string | null
           scheduled_date: string
           status?: string
         }
@@ -110,6 +118,7 @@ export type Database = {
           payment_date?: string | null
           payment_method?: string | null
           payment_status?: string
+          photo_url?: string | null
           scheduled_date?: string
           status?: string
         }
@@ -127,16 +136,19 @@ export type Database = {
         Row: {
           business_name: string
           created_at: string
+          google_review_link: string | null
           id: string
         }
         Insert: {
           business_name?: string
           created_at?: string
+          google_review_link?: string | null
           id: string
         }
         Update: {
           business_name?: string
           created_at?: string
+          google_review_link?: string | null
           id?: string
         }
         Relationships: []

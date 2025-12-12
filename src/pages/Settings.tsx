@@ -1,21 +1,23 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { EditBusinessNameModal } from '@/components/EditBusinessNameModal';
 import { ExportEarningsModal } from '@/components/ExportEarningsModal';
+import { BusinessInsights } from '@/components/BusinessInsights';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const Settings = () => {
-  const { businessName, userEmail, updateBusinessName, recentlyArchivedCustomers, unarchiveCustomer } = useSupabaseData();
+  const { businessName, userEmail, updateBusinessName, recentlyArchivedCustomers, unarchiveCustomer, weeklyEarnings, customers } = useSupabaseData();
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const { isInstalled } = useInstallPrompt();
@@ -23,6 +25,7 @@ const Settings = () => {
   const [isEditBusinessNameOpen, setIsEditBusinessNameOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [insightsOpen, setInsightsOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -64,11 +67,44 @@ const Settings = () => {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-3"
         >
+          {/* Business Insights Collapsible */}
+          <Collapsible open={insightsOpen} onOpenChange={setInsightsOpen}>
+            <CollapsibleTrigger asChild>
+              <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={cn(
+                  "w-full bg-card rounded-xl border border-border p-4",
+                  "flex items-center gap-4 text-left",
+                  "hover:bg-muted/50 transition-colors",
+                  "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+                )}
+              >
+                <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
+                  <BarChart3 className="w-5 h-5 text-accent" />
+                </div>
+                
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-muted-foreground">Business</p>
+                  <p className="font-medium text-foreground">Insights & Stats</p>
+                </div>
+
+                <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", insightsOpen && "rotate-90")} />
+              </motion.button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <BusinessInsights 
+                weeklyEarnings={weeklyEarnings} 
+                customerCount={customers.length}
+              />
+            </CollapsibleContent>
+          </Collapsible>
+
           {/* Business Name - Clickable */}
           <motion.button
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0 }}
+            transition={{ delay: 0.05 }}
             onClick={() => setIsEditBusinessNameOpen(true)}
             className={cn(
               "w-full bg-card rounded-xl border border-border p-4",
@@ -286,7 +322,7 @@ const Settings = () => {
 
         {/* App Version */}
         <p className="text-center text-xs text-muted-foreground mt-12">
-          SoloWipe v1.0.0
+          SoloWipe v1.1.0
         </p>
       </main>
 

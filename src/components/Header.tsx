@@ -1,12 +1,14 @@
 import { format } from 'date-fns';
+import { WeatherWidget } from './WeatherWidget';
 
 interface HeaderProps {
   showLogo?: boolean;
   title?: string;
   rightContent?: React.ReactNode;
+  showWeather?: boolean;
 }
 
-export function Header({ showLogo = true, title, rightContent }: HeaderProps) {
+export function Header({ showLogo = true, title, rightContent, showWeather = false }: HeaderProps) {
   const today = format(new Date(), 'EEE, d MMM');
 
   return (
@@ -24,7 +26,8 @@ export function Header({ showLogo = true, title, rightContent }: HeaderProps) {
           ) : null}
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {showWeather && <WeatherWidget />}
           {rightContent || (
             <span className="text-sm font-medium text-muted-foreground">
               {today}
