@@ -274,9 +274,9 @@ export function useSupabaseData() {
     enabled: !!user,
   });
 
-  // Complete job mutation
+  // Complete job mutation with optional custom amount and photo
   const completeJobMutation = useMutation({
-    mutationFn: async (jobId: string) => {
+    mutationFn: async ({ jobId, customAmount, photoUrl }: { jobId: string; customAmount?: number; photoUrl?: string }) => {
       const job = pendingJobs.find(j => j.id === jobId);
       if (!job) throw new Error('Job not found');
 
@@ -293,16 +293,20 @@ export function useSupabaseData() {
       const paymentMethod = isGoCardless ? 'gocardless' : null;
       const paymentDate = isGoCardless ? completedAt : null;
 
+      // Use custom amount if provided, otherwise use customer's default price
+      const amountCollected = customAmount ?? job.customer.price;
+
       // 1. Update current job to completed
       const { error: updateError } = await supabase
         .from('jobs')
         .update({
           status: 'completed',
           completed_at: completedAt,
-          amount_collected: job.customer.price,
+          amount_collected: amountCollected,
           payment_status: paymentStatus,
           payment_method: paymentMethod,
           payment_date: paymentDate,
+          photo_url: photoUrl || null,
         })
         .eq('id', jobId);
 
@@ -324,7 +328,7 @@ export function useSupabaseData() {
       return {
         jobId,
         newJobId: newJob.id,
-        collectedAmount: job.customer.price,
+        collectedAmount: amountCollected,
         nextDate: format(nextDate, 'dd MMM yyyy'),
         customerName: job.customer.name,
       };
@@ -360,6 +364,42 @@ export function useSupabaseData() {
       queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
       queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
       queryClient.invalidateQueries({ queryKey: ['weeklyEarnings'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  // Batch mark jobs as paid mutation
+  const batchMarkPaidMutation = useMutation({
+    mutationFn: async ({ jobIds, method }: { jobIds: string[]; method: 'cash' | 'transfer' }) => {
+      const now = new Date().toISOString();
+
+      const { error } = await supabase
+        .from('jobs')
+        .update({
+          payment_status: 'paid',
+          payment_method: method,
+          payment_date: now,
+        })
+        .in('id', jobIds);
+
+      if (error) throw error;
+      
+      return { count: jobIds.length, method };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
+      queryClient.invalidateQueries({ queryKey: ['weeklyEarnings'] });
+      toast({
+        title: `${result.count} payments recorded!`,
+        description: `Marked as ${result.method}`,
+      });
     },
     onError: (error) => {
       toast({
@@ -751,8 +791,8 @@ export function useSupabaseData() {
     },
   });
 
-  const completeJob = (jobId: string) => {
-    return completeJobMutation.mutateAsync(jobId);
+  const completeJob = (jobId: string, customAmount?: number, photoUrl?: string) => {
+    return completeJobMutation.mutateAsync({ jobId, customAmount, photoUrl });
   };
 
   const addCustomer = (data: {
@@ -800,6 +840,10 @@ export function useSupabaseData() {
 
   const markJobPaid = (jobId: string, method: 'cash' | 'transfer') => {
     return markJobPaidMutation.mutateAsync({ jobId, method });
+  };
+
+  const batchMarkPaid = (jobIds: string[], method: 'cash' | 'transfer') => {
+    return batchMarkPaidMutation.mutateAsync({ jobIds, method });
   };
 
   const updateJobNotes = (jobId: string, notes: string | null) => {
@@ -850,6 +894,7 @@ export function useSupabaseData() {
     rescheduleJob,
     skipJob,
     markJobPaid,
+    batchMarkPaid,
     updateJobNotes,
     undoCompleteJob,
     undoMarkPaid,

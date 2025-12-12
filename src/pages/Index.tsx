@@ -14,6 +14,9 @@ import { OnMyWayButton } from '@/components/OnMyWayButton';
 import { QuickAddCustomerModal } from '@/components/QuickAddCustomerModal';
 import { WelcomeFlow } from '@/components/WelcomeFlow';
 import { AskForReviewButton } from '@/components/AskForReviewButton';
+import { PriceAdjustModal } from '@/components/PriceAdjustModal';
+import { PhotoCaptureModal } from '@/components/PhotoCaptureModal';
+import { OptimizeRouteButton } from '@/components/OptimizeRouteButton';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -50,6 +53,9 @@ const Index = () => {
   const [jobToComplete, setJobToComplete] = useState<JobWithCustomer | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [priceAdjustOpen, setPriceAdjustOpen] = useState(false);
+  const [photoCaptureOpen, setPhotoCaptureOpen] = useState(false);
+  const [capturedPhotoUrl, setCapturedPhotoUrl] = useState<string | null>(null);
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     return localStorage.getItem('solowipe_welcome_dismissed') === 'true';
   });
@@ -91,15 +97,15 @@ const Index = () => {
 
   const handleCompleteRequest = (job: JobWithCustomer) => {
     setJobToComplete(job);
-    setCompleteConfirmOpen(true);
+    setCapturedPhotoUrl(null);
+    setPriceAdjustOpen(true);
   };
 
-  const handleConfirmComplete = async () => {
+  const handleConfirmComplete = async (amount: number, photoUrl?: string) => {
     if (!jobToComplete || completingJobId) return;
     
     const jobId = jobToComplete.id;
-    const customerName = jobToComplete.customer.name;
-    setCompleteConfirmOpen(false);
+    setPriceAdjustOpen(false);
     setCompletingJobId(jobId);
 
     // Fire confetti immediately for responsiveness
@@ -114,7 +120,7 @@ const Index = () => {
     setLocalJobs(prev => prev.filter(job => job.id !== jobId));
 
     try {
-      const result = await completeJob(jobId);
+      const result = await completeJob(jobId, amount, photoUrl);
       
       const { id: toastId } = toast({
         title: `£${result.collectedAmount} Collected!`,
@@ -151,7 +157,17 @@ const Index = () => {
     } finally {
       setCompletingJobId(null);
       setJobToComplete(null);
+      setCapturedPhotoUrl(null);
     }
+  };
+
+  const handleCapturePhoto = () => {
+    setPhotoCaptureOpen(true);
+  };
+
+  const handlePhotoCapture = (url: string) => {
+    setCapturedPhotoUrl(url);
+    setPhotoCaptureOpen(false);
   };
 
   const handleSkipRequest = (job: JobWithCustomer) => {
@@ -396,6 +412,13 @@ const Index = () => {
               </motion.div>
             )}
 
+            {/* Route optimization */}
+            {localJobs.length >= 2 && (
+              <div className="mb-4">
+                <OptimizeRouteButton jobs={localJobs} onReorder={setLocalJobs} />
+              </div>
+            )}
+
             {/* Jobs list */}
             <div className="space-y-4">
               <AnimatePresence mode="popLayout">
@@ -530,28 +553,25 @@ const Index = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={completeConfirmOpen} onOpenChange={setCompleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Mark job complete?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {jobToComplete && (
-                <>
-                  This will mark <strong>{jobToComplete.customer.name}</strong> at{' '}
-                  <strong>{jobToComplete.customer.address}</strong> as complete and collect{' '}
-                  <strong>£{jobToComplete.customer.price}</strong>.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmComplete} className="bg-accent hover:bg-accent/90">
-              Mark Complete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <PriceAdjustModal
+        isOpen={priceAdjustOpen}
+        job={jobToComplete}
+        onClose={() => {
+          setPriceAdjustOpen(false);
+          setJobToComplete(null);
+          setCapturedPhotoUrl(null);
+        }}
+        onConfirm={handleConfirmComplete}
+        onCapturePhoto={handleCapturePhoto}
+        capturedPhotoUrl={capturedPhotoUrl}
+      />
+
+      <PhotoCaptureModal
+        isOpen={photoCaptureOpen}
+        onClose={() => setPhotoCaptureOpen(false)}
+        onCapture={handlePhotoCapture}
+        jobId={jobToComplete?.id}
+      />
 
       <BottomNav />
     </div>
