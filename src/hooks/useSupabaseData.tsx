@@ -193,6 +193,67 @@ export function useSupabaseData() {
     0
   );
 
+  // Fetch unpaid jobs (completed but not yet paid)
+  const { data: unpaidJobs = [], isLoading: unpaidLoading } = useQuery({
+    queryKey: ['unpaidJobs', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          customer:customers(*)
+        `)
+        .eq('status', 'completed')
+        .eq('payment_status', 'unpaid')
+        .order('completed_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      return (data || []).map(job => ({
+        ...job,
+        customer: job.customer as Customer,
+      })) as JobWithCustomer[];
+    },
+    enabled: !!user,
+  });
+
+  // Fetch paid jobs this week
+  const sevenDaysAgo = format(subWeeks(new Date(), 1), 'yyyy-MM-dd');
+  
+  const { data: paidThisWeek = [], isLoading: paidLoading } = useQuery({
+    queryKey: ['paidThisWeek', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          customer:customers(*)
+        `)
+        .eq('status', 'completed')
+        .eq('payment_status', 'paid')
+        .gte('payment_date', `${sevenDaysAgo}T00:00:00`)
+        .order('payment_date', { ascending: false });
+      
+      if (error) throw error;
+      
+      return (data || []).map(job => ({
+        ...job,
+        customer: job.customer as Customer,
+      })) as JobWithCustomer[];
+    },
+    enabled: !!user,
+  });
+
+  // Calculate total outstanding
+  const totalOutstanding = unpaidJobs.reduce(
+    (sum, job) => sum + (job.amount_collected || 0),
+    0
+  );
+
   // Complete job mutation
   const completeJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
@@ -206,6 +267,12 @@ export function useSupabaseData() {
       const nextDate = addWeeks(now, job.customer.frequency_weeks);
       const nextScheduledDate = format(nextDate, 'yyyy-MM-dd');
 
+      // Determine payment status based on GoCardless
+      const isGoCardless = !!job.customer.gocardless_id;
+      const paymentStatus = isGoCardless ? 'paid' : 'unpaid';
+      const paymentMethod = isGoCardless ? 'gocardless' : null;
+      const paymentDate = isGoCardless ? completedAt : null;
+
       // 1. Update current job to completed
       const { error: updateError } = await supabase
         .from('jobs')
@@ -213,6 +280,9 @@ export function useSupabaseData() {
           status: 'completed',
           completed_at: completedAt,
           amount_collected: job.customer.price,
+          payment_status: paymentStatus,
+          payment_method: paymentMethod,
+          payment_date: paymentDate,
         })
         .eq('id', jobId);
 
@@ -238,6 +308,41 @@ export function useSupabaseData() {
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
       queryClient.invalidateQueries({ queryKey: ['completedToday'] });
       queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
+    },
+  });
+
+  // Mark job as paid mutation
+  const markJobPaidMutation = useMutation({
+    mutationFn: async ({ jobId, method }: { jobId: string; method: 'cash' | 'transfer' }) => {
+      const now = new Date().toISOString();
+
+      const { error } = await supabase
+        .from('jobs')
+        .update({
+          payment_status: 'paid',
+          payment_method: method,
+          payment_date: now,
+        })
+        .eq('id', jobId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
+      queryClient.invalidateQueries({ queryKey: ['weeklyEarnings'] });
+      toast({
+        title: 'Payment recorded!',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
@@ -507,8 +612,12 @@ export function useSupabaseData() {
     return skipJobMutation.mutateAsync(jobId);
   };
 
+  const markJobPaid = (jobId: string, method: 'cash' | 'transfer') => {
+    return markJobPaidMutation.mutateAsync({ jobId, method });
+  };
+
   const businessName = profile?.business_name || 'My Window Cleaning';
-  const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading;
+  const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading;
 
   return {
     customers,
@@ -517,6 +626,9 @@ export function useSupabaseData() {
     completedToday,
     todayEarnings,
     weeklyEarnings,
+    unpaidJobs,
+    paidThisWeek,
+    totalOutstanding,
     businessName,
     completeJob,
     addCustomer,
@@ -525,6 +637,7 @@ export function useSupabaseData() {
     updateBusinessName,
     rescheduleJob,
     skipJob,
+    markJobPaid,
     isLoading,
     userEmail: user?.email || '',
   };

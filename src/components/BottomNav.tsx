@@ -1,11 +1,12 @@
-import { Home, Users, PoundSterling, Settings } from 'lucide-react';
+import { Home, Users, Wallet, TrendingUp, Settings } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { cn } from '@/lib/utils';
 
 const navItems = [
   { to: '/', icon: Home, label: 'Today' },
   { to: '/customers', icon: Users, label: 'Customers' },
-  { to: '/earnings', icon: PoundSterling, label: 'Earnings' },
+  { to: '/money', icon: Wallet, label: 'Money' },
+  { to: '/earnings', icon: TrendingUp, label: 'Earnings' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 

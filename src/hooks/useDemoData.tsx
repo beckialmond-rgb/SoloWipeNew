@@ -76,6 +76,10 @@ const generateDemoJobs = (customers: Customer[]): JobWithCustomer[] =>
     status: 'pending' as const,
     completed_at: null,
     amount_collected: null,
+    payment_status: 'unpaid' as const,
+    payment_method: null,
+    payment_date: null,
+    invoice_number: null,
     created_at: new Date().toISOString(),
     customer,
   }));
@@ -109,6 +113,10 @@ export function useDemoData() {
       status: 'pending',
       completed_at: null,
       amount_collected: null,
+      payment_status: 'unpaid' as const,
+      payment_method: null,
+      payment_date: null,
+      invoice_number: null,
       created_at: new Date().toISOString(),
       customer: job.customer,
     };
