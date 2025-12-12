@@ -1,6 +1,7 @@
 export interface Profile {
   id: string;
   business_name: string;
+  google_review_link: string | null;
   created_at: string;
 }
 
@@ -16,6 +17,8 @@ export interface Customer {
   gocardless_id: string | null;
   notes: string | null;
   archived_at: string | null;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
 }
 
@@ -32,6 +35,7 @@ export interface Job {
   invoice_number: string | null;
   notes: string | null;
   cancelled_at: string | null;
+  photo_url: string | null;
   created_at: string;
 }
 
