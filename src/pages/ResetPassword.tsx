@@ -1,12 +1,13 @@
 import { useState, useEffect, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Lock, Loader2, CheckCircle, X } from 'lucide-react';
+import { Loader2, CheckCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { usePasswordStrength } from '@/hooks/usePasswordStrength';
 import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
+import { PasswordInput } from '@/components/PasswordInput';
 import { cn } from '@/lib/utils';
 
 const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
@@ -158,25 +159,15 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
           {!success && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <input
-                    type="password"
-                    placeholder="New Password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    onFocus={() => setShowPasswordFeedback(true)}
-                    onBlur={() => setShowPasswordFeedback(false)}
-                    required
-                    minLength={8}
-                    className={cn(
-                      "w-full h-14 pl-12 pr-4 rounded-xl",
-                      "bg-muted border-0",
-                      "text-foreground placeholder:text-muted-foreground",
-                      "focus:outline-none focus:ring-2 focus:ring-primary"
-                    )}
-                  />
-                </div>
+                <PasswordInput
+                  placeholder="New Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setShowPasswordFeedback(true)}
+                  onBlur={() => setShowPasswordFeedback(false)}
+                  required
+                  minLength={8}
+                />
                 
                 {/* Password Strength Indicator */}
                 {password.length > 0 && (
@@ -188,24 +179,14 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
               </div>
 
               <div className="space-y-2">
-                <div className="relative">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <input
-                    type="password"
-                    placeholder="Confirm Password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    minLength={8}
-                    className={cn(
-                      "w-full h-14 pl-12 pr-4 rounded-xl",
-                      "bg-muted border-0",
-                      "text-foreground placeholder:text-muted-foreground",
-                      "focus:outline-none focus:ring-2",
-                      !passwordsMatch ? "focus:ring-destructive ring-2 ring-destructive" : "focus:ring-primary"
-                    )}
-                  />
-                </div>
+                <PasswordInput
+                  placeholder="Confirm Password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  hasError={!passwordsMatch}
+                />
                 {!passwordsMatch && (
                   <p className="text-xs text-destructive flex items-center gap-1">
                     <X className="w-3 h-3" />
