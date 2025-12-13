@@ -27,6 +27,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   const [showVerificationResend, setShowVerificationResend] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
   const [rateLimitedUntil, setRateLimitedUntil] = useState<Date | null>(null);
+  const [failedAttempts, setFailedAttempts] = useState(0);
   
   const passwordsMatch = password === confirmPassword;
   const { user, loading: authLoading, signIn, signUp, signInWithOAuth, resendVerificationEmail } = useAuth();
@@ -99,12 +100,17 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
             setRateLimitedUntil(new Date(Date.now() + 60000)); // 1 minute cooldown
           }
           
+          // Track failed attempts
+          setFailedAttempts(prev => prev + 1);
+          
           toast({
             title: 'Sign in failed',
             description: error.message,
             variant: 'destructive',
           });
         } else {
+          // Reset failed attempts on success
+          setFailedAttempts(0);
           // Store remember me preference
           if (!rememberMe) {
             sessionStorage.setItem('clearSessionOnClose', 'true');
@@ -323,6 +329,24 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
                     Privacy Policy
                   </a>
                 </label>
+              </div>
+            )}
+
+            {/* Account lockout warning */}
+            {isLogin && failedAttempts >= 3 && failedAttempts < 5 && rateLimitSeconds === 0 && (
+              <div className="p-3 rounded-xl bg-warning/10 border border-warning/20">
+                <p className="text-sm text-warning text-center">
+                  ⚠️ {5 - failedAttempts} attempt{5 - failedAttempts !== 1 ? 's' : ''} remaining before temporary lockout
+                </p>
+              </div>
+            )}
+
+            {/* Lockout warning - 5+ failed attempts */}
+            {isLogin && failedAttempts >= 5 && rateLimitSeconds === 0 && (
+              <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                <p className="text-sm text-destructive text-center">
+                  🔒 Multiple failed attempts detected. Your account may be temporarily locked for security. Try again later or reset your password.
+                </p>
               </div>
             )}
 
