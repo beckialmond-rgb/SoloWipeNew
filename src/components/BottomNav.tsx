@@ -4,10 +4,12 @@ import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useOffline } from '@/contexts/OfflineContext';
 import { format } from 'date-fns';
 
 export function BottomNav() {
   const { user } = useAuth();
+  const { pendingCount } = useOffline();
   const today = format(new Date(), 'yyyy-MM-dd');
 
   // Count unpaid jobs
@@ -53,7 +55,7 @@ export function BottomNav() {
     { to: '/customers', icon: Users, label: 'Customers', badge: 0, badgeColor: '' },
     { to: '/money', icon: Wallet, label: 'Money', badge: unpaidCount, badgeColor: 'bg-amber-500' },
     { to: '/calendar', icon: CalendarDays, label: 'Calendar', badge: 0, badgeColor: '' },
-    { to: '/settings', icon: Settings, label: 'Settings', badge: 0, badgeColor: '' },
+    { to: '/settings', icon: Settings, label: 'Settings', badge: pendingCount, badgeColor: 'bg-orange-500' },
   ];
 
   return (
