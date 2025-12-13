@@ -19,7 +19,7 @@ import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 const Money = () => {
   const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, batchMarkPaid, undoMarkPaid, isLoading } = useSupabaseData();
   const { toast, dismiss } = useToast();
-  const { requireAuth } = useSoftPaywall();
+  const { requirePremium } = useSoftPaywall();
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
   const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -27,7 +27,7 @@ const Money = () => {
   const [batchModalOpen, setBatchModalOpen] = useState(false);
 
   const handleMarkPaid = (job: JobWithCustomer) => {
-    if (!requireAuth('mark-paid')) return;
+    if (!requirePremium('mark-paid')) return;
     setSelectedJob(job);
     setIsMarkPaidOpen(true);
   };
