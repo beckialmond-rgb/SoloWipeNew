@@ -13,6 +13,7 @@ import { JobNotesModal } from '@/components/JobNotesModal';
 import { OnMyWayButton } from '@/components/OnMyWayButton';
 import { QuickAddCustomerModal } from '@/components/QuickAddCustomerModal';
 import { WelcomeFlow } from '@/components/WelcomeFlow';
+import { WelcomeTour, useWelcomeTour } from '@/components/WelcomeTour';
 import { AskForReviewButton } from '@/components/AskForReviewButton';
 import { PriceAdjustModal } from '@/components/PriceAdjustModal';
 import { PhotoCaptureModal } from '@/components/PhotoCaptureModal';
@@ -40,6 +41,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 const Index = () => {
   const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading, markJobPaid, profile } = useSupabaseData();
   const { toast, dismiss } = useToast();
+  const { showTour, completeTour } = useWelcomeTour();
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
@@ -614,6 +616,9 @@ const Index = () => {
       />
 
       <BottomNav />
+
+      {/* Welcome Tour for first-time users */}
+      {showTour && <WelcomeTour onComplete={completeTour} />}
     </div>
   );
 };
