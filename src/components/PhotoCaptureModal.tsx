@@ -90,18 +90,18 @@ export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCa
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black z-50 flex flex-col"
+        className="fixed inset-0 bg-black z-50"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 bg-black/50">
+        {/* Header - fixed at top */}
+        <div className="fixed top-0 left-0 right-0 flex items-center justify-between p-4 bg-black/80 z-10">
           <h2 className="text-white font-semibold">Photo Evidence</h2>
           <button onClick={handleClose} className="p-2 hover:bg-white/10 rounded-full">
             <X className="w-6 h-6 text-white" />
           </button>
         </div>
 
-        {/* Preview area */}
-        <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+        {/* Preview area - constrained between header and controls */}
+        <div className="absolute top-16 left-0 right-0 bottom-40 flex items-center justify-center bg-black overflow-hidden">
           {capturedImage ? (
             <img 
               src={capturedImage} 
@@ -150,9 +150,9 @@ export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCa
           )}
         </div>
 
-        {/* Controls - always visible at bottom */}
+        {/* Controls - fixed at bottom, always visible */}
         {capturedImage && (
-          <div className="p-4 pb-24 bg-black/50 safe-bottom">
+          <div className="fixed bottom-0 left-0 right-0 p-4 pb-32 bg-black/80 z-10">
             <div className="flex gap-3">
               <Button
                 variant="outline"
@@ -163,7 +163,7 @@ export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCa
                 Retake
               </Button>
               <Button
-                className="flex-1 h-14 bg-green-600 hover:bg-green-700"
+                className="flex-1 h-14 bg-green-600 hover:bg-green-700 text-white"
                 onClick={uploadPhoto}
                 disabled={isUploading}
               >
