@@ -4,10 +4,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { Customer, JobWithCustomer } from '@/types/database';
 import { format, addWeeks, startOfWeek, subWeeks } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+import { mutationQueue, localData } from '@/lib/offlineStorage';
+import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
 export function useSupabaseData() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { isOnline } = useOnlineStatus();
   const today = format(new Date(), 'yyyy-MM-dd');
   const fourWeeksFromNow = format(addWeeks(new Date(), 4), 'yyyy-MM-dd');
 
@@ -278,13 +281,11 @@ export function useSupabaseData() {
     enabled: !!user,
   });
 
-  // Complete job mutation with optional custom amount and photo
-  // Track in-flight job completions to prevent double-submission
+  // Complete job mutation with OFFLINE SUPPORT
   const completingJobIds = new Set<string>();
 
   const completeJobMutation = useMutation({
     mutationFn: async ({ jobId, customAmount, photoUrl }: { jobId: string; customAmount?: number; photoUrl?: string }) => {
-      // CRITICAL: Prevent double-submission of the same job
       if (completingJobIds.has(jobId)) {
         throw new Error('Job completion already in progress');
       }
@@ -294,7 +295,52 @@ export function useSupabaseData() {
         const job = pendingJobs.find(j => j.id === jobId);
         if (!job) throw new Error('Job not found');
 
-        // Double-check the job hasn't already been completed (race condition guard)
+        const now = new Date();
+        const completedAt = now.toISOString();
+        const nextDate = addWeeks(now, job.customer.frequency_weeks);
+        const nextScheduledDate = format(nextDate, 'yyyy-MM-dd');
+        const isGoCardless = !!job.customer.gocardless_id;
+        const paymentStatus = isGoCardless ? 'paid' : 'unpaid';
+        const paymentMethod = isGoCardless ? 'gocardless' : null;
+        const paymentDate = isGoCardless ? completedAt : null;
+        const amountCollected = customAmount ?? job.customer.price;
+
+        // If offline, queue the mutation and apply optimistic update
+        if (!isOnline) {
+          await mutationQueue.add({
+            type: 'completeJob',
+            payload: {
+              jobId,
+              customAmount,
+              photoUrl,
+              customerData: {
+                customer_id: job.customer_id,
+                frequency_weeks: job.customer.frequency_weeks,
+                price: job.customer.price,
+                gocardless_id: job.customer.gocardless_id,
+              },
+            },
+          });
+
+          // Store optimistic data
+          await localData.setOptimisticJob(jobId, {
+            status: 'completed',
+            completed_at: completedAt,
+            amount_collected: amountCollected,
+            payment_status: paymentStatus,
+          });
+
+          return {
+            jobId,
+            newJobId: `offline_${Date.now()}`,
+            collectedAmount: amountCollected,
+            nextDate: format(nextDate, 'dd MMM yyyy'),
+            customerName: job.customer.name,
+            offline: true,
+          };
+        }
+
+        // Online: perform the actual mutation
         const { data: currentJob } = await supabase
           .from('jobs')
           .select('status')
@@ -305,23 +351,6 @@ export function useSupabaseData() {
           throw new Error('Job already completed');
         }
 
-        const now = new Date();
-        const completedAt = now.toISOString();
-        
-        // Calculate next date from TODAY + frequency_weeks (not from old scheduled date)
-        const nextDate = addWeeks(now, job.customer.frequency_weeks);
-        const nextScheduledDate = format(nextDate, 'yyyy-MM-dd');
-
-        // Determine payment status based on GoCardless
-        const isGoCardless = !!job.customer.gocardless_id;
-        const paymentStatus = isGoCardless ? 'paid' : 'unpaid';
-        const paymentMethod = isGoCardless ? 'gocardless' : null;
-        const paymentDate = isGoCardless ? completedAt : null;
-
-        // Use custom amount if provided, otherwise use customer's default price
-        const amountCollected = customAmount ?? job.customer.price;
-
-        // 1. Update current job to completed
         const { error: updateError } = await supabase
           .from('jobs')
           .update({
@@ -334,11 +363,10 @@ export function useSupabaseData() {
             photo_url: photoUrl || null,
           })
           .eq('id', jobId)
-          .eq('status', 'pending'); // Only update if still pending (atomic guard)
+          .eq('status', 'pending');
 
         if (updateError) throw updateError;
 
-        // 2. Create new job for the future
         const { data: newJob, error: insertError } = await supabase
           .from('jobs')
           .insert({
@@ -359,26 +387,68 @@ export function useSupabaseData() {
           customerName: job.customer.name,
         };
       } finally {
-        // Always remove from tracking set when done
         completingJobIds.delete(jobId);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['completedToday'] });
-      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
+    onMutate: async ({ jobId, customAmount }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['pendingJobs'] });
+      await queryClient.cancelQueries({ queryKey: ['completedToday'] });
+
+      // Snapshot previous values
+      const previousPending = queryClient.getQueryData(['pendingJobs', user?.id, today]);
+      const previousCompleted = queryClient.getQueryData(['completedToday', user?.id, today]);
+
+      // Optimistically update the cache
+      const job = pendingJobs.find(j => j.id === jobId);
+      if (job) {
+        const now = new Date();
+        const completedJob: JobWithCustomer = {
+          ...job,
+          status: 'completed',
+          completed_at: now.toISOString(),
+          amount_collected: customAmount ?? job.customer.price,
+          payment_status: job.customer.gocardless_id ? 'paid' : 'unpaid',
+        };
+
+        // Remove from pending
+        queryClient.setQueryData(['pendingJobs', user?.id, today], (old: JobWithCustomer[] | undefined) =>
+          (old || []).filter(j => j.id !== jobId)
+        );
+
+        // Add to completed
+        queryClient.setQueryData(['completedToday', user?.id, today], (old: JobWithCustomer[] | undefined) =>
+          [completedJob, ...(old || [])]
+        );
+      }
+
+      return { previousPending, previousCompleted };
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousPending) {
+        queryClient.setQueryData(['pendingJobs', user?.id, today], context.previousPending);
+      }
+      if (context?.previousCompleted) {
+        queryClient.setQueryData(['completedToday', user?.id, today], context.previousCompleted);
+      }
+    },
+    onSuccess: (data) => {
+      if (!data?.offline) {
+        queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+        queryClient.invalidateQueries({ queryKey: ['completedToday'] });
+        queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+        queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+        queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
+      }
     },
   });
 
-  // Track in-flight payment operations to prevent double-submission
+  // Mark job as paid with OFFLINE SUPPORT
   const payingJobIds = new Set<string>();
 
-  // Mark job as paid mutation
   const markJobPaidMutation = useMutation({
     mutationFn: async ({ jobId, method }: { jobId: string; method: 'cash' | 'transfer' }) => {
-      // CRITICAL: Prevent double-submission
       if (payingJobIds.has(jobId)) {
         throw new Error('Payment already in progress');
       }
@@ -386,6 +456,22 @@ export function useSupabaseData() {
 
       try {
         const now = new Date().toISOString();
+
+        // If offline, queue the mutation
+        if (!isOnline) {
+          await mutationQueue.add({
+            type: 'markJobPaid',
+            payload: { jobId, method },
+          });
+
+          await localData.setOptimisticJob(jobId, {
+            payment_status: 'paid',
+            payment_method: method,
+            payment_date: now,
+          });
+
+          return { jobId, method, offline: true };
+        }
 
         const { error, count } = await supabase
           .from('jobs')
@@ -395,7 +481,7 @@ export function useSupabaseData() {
             payment_date: now,
           })
           .eq('id', jobId)
-          .eq('payment_status', 'unpaid'); // Only update if still unpaid (atomic guard)
+          .eq('payment_status', 'unpaid');
 
         if (error) throw error;
         if (count === 0) throw new Error('Job already paid');
@@ -405,27 +491,61 @@ export function useSupabaseData() {
         payingJobIds.delete(jobId);
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
-      queryClient.invalidateQueries({ queryKey: ['weeklyEarnings'] });
+    onMutate: async ({ jobId, method }) => {
+      await queryClient.cancelQueries({ queryKey: ['unpaidJobs'] });
+      await queryClient.cancelQueries({ queryKey: ['paidThisWeek'] });
+
+      const previousUnpaid = queryClient.getQueryData(['unpaidJobs', user?.id]);
+      const previousPaid = queryClient.getQueryData(['paidThisWeek', user?.id]);
+
+      const job = unpaidJobs.find(j => j.id === jobId);
+      if (job) {
+        const now = new Date().toISOString();
+        const paidJob: JobWithCustomer = {
+          ...job,
+          payment_status: 'paid',
+          payment_method: method,
+          payment_date: now,
+        };
+
+        queryClient.setQueryData(['unpaidJobs', user?.id], (old: JobWithCustomer[] | undefined) =>
+          (old || []).filter(j => j.id !== jobId)
+        );
+
+        queryClient.setQueryData(['paidThisWeek', user?.id], (old: JobWithCustomer[] | undefined) =>
+          [paidJob, ...(old || [])]
+        );
+      }
+
+      return { previousUnpaid, previousPaid };
     },
-    onError: (error) => {
+    onError: (err, variables, context) => {
+      if (context?.previousUnpaid) {
+        queryClient.setQueryData(['unpaidJobs', user?.id], context.previousUnpaid);
+      }
+      if (context?.previousPaid) {
+        queryClient.setQueryData(['paidThisWeek', user?.id], context.previousPaid);
+      }
       toast({
         title: 'Error',
-        description: error.message,
+        description: err.message,
         variant: 'destructive',
       });
     },
+    onSuccess: (data) => {
+      if (!data?.offline) {
+        queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+        queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
+        queryClient.invalidateQueries({ queryKey: ['weeklyEarnings'] });
+      }
+    },
   });
 
-  // Track in-flight batch payment operations
+  // Batch mark jobs as paid with OFFLINE SUPPORT
   const batchPaymentInProgress = { current: false };
 
-  // Batch mark jobs as paid mutation
   const batchMarkPaidMutation = useMutation({
     mutationFn: async ({ jobIds, method }: { jobIds: string[]; method: 'cash' | 'transfer' }) => {
-      // CRITICAL: Prevent double-submission of batch
       if (batchPaymentInProgress.current) {
         throw new Error('Batch payment already in progress');
       }
@@ -433,6 +553,23 @@ export function useSupabaseData() {
 
       try {
         const now = new Date().toISOString();
+
+        if (!isOnline) {
+          await mutationQueue.add({
+            type: 'batchMarkPaid',
+            payload: { jobIds, method },
+          });
+
+          for (const jobId of jobIds) {
+            await localData.setOptimisticJob(jobId, {
+              payment_status: 'paid',
+              payment_method: method,
+              payment_date: now,
+            });
+          }
+
+          return { count: jobIds.length, method, offline: true };
+        }
 
         const { error } = await supabase
           .from('jobs')
@@ -442,7 +579,7 @@ export function useSupabaseData() {
             payment_date: now,
           })
           .in('id', jobIds)
-          .eq('payment_status', 'unpaid'); // Only update unpaid jobs (atomic guard)
+          .eq('payment_status', 'unpaid');
 
         if (error) throw error;
         
@@ -451,20 +588,36 @@ export function useSupabaseData() {
         batchPaymentInProgress.current = false;
       }
     },
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
-      queryClient.invalidateQueries({ queryKey: ['weeklyEarnings'] });
-      toast({
-        title: `${result.count} payments recorded!`,
-        description: `Marked as ${result.method}`,
-      });
+    onMutate: async ({ jobIds, method }) => {
+      await queryClient.cancelQueries({ queryKey: ['unpaidJobs'] });
+
+      const previousUnpaid = queryClient.getQueryData(['unpaidJobs', user?.id]);
+
+      queryClient.setQueryData(['unpaidJobs', user?.id], (old: JobWithCustomer[] | undefined) =>
+        (old || []).filter(j => !jobIds.includes(j.id))
+      );
+
+      return { previousUnpaid };
     },
-    onError: (error) => {
+    onError: (err, variables, context) => {
+      if (context?.previousUnpaid) {
+        queryClient.setQueryData(['unpaidJobs', user?.id], context.previousUnpaid);
+      }
       toast({
         title: 'Error',
-        description: error.message,
+        description: err.message,
         variant: 'destructive',
+      });
+    },
+    onSuccess: (result) => {
+      if (!result?.offline) {
+        queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+        queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
+        queryClient.invalidateQueries({ queryKey: ['weeklyEarnings'] });
+      }
+      toast({
+        title: `${result.count} payments recorded!`,
+        description: result.offline ? 'Will sync when online' : `Marked as ${result.method}`,
       });
     },
   });
@@ -482,7 +635,6 @@ export function useSupabaseData() {
     }) => {
       if (!user) throw new Error('Not authenticated');
 
-      // 1. Insert customer
       const { data: newCustomer, error: customerError } = await supabase
         .from('customers')
         .insert({
@@ -500,7 +652,6 @@ export function useSupabaseData() {
 
       if (customerError) throw customerError;
 
-      // 2. Create first job with user-selected date
       const { error: jobError } = await supabase
         .from('jobs')
         .insert({
@@ -567,12 +718,11 @@ export function useSupabaseData() {
     },
   });
 
-  // Archive customer mutation (soft-delete jobs instead of hard delete)
+  // Archive customer mutation
   const archiveCustomerMutation = useMutation({
     mutationFn: async (id: string) => {
       const now = new Date().toISOString();
       
-      // 1. Soft-delete all pending jobs for this customer (set cancelled_at)
       const { error: jobsError } = await supabase
         .from('jobs')
         .update({ cancelled_at: now })
@@ -581,7 +731,6 @@ export function useSupabaseData() {
 
       if (jobsError) throw jobsError;
 
-      // 2. Archive the customer with timestamp
       const { error } = await supabase
         .from('customers')
         .update({ status: 'inactive', archived_at: now })
@@ -613,7 +762,6 @@ export function useSupabaseData() {
   // Unarchive customer mutation
   const unarchiveCustomerMutation = useMutation({
     mutationFn: async (id: string) => {
-      // 1. Restore the customer
       const { error: customerError } = await supabase
         .from('customers')
         .update({ status: 'active', archived_at: null })
@@ -621,7 +769,6 @@ export function useSupabaseData() {
 
       if (customerError) throw customerError;
 
-      // 2. Restore cancelled pending jobs (clear cancelled_at)
       const { error: jobsError } = await supabase
         .from('jobs')
         .update({ cancelled_at: null })
@@ -631,7 +778,6 @@ export function useSupabaseData() {
 
       if (jobsError) throw jobsError;
       
-      // Get the customer name for the toast
       const customer = recentlyArchivedCustomers.find(c => c.id === id);
       return { customerName: customer?.name || 'Customer' };
     },
@@ -708,9 +854,22 @@ export function useSupabaseData() {
     },
   });
 
-  // Reschedule job mutation
+  // Reschedule job mutation with OFFLINE SUPPORT
   const rescheduleJobMutation = useMutation({
     mutationFn: async ({ jobId, newDate }: { jobId: string; newDate: string }) => {
+      if (!isOnline) {
+        await mutationQueue.add({
+          type: 'rescheduleJob',
+          payload: { jobId, newDate },
+        });
+
+        await localData.setOptimisticJob(jobId, {
+          scheduled_date: newDate,
+        });
+
+        return { offline: true };
+      }
+
       const { error } = await supabase
         .from('jobs')
         .update({ scheduled_date: newDate })
@@ -718,26 +877,49 @@ export function useSupabaseData() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+    onMutate: async ({ jobId, newDate }) => {
+      await queryClient.cancelQueries({ queryKey: ['pendingJobs'] });
+      await queryClient.cancelQueries({ queryKey: ['upcomingJobs'] });
+
+      const previousPending = queryClient.getQueryData(['pendingJobs', user?.id, today]);
+      const previousUpcoming = queryClient.getQueryData(['upcomingJobs', user?.id, today]);
+
+      // Update job in cache
+      const updateJobDate = (jobs: JobWithCustomer[] | undefined) =>
+        (jobs || []).map(j => j.id === jobId ? { ...j, scheduled_date: newDate } : j);
+
+      queryClient.setQueryData(['pendingJobs', user?.id, today], updateJobDate);
+      queryClient.setQueryData(['upcomingJobs', user?.id, today], updateJobDate);
+
+      return { previousPending, previousUpcoming };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousPending) {
+        queryClient.setQueryData(['pendingJobs', user?.id, today], context.previousPending);
+      }
+      if (context?.previousUpcoming) {
+        queryClient.setQueryData(['upcomingJobs', user?.id, today], context.previousUpcoming);
+      }
+      toast({
+        title: 'Error',
+        description: err.message,
+        variant: 'destructive',
+      });
+    },
+    onSuccess: (data) => {
+      if (!data?.offline) {
+        queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+        queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      }
       toast({
         title: 'Job rescheduled',
       });
     },
-    onError: (error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
   });
 
-  // Skip job mutation - reschedules to next frequency interval without marking complete
+  // Skip job mutation with OFFLINE SUPPORT
   const skipJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      // Try to find in pending jobs first, then upcoming jobs
       const job = pendingJobs.find(j => j.id === jobId) || upcomingJobs.find(j => j.id === jobId);
       if (!job) throw new Error('Job not found');
 
@@ -745,6 +927,25 @@ export function useSupabaseData() {
       const now = new Date();
       const nextDate = addWeeks(now, job.customer.frequency_weeks);
       const nextScheduledDate = format(nextDate, 'yyyy-MM-dd');
+
+      if (!isOnline) {
+        await mutationQueue.add({
+          type: 'skipJob',
+          payload: { jobId, newScheduledDate: nextScheduledDate },
+        });
+
+        await localData.setOptimisticJob(jobId, {
+          scheduled_date: nextScheduledDate,
+        });
+
+        return {
+          jobId,
+          originalDate,
+          nextDate: format(nextDate, 'dd MMM yyyy'),
+          customerName: job.customer.name,
+          offline: true,
+        };
+      }
 
       const { error } = await supabase
         .from('jobs')
@@ -760,23 +961,44 @@ export function useSupabaseData() {
         customerName: job.customer.name,
       };
     },
-    onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+    onMutate: async (jobId) => {
+      await queryClient.cancelQueries({ queryKey: ['pendingJobs'] });
+      await queryClient.cancelQueries({ queryKey: ['upcomingJobs'] });
+
+      const previousPending = queryClient.getQueryData(['pendingJobs', user?.id, today]);
+      const previousUpcoming = queryClient.getQueryData(['upcomingJobs', user?.id, today]);
+
+      // Remove job from pending (it will reappear in upcoming after sync)
+      queryClient.setQueryData(['pendingJobs', user?.id, today], (old: JobWithCustomer[] | undefined) =>
+        (old || []).filter(j => j.id !== jobId)
+      );
+
+      return { previousPending, previousUpcoming };
     },
-    onError: (error) => {
+    onError: (err, variables, context) => {
+      if (context?.previousPending) {
+        queryClient.setQueryData(['pendingJobs', user?.id, today], context.previousPending);
+      }
+      if (context?.previousUpcoming) {
+        queryClient.setQueryData(['upcomingJobs', user?.id, today], context.previousUpcoming);
+      }
       toast({
         title: 'Error',
-        description: error.message,
+        description: err.message,
         variant: 'destructive',
       });
+    },
+    onSuccess: (result) => {
+      if (!result?.offline) {
+        queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+        queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      }
     },
   });
 
   // Undo complete job mutation
   const undoCompleteJobMutation = useMutation({
     mutationFn: async ({ jobId, newJobId }: { jobId: string; newJobId: string }) => {
-      // 1. Delete the newly created future job
       const { error: deleteError } = await supabase
         .from('jobs')
         .delete()
@@ -784,7 +1006,6 @@ export function useSupabaseData() {
 
       if (deleteError) throw deleteError;
 
-      // 2. Reset the original job back to pending
       const { error: updateError } = await supabase
         .from('jobs')
         .update({
@@ -849,9 +1070,20 @@ export function useSupabaseData() {
     },
   });
 
-  // Update job notes mutation
+  // Update job notes mutation with OFFLINE SUPPORT
   const updateJobNotesMutation = useMutation({
     mutationFn: async ({ jobId, notes }: { jobId: string; notes: string | null }) => {
+      if (!isOnline) {
+        await mutationQueue.add({
+          type: 'updateJobNotes',
+          payload: { jobId, notes },
+        });
+
+        await localData.setOptimisticJob(jobId, { notes });
+
+        return { offline: true };
+      }
+
       const { error } = await supabase
         .from('jobs')
         .update({ notes })
@@ -859,11 +1091,13 @@ export function useSupabaseData() {
 
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['completedToday'] });
-      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
-      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+    onSuccess: (data) => {
+      if (!data?.offline) {
+        queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+        queryClient.invalidateQueries({ queryKey: ['completedToday'] });
+        queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+        queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+      }
       toast({
         title: 'Notes saved!',
       });
@@ -994,6 +1228,7 @@ export function useSupabaseData() {
     undoSkipJob,
     refetchAll,
     isLoading,
+    isOnline,
     userEmail: user?.email || '',
   };
 }
