@@ -22,6 +22,7 @@ import { MarkPaidModal } from '@/components/MarkPaidModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { useJobReminders } from '@/hooks/useJobReminders';
 import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import { ToastAction } from '@/components/ui/toast';
@@ -42,6 +43,10 @@ const Index = () => {
   const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading, markJobPaid, profile } = useSupabaseData();
   const { toast, dismiss } = useToast();
   const { showTour, completeTour } = useWelcomeTour();
+  
+  // Enable job reminders for upcoming jobs
+  const allUpcomingJobs = [...pendingJobs, ...upcomingJobs];
+  useJobReminders(allUpcomingJobs);
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
