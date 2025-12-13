@@ -22,6 +22,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const [rememberMe, setRememberMe] = useState(true);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPasswordFeedback, setShowPasswordFeedback] = useState(false);
   
   const passwordsMatch = password === confirmPassword;
@@ -235,9 +236,34 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
               </div>
             )}
 
+            {/* Terms checkbox - only show on signup */}
+            {!isLogin && (
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="acceptTerms"
+                  checked={acceptedTerms}
+                  onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                  className="h-5 w-5 mt-0.5"
+                />
+                <label 
+                  htmlFor="acceptTerms" 
+                  className="text-sm text-muted-foreground cursor-pointer select-none leading-tight"
+                >
+                  I agree to the{' '}
+                  <a href="/terms" target="_blank" className="text-primary hover:underline">
+                    Terms of Service
+                  </a>{' '}
+                  and{' '}
+                  <a href="/privacy" target="_blank" className="text-primary hover:underline">
+                    Privacy Policy
+                  </a>
+                </label>
+              </div>
+            )}
+
             <Button
               type="submit"
-              disabled={loading || (!isLogin && (!emailValidation.isValid || passwordStrength.score < 3 || !passwordsMatch))}
+              disabled={loading || (!isLogin && (!emailValidation.isValid || passwordStrength.score < 3 || !passwordsMatch || !acceptedTerms))}
               className={cn(
                 "w-full h-14 rounded-xl",
                 "bg-primary hover:bg-primary/90 text-primary-foreground",
