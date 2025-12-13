@@ -157,7 +157,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
 
             <Button
               type="submit"
-              disabled={loading}
+              disabled={loading || (!isLogin && (!emailValidation.isValid || passwordStrength.score < 3))}
               className={cn(
                 "w-full h-14 rounded-xl",
                 "bg-primary hover:bg-primary/90 text-primary-foreground",
