@@ -63,9 +63,9 @@ export function CompletedJobItem({ job, index, onMarkPaid, onAddNote }: Complete
         </div>
       </div>
 
-      {/* Photo evidence */}
+      {/* Photo evidence thumbnail */}
       {job.photo_url && (
-        <div className="mt-4">
+        <div className="mt-3">
           {showPhoto ? (
             <div className="relative">
               <img 
@@ -74,14 +74,24 @@ export function CompletedJobItem({ job, index, onMarkPaid, onAddNote }: Complete
                 className="w-full h-48 object-cover rounded-lg cursor-pointer"
                 onClick={() => setShowPhoto(false)}
               />
+              <p className="text-xs text-muted-foreground text-center mt-1">Tap to minimize</p>
             </div>
           ) : (
             <button
               onClick={() => setShowPhoto(true)}
-              className="flex items-center gap-2 text-sm text-primary hover:underline"
+              className="flex items-center gap-3 w-full"
             >
-              <Image className="w-4 h-4" />
-              View photo evidence
+              <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-border flex-shrink-0">
+                <img 
+                  src={job.photo_url} 
+                  alt="Job evidence thumbnail" 
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                  <Image className="w-5 h-5 text-white" />
+                </div>
+              </div>
+              <span className="text-sm text-primary">Photo evidence captured</span>
             </button>
           )}
         </div>
