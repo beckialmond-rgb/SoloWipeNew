@@ -56,8 +56,8 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
 
   return (
     <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent className="max-h-[85vh]">
-        <DrawerHeader className="text-left">
+      <DrawerContent className="max-h-[85vh] flex flex-col">
+        <DrawerHeader className="text-left flex-shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
               <Zap className="w-4 h-4 text-accent" />
@@ -69,7 +69,7 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
           </div>
         </DrawerHeader>
 
-        <form onSubmit={handleSubmit} className="px-6 pb-8">
+        <form onSubmit={handleSubmit} className="px-6 pb-10 overflow-y-auto flex-1">
           <div className="space-y-3">
             {/* Name */}
             <div>
