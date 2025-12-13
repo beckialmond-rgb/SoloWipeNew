@@ -7,6 +7,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { SoftProtectedRoute } from "@/components/SoftProtectedRoute";
+import { SoftPaywallProvider } from "@/hooks/useSoftPaywall";
+import { TrialGateModal } from "@/components/TrialGateModal";
+import { DemoModeBanner } from "@/components/DemoModeBanner";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
@@ -59,74 +63,78 @@ const App = () => (
       }}
     >
       <AuthProvider>
-        <OfflineProvider>
-          <TooltipProvider>
-            <OfflineIndicator />
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <KeyboardShortcutsProvider>
-                <Routes>
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/reset-password" element={<ResetPassword />} />
-                  <Route
-                    path="/"
-                    element={
-                      <ProtectedRoute>
-                        <Index />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/customers"
-                    element={
-                      <ProtectedRoute>
-                        <Customers />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/money"
-                    element={
-                      <ProtectedRoute>
-                        <Money />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/earnings"
-                    element={
-                      <ProtectedRoute>
-                        <Earnings />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/calendar"
-                    element={
-                      <ProtectedRoute>
-                        <Calendar />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/settings"
-                    element={
-                      <ProtectedRoute>
-                        <Settings />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route path="/install" element={<Install />} />
-                  <Route path="/terms" element={<Terms />} />
-                  <Route path="/privacy" element={<Privacy />} />
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </KeyboardShortcutsProvider>
-            </BrowserRouter>
-          </TooltipProvider>
-        </OfflineProvider>
+        <SoftPaywallProvider>
+          <OfflineProvider>
+            <TooltipProvider>
+              <OfflineIndicator />
+              <DemoModeBanner />
+              <TrialGateModal />
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <KeyboardShortcutsProvider>
+                  <Routes>
+                    <Route path="/auth" element={<Auth />} />
+                    <Route path="/forgot-password" element={<ForgotPassword />} />
+                    <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route
+                      path="/"
+                      element={
+                        <SoftProtectedRoute>
+                          <Index />
+                        </SoftProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/customers"
+                      element={
+                        <SoftProtectedRoute>
+                          <Customers />
+                        </SoftProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/money"
+                      element={
+                        <SoftProtectedRoute>
+                          <Money />
+                        </SoftProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/earnings"
+                      element={
+                        <SoftProtectedRoute>
+                          <Earnings />
+                        </SoftProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/calendar"
+                      element={
+                        <SoftProtectedRoute>
+                          <Calendar />
+                        </SoftProtectedRoute>
+                      }
+                    />
+                    <Route
+                      path="/settings"
+                      element={
+                        <ProtectedRoute>
+                          <Settings />
+                        </ProtectedRoute>
+                      }
+                    />
+                    <Route path="/install" element={<Install />} />
+                    <Route path="/terms" element={<Terms />} />
+                    <Route path="/privacy" element={<Privacy />} />
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </KeyboardShortcutsProvider>
+              </BrowserRouter>
+            </TooltipProvider>
+          </OfflineProvider>
+        </SoftPaywallProvider>
       </AuthProvider>
     </PersistQueryClientProvider>
   </ThemeProvider>

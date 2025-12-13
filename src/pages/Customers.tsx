@@ -13,9 +13,11 @@ import { LoadingState } from '@/components/LoadingState';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 
 const Customers = () => {
   const { customers, businessName, isLoading, addCustomer, updateCustomer, archiveCustomer } = useSupabaseData();
+  const { requireAuth } = useSoftPaywall();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -29,11 +31,13 @@ const Customers = () => {
   );
 
   const handleEditCustomer = (customer: Customer) => {
+    if (!requireAuth('edit')) return;
     setSelectedCustomer(null);
     setEditingCustomer(customer);
   };
 
   const handleArchiveCustomer = async (customerId: string) => {
+    if (!requireAuth('edit')) return;
     await archiveCustomer(customerId);
     setSelectedCustomer(null);
   };
@@ -41,6 +45,11 @@ const Customers = () => {
   const handleViewHistory = (customer: Customer) => {
     setSelectedCustomer(null);
     setHistoryCustomer(customer);
+  };
+
+  const handleAddClick = () => {
+    if (!requireAuth('add-customer')) return;
+    setIsAddModalOpen(true);
   };
 
   return (
@@ -64,7 +73,7 @@ const Customers = () => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.2 }}
-              onClick={() => setIsAddModalOpen(true)}
+              onClick={handleAddClick}
               className={cn(
                 "w-full mt-6 h-14 rounded-xl",
                 "bg-primary text-primary-foreground",
@@ -139,7 +148,7 @@ const Customers = () => {
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           whileTap={{ scale: 0.95 }}
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={handleAddClick}
           className={cn(
             "fixed right-4 bottom-24 z-40",
             "w-14 h-14 rounded-full",
