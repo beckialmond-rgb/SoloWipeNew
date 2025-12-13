@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 import { AnimatePresence, motion, Reorder } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Header } from '@/components/Header';
@@ -21,12 +21,14 @@ import { PhotoCaptureModal } from '@/components/PhotoCaptureModal';
 import { OptimizeRouteButton } from '@/components/OptimizeRouteButton';
 import { MarkPaidModal } from '@/components/MarkPaidModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { useAuth } from '@/hooks/useAuth';
+import { useSubscription } from '@/hooks/useSubscription';
 import { useToast } from '@/hooks/use-toast';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useJobReminders } from '@/hooks/useJobReminders';
 import { useHaptics } from '@/hooks/useHaptics';
 import { syncStatus } from '@/lib/offlineStorage';
-import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation } from 'lucide-react';
+import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation, X, Gift } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import { ToastAction } from '@/components/ui/toast';
 import {
@@ -44,9 +46,20 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 const Index = () => {
   const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading, markJobPaid, profile } = useSupabaseData();
+  const { user } = useAuth();
+  const { subscribed, status } = useSubscription();
   const { toast, dismiss } = useToast();
   const { showTour, completeTour } = useWelcomeTour();
   const { success } = useHaptics();
+  
+  // Calculate grace period for trial banner
+  const gracePeriodDaysRemaining = user?.created_at 
+    ? Math.max(0, 14 - differenceInDays(new Date(), new Date(user.created_at)))
+    : 0;
+  const isInGracePeriod = !subscribed && status !== 'trialing' && gracePeriodDaysRemaining > 0;
+  const [trialBannerDismissed, setTrialBannerDismissed] = useState(() => {
+    return localStorage.getItem('solowipe_trial_banner_dismissed') === 'true';
+  });
   
   // Enable job reminders for upcoming jobs
   const allUpcomingJobs = [...pendingJobs, ...upcomingJobs];
@@ -73,6 +86,11 @@ const Index = () => {
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     return localStorage.getItem('solowipe_welcome_dismissed') === 'true';
   });
+  
+  const handleDismissTrialBanner = () => {
+    setTrialBannerDismissed(true);
+    localStorage.setItem('solowipe_trial_banner_dismissed', 'true');
+  };
 
   // Pull to refresh - full cloud sync
   const { isPulling, isRefreshing, pullDistance, handlers } = usePullToRefresh({
@@ -435,6 +453,34 @@ const Index = () => {
           />
         ) : (
           <>
+            {/* Trial Welcome Banner */}
+            {isInGracePeriod && !trialBannerDismissed && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-r from-emerald-500/10 to-primary/10 border border-emerald-500/30 rounded-xl p-4 mb-6 relative"
+              >
+                <button
+                  onClick={handleDismissTrialBanner}
+                  className="absolute top-2 right-2 p-1 rounded-full hover:bg-background/50 transition-colors"
+                  aria-label="Dismiss"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+                <div className="flex items-start gap-3 pr-6">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0">
+                    <Gift className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Welcome to your free trial!</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      You have <span className="font-medium text-emerald-600">{gracePeriodDaysRemaining} day{gracePeriodDaysRemaining !== 1 ? 's' : ''}</span> to explore all Pro features free. Add customers, complete jobs, and see how SoloWipe transforms your workflow.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* Today's Stats Summary */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
