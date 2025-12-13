@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Header } from '@/components/Header';
@@ -13,6 +13,7 @@ import { WelcomeTour, useWelcomeTour } from '@/components/WelcomeTour';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
+import { useNotifications } from '@/hooks/useNotifications';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
@@ -23,6 +24,7 @@ const Settings = () => {
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const { isInstalled } = useInstallPrompt();
+  const { isSupported: notificationsSupported, isEnabled: notificationsEnabled, requestPermission, disableNotifications } = useNotifications();
   const { theme, setTheme } = useTheme();
   const [isEditBusinessNameOpen, setIsEditBusinessNameOpen] = useState(false);
   const [isEditGoogleReviewLinkOpen, setIsEditGoogleReviewLinkOpen] = useState(false);
@@ -200,6 +202,42 @@ const Settings = () => {
 
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </motion.button>
+
+          {/* Notifications Toggle */}
+          {notificationsSupported && (
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.13 }}
+              onClick={() => notificationsEnabled ? disableNotifications() : requestPermission()}
+              className={cn(
+                "w-full bg-card rounded-xl border border-border p-4",
+                "flex items-center gap-4 text-left",
+                "hover:bg-muted/50 transition-colors",
+                "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+              )}
+            >
+              <div className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center",
+                notificationsEnabled ? "bg-action-green/10" : "bg-muted"
+              )}>
+                {notificationsEnabled ? (
+                  <Bell className="w-5 h-5 text-action-green" />
+                ) : (
+                  <BellOff className="w-5 h-5 text-muted-foreground" />
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-muted-foreground">Job Reminders</p>
+                <p className="font-medium text-foreground">
+                  {notificationsEnabled ? 'Enabled' : 'Disabled'}
+                </p>
+              </div>
+
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </motion.button>
+          )}
 
           {/* Earnings Report */}
           <motion.button
