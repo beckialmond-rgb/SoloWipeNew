@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, Loader2, CheckCircle } from 'lucide-react';
@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-const ResetPassword = () => {
+const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -80,7 +80,7 @@ const ResetPassword = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div ref={ref} className="min-h-screen bg-background flex flex-col">
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -113,7 +113,7 @@ const ResetPassword = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div ref={ref} className="min-h-screen bg-background flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -208,6 +208,8 @@ const ResetPassword = () => {
       </div>
     </div>
   );
-};
+});
+
+ResetPassword.displayName = 'ResetPassword';
 
 export default ResetPassword;
