@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Header } from '@/components/Header';
@@ -9,6 +9,7 @@ import { EditBusinessNameModal } from '@/components/EditBusinessNameModal';
 import { EditGoogleReviewLinkModal } from '@/components/EditGoogleReviewLinkModal';
 import { ExportEarningsModal } from '@/components/ExportEarningsModal';
 import { BusinessInsights } from '@/components/BusinessInsights';
+import { WelcomeTour, useWelcomeTour } from '@/components/WelcomeTour';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
@@ -28,6 +29,7 @@ const Settings = () => {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const { showTour, completeTour, resetTour } = useWelcomeTour();
 
   const handleSignOut = async () => {
     await signOut();
@@ -276,6 +278,31 @@ const Settings = () => {
             </motion.button>
           )}
 
+          {/* Replay Tour Button */}
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            onClick={resetTour}
+            className={cn(
+              "w-full bg-card rounded-xl border border-border p-4",
+              "flex items-center gap-4 text-left",
+              "hover:bg-muted/50 transition-colors",
+              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            )}
+          >
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <HelpCircle className="w-5 h-5 text-primary" />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-muted-foreground">Need a refresher?</p>
+              <p className="font-medium text-foreground">Replay App Tour</p>
+            </div>
+
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </motion.button>
+
           {/* Recently Deleted Section */}
           {recentlyArchivedCustomers.length > 0 && (
             <motion.div
@@ -379,6 +406,9 @@ const Settings = () => {
         onClose={() => setIsEditGoogleReviewLinkOpen(false)}
         onSubmit={updateGoogleReviewLink}
       />
+
+      {/* Welcome Tour */}
+      {showTour && <WelcomeTour onComplete={completeTour} />}
     </div>
   );
 };
