@@ -57,14 +57,14 @@ export function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-bottom">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-sm border-t border-border safe-bottom">
+      <div className="flex items-center justify-around h-18 max-w-lg mx-auto py-2">
         {navItems.map(({ to, icon: Icon, label, badge, badgeColor }) => (
           <NavLink
             key={to}
             to={to}
             className={cn(
-              "relative flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-xl transition-all duration-200",
+              "relative flex flex-col items-center justify-center gap-1.5 px-4 py-2 rounded-xl transition-all duration-200 touch-sm",
               "text-muted-foreground hover:text-primary"
             )}
             activeClassName="text-primary bg-primary/10"
@@ -73,7 +73,7 @@ export function BottomNav() {
               <Icon className="w-6 h-6" />
               {badge > 0 && (
                 <span className={cn(
-                  "absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold text-white rounded-full px-1",
+                  "absolute -top-1.5 -right-2 min-w-[20px] h-5 flex items-center justify-center text-xs font-bold text-white rounded-full px-1.5",
                   badgeColor || 'bg-primary'
                 )}>
                   {badge > 99 ? '99+' : badge}

@@ -27,33 +27,33 @@ export function UnpaidJobCard({ job, index, onMarkPaid }: UnpaidJobCardProps) {
       className="bg-card rounded-xl border border-border overflow-hidden"
     >
       <div className="p-4">
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-foreground truncate text-lg">
               {job.customer.name}
             </p>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
-              <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+              <MapPin className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">{job.customer.address}</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-2">
               Completed: {job.completed_at ? format(new Date(job.completed_at), 'd MMM yyyy') : 'Unknown'}
             </p>
           </div>
-          <div className="text-right">
-            <div className="flex items-center gap-1 text-amber-600">
+          <div className="text-right ml-4">
+            <div className="flex items-center gap-1 text-warning">
               <PoundSterling className="w-5 h-5" />
               <span className="text-2xl font-bold">{(job.amount_collected || 0).toFixed(2)}</span>
             </div>
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           {job.customer.mobile_phone && (
             <Button
               variant="outline"
-              size="sm"
-              className="flex-1 h-12"
+              size="lg"
+              className="flex-1"
               onClick={handleSendReminder}
             >
               <Phone className="w-4 h-4 mr-2" />
@@ -61,8 +61,9 @@ export function UnpaidJobCard({ job, index, onMarkPaid }: UnpaidJobCardProps) {
             </Button>
           )}
           <Button
-            size="sm"
-            className="flex-1 h-12 bg-green-600 hover:bg-green-700"
+            variant="success"
+            size="lg"
+            className="flex-1"
             onClick={onMarkPaid}
           >
             Mark Paid

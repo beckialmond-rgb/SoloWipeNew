@@ -26,13 +26,11 @@ export function CompletedJobItem({ job, index, onMarkPaid, onAddNote }: Complete
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.05 }}
-      className={cn(
-        "p-4 bg-card rounded-xl border border-border"
-      )}
+      className="p-4 bg-card rounded-xl border border-border"
     >
       <div className="flex items-center gap-4">
-        <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center">
-          <Check className="w-5 h-5 text-accent" />
+        <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center flex-shrink-0">
+          <Check className="w-5 h-5 text-success" />
         </div>
 
         <div className="flex-1 min-w-0">
@@ -45,14 +43,14 @@ export function CompletedJobItem({ job, index, onMarkPaid, onAddNote }: Complete
         </div>
 
         <div className="text-right flex flex-col items-end gap-1">
-          <div className="flex items-center gap-1.5">
-            <p className="font-bold text-accent">
+          <div className="flex items-center gap-2">
+            <p className="font-bold text-success text-lg">
               £{job.amount_collected}
             </p>
             {isPaid ? (
-              <CheckCircle className="w-4 h-4 text-green-500" />
+              <CheckCircle className="w-5 h-5 text-success" />
             ) : (
-              <Circle className="w-4 h-4 text-amber-500 fill-amber-500" />
+              <Circle className="w-5 h-5 text-warning fill-warning" />
             )}
           </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -67,7 +65,7 @@ export function CompletedJobItem({ job, index, onMarkPaid, onAddNote }: Complete
 
       {/* Photo evidence */}
       {job.photo_url && (
-        <div className="mt-3">
+        <div className="mt-4">
           {showPhoto ? (
             <div className="relative">
               <img 
@@ -80,9 +78,9 @@ export function CompletedJobItem({ job, index, onMarkPaid, onAddNote }: Complete
           ) : (
             <button
               onClick={() => setShowPhoto(true)}
-              className="flex items-center gap-2 text-xs text-primary hover:underline"
+              className="flex items-center gap-2 text-sm text-primary hover:underline"
             >
-              <Image className="w-3.5 h-3.5" />
+              <Image className="w-4 h-4" />
               View photo evidence
             </button>
           )}
@@ -92,40 +90,40 @@ export function CompletedJobItem({ job, index, onMarkPaid, onAddNote }: Complete
       {/* Notes section */}
       {job.notes && (
         <div 
-          className="mt-3 p-2 bg-amber-500/10 rounded-lg border border-amber-500/20 cursor-pointer"
+          className="mt-4 p-3 bg-warning/10 rounded-lg border border-warning/20 cursor-pointer"
           onClick={() => onAddNote?.(job)}
         >
           <div className="flex items-start gap-2">
-            <StickyNote className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+            <StickyNote className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
             <p className="text-sm text-foreground">{job.notes}</p>
           </div>
         </div>
       )}
 
       {/* Action buttons */}
-      <div className="flex items-center gap-2 mt-3">
-        {!job.notes && onAddNote && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs text-amber-600 border-amber-200 hover:bg-amber-50 hover:text-amber-700"
-            onClick={() => onAddNote(job)}
-          >
-            <StickyNote className="w-3 h-3 mr-1" />
-            Add Note
-          </Button>
-        )}
-        {!isPaid && onMarkPaid && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-7 text-xs text-green-600 border-green-200 hover:bg-green-50 hover:text-green-700"
-            onClick={() => onMarkPaid(job)}
-          >
-            Mark Paid
-          </Button>
-        )}
-      </div>
+      {(!job.notes || !isPaid) && (onAddNote || onMarkPaid) && (
+        <div className="flex items-center gap-3 mt-4">
+          {!job.notes && onAddNote && (
+            <Button
+              size="sm"
+              variant="warning"
+              onClick={() => onAddNote(job)}
+            >
+              <StickyNote className="w-4 h-4 mr-1.5" />
+              Add Note
+            </Button>
+          )}
+          {!isPaid && onMarkPaid && (
+            <Button
+              size="sm"
+              variant="success"
+              onClick={() => onMarkPaid(job)}
+            >
+              Mark Paid
+            </Button>
+          )}
+        </div>
+      )}
     </motion.div>
   );
 }

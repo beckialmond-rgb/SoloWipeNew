@@ -94,22 +94,23 @@ const Customers = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className={cn(
                     "w-full h-12 pl-12 pr-4 rounded-xl",
-                    "bg-muted border-0",
+                    "bg-muted border border-border",
                     "text-foreground placeholder:text-muted-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-primary"
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
+                    "transition-all duration-200"
                   )}
                 />
               </div>
             </motion.div>
 
             {/* Customer count */}
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-5">
               <Users className="w-4 h-4" />
               <span>{filteredCustomers.length} customers</span>
             </div>
 
             {/* Customer list */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               {filteredCustomers.map((customer, index) => (
                 <CustomerCard
                   key={customer.id}

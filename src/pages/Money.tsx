@@ -105,47 +105,47 @@ const Money = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white"
+          className="bg-gradient-to-br from-warning to-warning/80 rounded-xl p-6 text-warning-foreground"
         >
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3 mb-3">
             <Wallet className="w-6 h-6" />
-            <span className="text-white/80 text-sm font-medium">Outstanding Balance</span>
+            <span className="text-warning-foreground/80 font-medium">Outstanding Balance</span>
           </div>
           <p className="text-4xl font-bold">
             £{totalOutstanding.toFixed(2)}
           </p>
-          <p className="text-white/70 text-sm mt-1">
+          <p className="text-warning-foreground/70 text-sm mt-2">
             {unpaidJobs.length} unpaid {unpaidJobs.length === 1 ? 'job' : 'jobs'}
           </p>
         </motion.div>
 
         {/* Tabs */}
         <Tabs defaultValue="unpaid" className="w-full">
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="unpaid" className="flex items-center gap-2">
+          <TabsList className="w-full grid grid-cols-2 h-12">
+            <TabsTrigger value="unpaid" className="flex items-center gap-2 text-sm">
               <Clock className="w-4 h-4" />
               Unpaid ({unpaidJobs.length})
             </TabsTrigger>
-            <TabsTrigger value="paid" className="flex items-center gap-2">
+            <TabsTrigger value="paid" className="flex items-center gap-2 text-sm">
               <CheckCircle className="w-4 h-4" />
               Paid This Week
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="unpaid" className="mt-4 space-y-3">
+          <TabsContent value="unpaid" className="mt-6 space-y-4">
             {unpaidJobs.length === 0 ? (
               <EmptyState
-                icon={<CheckCircle className="w-12 h-12 text-green-500" />}
+                icon={<CheckCircle className="w-12 h-12 text-success" />}
                 title="All Caught Up!"
                 description="No unpaid jobs to chase."
               />
             ) : (
               <>
                 {/* Batch selection controls */}
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between">
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="default"
                     onClick={toggleSelectMode}
                     className="gap-2"
                   >
@@ -162,19 +162,19 @@ const Money = () => {
                     )}
                   </Button>
                   {selectMode && (
-                    <div className="flex gap-2">
+                    <div className="flex gap-3">
                       <Button
                         variant="ghost"
-                        size="sm"
+                        size="default"
                         onClick={selectAllJobs}
                       >
                         Select All
                       </Button>
                       <Button
-                        size="sm"
+                        variant="success"
+                        size="default"
                         onClick={() => setBatchModalOpen(true)}
                         disabled={selectedJobIds.size === 0}
-                        className="bg-green-600 hover:bg-green-700"
                       >
                         Mark {selectedJobIds.size} Paid
                       </Button>
@@ -182,34 +182,36 @@ const Money = () => {
                   )}
                 </div>
 
-                {unpaidJobs.map((job, index) => (
-                  <div key={job.id} className="relative">
-                    {selectMode && (
-                      <button
-                        onClick={() => toggleJobSelection(job.id)}
-                        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-10 p-2"
-                      >
-                        {selectedJobIds.has(job.id) ? (
-                          <CheckSquare className="w-6 h-6 text-primary" />
-                        ) : (
-                          <Square className="w-6 h-6 text-muted-foreground" />
-                        )}
-                      </button>
-                    )}
-                    <div className={selectMode ? 'ml-8' : ''}>
-                      <UnpaidJobCard
-                        job={job}
-                        index={index}
-                        onMarkPaid={() => !selectMode && handleMarkPaid(job)}
-                      />
+                <div className="space-y-4">
+                  {unpaidJobs.map((job, index) => (
+                    <div key={job.id} className="relative">
+                      {selectMode && (
+                        <button
+                          onClick={() => toggleJobSelection(job.id)}
+                          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 z-10 p-2 touch-sm"
+                        >
+                          {selectedJobIds.has(job.id) ? (
+                            <CheckSquare className="w-6 h-6 text-primary" />
+                          ) : (
+                            <Square className="w-6 h-6 text-muted-foreground" />
+                          )}
+                        </button>
+                      )}
+                      <div className={selectMode ? 'ml-10' : ''}>
+                        <UnpaidJobCard
+                          job={job}
+                          index={index}
+                          onMarkPaid={() => !selectMode && handleMarkPaid(job)}
+                        />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </>
             )}
           </TabsContent>
 
-          <TabsContent value="paid" className="mt-4 space-y-3">
+          <TabsContent value="paid" className="mt-6 space-y-4">
             {paidThisWeek.length === 0 ? (
               <EmptyState
                 icon={<Wallet className="w-12 h-12 text-muted-foreground" />}
@@ -227,21 +229,21 @@ const Money = () => {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground truncate">
+                      <p className="font-semibold text-foreground truncate text-base">
                         {job.customer.name}
                       </p>
-                      <p className="text-sm text-muted-foreground truncate">
+                      <p className="text-sm text-muted-foreground truncate mt-1">
                         {job.customer.address}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1 capitalize">
+                      <p className="text-xs text-muted-foreground mt-2 capitalize">
                         {job.payment_method} • {job.payment_date ? new Date(job.payment_date).toLocaleDateString() : ''}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-green-600">
+                    <div className="text-right ml-4">
+                      <p className="text-xl font-bold text-success">
                         £{(job.amount_collected || 0).toFixed(2)}
                       </p>
-                      <CheckCircle className="w-5 h-5 text-green-500 ml-auto mt-1" />
+                      <CheckCircle className="w-5 h-5 text-success ml-auto mt-2" />
                     </div>
                   </div>
                 </motion.div>
