@@ -1,12 +1,13 @@
 import { useState, useEffect, forwardRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Building, Loader2 } from 'lucide-react';
+import { Mail, Building, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { usePasswordStrength } from '@/hooks/usePasswordStrength';
 import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
+import { PasswordInput } from '@/components/PasswordInput';
 import { cn } from '@/lib/utils';
 
 const Auth = forwardRef<HTMLDivElement>((_, ref) => {
@@ -140,25 +141,15 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
             </div>
 
             <div className="space-y-2">
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onFocus={() => !isLogin && setShowPasswordFeedback(true)}
-                  onBlur={() => setShowPasswordFeedback(false)}
-                  required
-                  minLength={8}
-                  className={cn(
-                    "w-full h-14 pl-12 pr-4 rounded-xl",
-                    "bg-muted border-0",
-                    "text-foreground placeholder:text-muted-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-primary"
-                  )}
-                />
-              </div>
+              <PasswordInput
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => !isLogin && setShowPasswordFeedback(true)}
+                onBlur={() => setShowPasswordFeedback(false)}
+                required
+                minLength={8}
+              />
               
               {/* Password Strength Indicator - only show on signup */}
               {!isLogin && password.length > 0 && (
