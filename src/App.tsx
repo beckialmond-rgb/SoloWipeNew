@@ -16,6 +16,7 @@ import Install from "./pages/Install";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -81,6 +82,7 @@ const App = () => (
                 }
               />
               <Route path="/install" element={<Install />} />
+              <Route path="/terms" element={<Terms />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
