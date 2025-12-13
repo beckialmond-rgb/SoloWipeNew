@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff, RefreshCw, CloudOff } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff, RefreshCw, CloudOff, Cloud } from 'lucide-react';
 import { useOffline } from '@/contexts/OfflineContext';
+import { syncStatus } from '@/lib/offlineStorage';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Header } from '@/components/Header';
@@ -33,7 +34,29 @@ const Settings = () => {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
   const { showTour, completeTour, resetTour } = useWelcomeTour();
+
+  // Load last synced timestamp
+  useEffect(() => {
+    setLastSynced(syncStatus.getLastSynced());
+  }, [isSyncing]); // Refresh when sync completes
+
+  const formatLastSynced = () => {
+    if (!lastSynced) return 'Never';
+    const date = new Date(lastSynced);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min${diffMins > 1 ? 's' : ''} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+    return format(date, 'd MMM yyyy');
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -317,6 +340,26 @@ const Settings = () => {
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
             </motion.button>
           )}
+
+          {/* Sync Status */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.23 }}
+            className={cn(
+              "w-full bg-card rounded-xl border border-border p-4",
+              "flex items-center gap-4 text-left"
+            )}
+          >
+            <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center">
+              <Cloud className="w-5 h-5 text-emerald-500" />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-muted-foreground">Last Synced</p>
+              <p className="font-medium text-foreground">{formatLastSynced()}</p>
+            </div>
+          </motion.div>
 
           {/* Sync Now Button - Show when there are pending changes */}
           {pendingCount > 0 && (
