@@ -24,9 +24,11 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   const [rememberMe, setRememberMe] = useState(true);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPasswordFeedback, setShowPasswordFeedback] = useState(false);
+  const [showVerificationResend, setShowVerificationResend] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
   
   const passwordsMatch = password === confirmPassword;
-  const { user, loading: authLoading, signIn, signUp, signInWithOAuth } = useAuth();
+  const { user, loading: authLoading, signIn, signUp, signInWithOAuth, resendVerificationEmail } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -62,6 +64,10 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) {
+          // Check if error is about email not confirmed
+          if (error.message?.toLowerCase().includes('email not confirmed')) {
+            setShowVerificationResend(true);
+          }
           toast({
             title: 'Sign in failed',
             description: error.message,
@@ -94,6 +100,27 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResendingEmail(true);
+    try {
+      const { error } = await resendVerificationEmail(email);
+      if (error) {
+        toast({
+          title: 'Failed to resend',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Verification email sent',
+          description: 'Please check your inbox and spam folder.',
+        });
+      }
+    } finally {
+      setResendingEmail(false);
     }
   };
 
@@ -353,13 +380,34 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
 
           {/* Forgot Password Link (only show on login) */}
           {isLogin && (
-            <div className="mt-4 text-center">
+            <div className="mt-4 text-center space-y-2">
               <Link
                 to="/forgot-password"
                 className="text-muted-foreground hover:text-primary text-sm"
               >
                 Forgot your password?
               </Link>
+              
+              {/* Resend verification email */}
+              {showVerificationResend && email && (
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    disabled={resendingEmail}
+                    className="text-primary hover:underline text-sm font-medium inline-flex items-center gap-2"
+                  >
+                    {resendingEmail ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      "Didn't receive verification email? Resend"
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
