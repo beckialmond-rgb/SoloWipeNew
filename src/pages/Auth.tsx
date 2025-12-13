@@ -17,10 +17,13 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [showPasswordFeedback, setShowPasswordFeedback] = useState(false);
+  
+  const passwordsMatch = password === confirmPassword;
   const { user, loading: authLoading, signIn, signUp, signInWithOAuth } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -197,6 +200,22 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
               )}
             </div>
 
+            {/* Confirm Password - only show on signup */}
+            {!isLogin && (
+              <div className="space-y-1">
+                <PasswordInput
+                  placeholder="Confirm Password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  hasError={confirmPassword.length > 0 && !passwordsMatch}
+                  required={!isLogin}
+                />
+                {confirmPassword.length > 0 && !passwordsMatch && (
+                  <p className="text-xs text-destructive pl-1">Passwords do not match</p>
+                )}
+              </div>
+            )}
+
             {/* Remember me checkbox - only show on login */}
             {isLogin && (
               <div className="flex items-center gap-3">
@@ -217,7 +236,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
 
             <Button
               type="submit"
-              disabled={loading || (!isLogin && (!emailValidation.isValid || passwordStrength.score < 3))}
+              disabled={loading || (!isLogin && (!emailValidation.isValid || passwordStrength.score < 3 || !passwordsMatch))}
               className={cn(
                 "w-full h-14 rounded-xl",
                 "bg-primary hover:bg-primary/90 text-primary-foreground",
