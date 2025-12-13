@@ -136,20 +136,41 @@ export type Database = {
         Row: {
           business_name: string
           created_at: string
+          gocardless_access_token_encrypted: string | null
+          gocardless_connected_at: string | null
+          gocardless_organisation_id: string | null
           google_review_link: string | null
           id: string
+          stripe_customer_id: string | null
+          subscription_ends_at: string | null
+          subscription_id: string | null
+          subscription_status: string | null
         }
         Insert: {
           business_name?: string
           created_at?: string
+          gocardless_access_token_encrypted?: string | null
+          gocardless_connected_at?: string | null
+          gocardless_organisation_id?: string | null
           google_review_link?: string | null
           id: string
+          stripe_customer_id?: string | null
+          subscription_ends_at?: string | null
+          subscription_id?: string | null
+          subscription_status?: string | null
         }
         Update: {
           business_name?: string
           created_at?: string
+          gocardless_access_token_encrypted?: string | null
+          gocardless_connected_at?: string | null
+          gocardless_organisation_id?: string | null
           google_review_link?: string | null
           id?: string
+          stripe_customer_id?: string | null
+          subscription_ends_at?: string | null
+          subscription_id?: string | null
+          subscription_status?: string | null
         }
         Relationships: []
       }
