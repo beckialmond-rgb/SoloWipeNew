@@ -372,23 +372,38 @@ export function useSupabaseData() {
     },
   });
 
+  // Track in-flight payment operations to prevent double-submission
+  const payingJobIds = new Set<string>();
+
   // Mark job as paid mutation
   const markJobPaidMutation = useMutation({
     mutationFn: async ({ jobId, method }: { jobId: string; method: 'cash' | 'transfer' }) => {
-      const now = new Date().toISOString();
+      // CRITICAL: Prevent double-submission
+      if (payingJobIds.has(jobId)) {
+        throw new Error('Payment already in progress');
+      }
+      payingJobIds.add(jobId);
 
-      const { error } = await supabase
-        .from('jobs')
-        .update({
-          payment_status: 'paid',
-          payment_method: method,
-          payment_date: now,
-        })
-        .eq('id', jobId);
+      try {
+        const now = new Date().toISOString();
 
-      if (error) throw error;
-      
-      return { jobId, method };
+        const { error, count } = await supabase
+          .from('jobs')
+          .update({
+            payment_status: 'paid',
+            payment_method: method,
+            payment_date: now,
+          })
+          .eq('id', jobId)
+          .eq('payment_status', 'unpaid'); // Only update if still unpaid (atomic guard)
+
+        if (error) throw error;
+        if (count === 0) throw new Error('Job already paid');
+        
+        return { jobId, method };
+      } finally {
+        payingJobIds.delete(jobId);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
@@ -404,23 +419,37 @@ export function useSupabaseData() {
     },
   });
 
+  // Track in-flight batch payment operations
+  const batchPaymentInProgress = { current: false };
+
   // Batch mark jobs as paid mutation
   const batchMarkPaidMutation = useMutation({
     mutationFn: async ({ jobIds, method }: { jobIds: string[]; method: 'cash' | 'transfer' }) => {
-      const now = new Date().toISOString();
+      // CRITICAL: Prevent double-submission of batch
+      if (batchPaymentInProgress.current) {
+        throw new Error('Batch payment already in progress');
+      }
+      batchPaymentInProgress.current = true;
 
-      const { error } = await supabase
-        .from('jobs')
-        .update({
-          payment_status: 'paid',
-          payment_method: method,
-          payment_date: now,
-        })
-        .in('id', jobIds);
+      try {
+        const now = new Date().toISOString();
 
-      if (error) throw error;
-      
-      return { count: jobIds.length, method };
+        const { error } = await supabase
+          .from('jobs')
+          .update({
+            payment_status: 'paid',
+            payment_method: method,
+            payment_date: now,
+          })
+          .in('id', jobIds)
+          .eq('payment_status', 'unpaid'); // Only update unpaid jobs (atomic guard)
+
+        if (error) throw error;
+        
+        return { count: jobIds.length, method };
+      } finally {
+        batchPaymentInProgress.current = false;
+      }
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
