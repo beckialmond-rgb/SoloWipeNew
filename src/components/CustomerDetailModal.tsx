@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MessageSquare, MapPin, Phone, Repeat, Pencil, Trash2, FileText, History } from 'lucide-react';
-import { Customer } from '@/types/database';
+import { X, MessageSquare, MapPin, Phone, Repeat, Pencil, Trash2, FileText, History, CreditCard, CheckCircle2 } from 'lucide-react';
+import { Customer, Profile } from '@/types/database';
 import { Button } from '@/components/ui/button';
+import { DirectDebitSetupModal } from '@/components/DirectDebitSetupModal';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,15 +20,21 @@ import { cn } from '@/lib/utils';
 interface CustomerDetailModalProps {
   customer: Customer | null;
   businessName: string;
+  profile?: Profile | null;
   onClose: () => void;
   onEdit?: (customer: Customer) => void;
   onArchive?: (customerId: string) => Promise<void>;
   onViewHistory?: (customer: Customer) => void;
+  onRefresh?: () => void;
 }
 
-export function CustomerDetailModal({ customer, businessName, onClose, onEdit, onArchive, onViewHistory }: CustomerDetailModalProps) {
+export function CustomerDetailModal({ customer, businessName, profile, onClose, onEdit, onArchive, onViewHistory, onRefresh }: CustomerDetailModalProps) {
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
+  const [showDirectDebitSetup, setShowDirectDebitSetup] = useState(false);
+
+  const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
+  const hasActiveMandate = !!customer?.gocardless_id;
 
   if (!customer) return null;
 
@@ -140,6 +148,33 @@ export function CustomerDetailModal({ customer, businessName, onClose, onEdit, o
                 )}
               </div>
 
+              {/* Direct Debit Status/Setup */}
+              {isGoCardlessConnected && (
+                hasActiveMandate ? (
+                  <div className="flex items-center gap-3 p-4 bg-success/10 rounded-xl border border-success/20">
+                    <CheckCircle2 className="w-5 h-5 text-success mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Direct Debit</p>
+                      <p className="font-medium text-success">Active</p>
+                    </div>
+                  </div>
+                ) : (
+                  <Button
+                    onClick={() => setShowDirectDebitSetup(true)}
+                    variant="outline"
+                    className={cn(
+                      "w-full fat-button rounded-xl",
+                      "border-primary text-primary",
+                      "hover:bg-primary/10",
+                      "font-semibold text-base"
+                    )}
+                  >
+                    <CreditCard className="w-5 h-5 mr-2" />
+                    Set Up Direct Debit
+                  </Button>
+                )
+              )}
+
               {/* Action Buttons */}
               <div className="space-y-3">
                 {/* View History Button */}
@@ -217,6 +252,15 @@ export function CustomerDetailModal({ customer, businessName, onClose, onEdit, o
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Direct Debit Setup Modal */}
+      {customer && (
+        <DirectDebitSetupModal
+          customer={customer}
+          isOpen={showDirectDebitSetup}
+          onClose={() => setShowDirectDebitSetup(false)}
+          onSuccess={() => onRefresh?.()}
+        />
+      )}
     </>
   );
 }

@@ -1,0 +1,202 @@
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Copy, MessageSquare, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { Customer } from '@/types/database';
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
+
+interface DirectDebitSetupModalProps {
+  customer: Customer;
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: DirectDebitSetupModalProps) {
+  const [isLoading, setIsLoading] = useState(false);
+  const [authorisationUrl, setAuthorisationUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCreateMandate = async () => {
+    setIsLoading(true);
+    try {
+      const exitUrl = `${window.location.origin}/customers`;
+      const successUrl = `${window.location.origin}/customers?mandate=success&customer=${customer.id}`;
+
+      const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
+        body: {
+          customerId: customer.id,
+          customerName: customer.name,
+          exitUrl,
+          successUrl,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.authorisationUrl) {
+        setAuthorisationUrl(data.authorisationUrl);
+        toast({
+          title: 'Direct Debit setup ready',
+          description: 'Share the link with your customer to set up Direct Debit.',
+        });
+      }
+    } catch (error: unknown) {
+      console.error('Failed to create mandate:', error);
+      toast({
+        title: 'Setup failed',
+        description: 'Failed to create Direct Debit setup. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!authorisationUrl) return;
+    
+    await navigator.clipboard.writeText(authorisationUrl);
+    setCopied(true);
+    toast({
+      title: 'Link copied',
+      description: 'Direct Debit setup link copied to clipboard.',
+    });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSendSms = () => {
+    if (!authorisationUrl || !customer.mobile_phone) return;
+    
+    const message = encodeURIComponent(
+      `Hi ${customer.name.split(' ')[0]}, please set up your Direct Debit for window cleaning payments using this secure link: ${authorisationUrl}`
+    );
+    window.open(`sms:${customer.mobile_phone}?body=${message}`, '_blank');
+  };
+
+  const handleOpenLink = () => {
+    if (!authorisationUrl) return;
+    window.open(authorisationUrl, '_blank');
+  };
+
+  const handleClose = () => {
+    setAuthorisationUrl(null);
+    setCopied(false);
+    onClose();
+    if (authorisationUrl) {
+      onSuccess();
+    }
+  };
+
+  return (
+    <Drawer open={isOpen} onOpenChange={handleClose}>
+      <DrawerContent>
+        <DrawerHeader className="text-left">
+          <DrawerTitle>Set Up Direct Debit</DrawerTitle>
+          <DrawerDescription>
+            {authorisationUrl 
+              ? `Share the link below with ${customer.name} to set up Direct Debit.`
+              : `Create a Direct Debit mandate for ${customer.name}.`
+            }
+          </DrawerDescription>
+        </DrawerHeader>
+
+        <div className="px-4 pb-4">
+          {!authorisationUrl ? (
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+                <p className="font-medium">{customer.name}</p>
+                <p className="text-sm text-muted-foreground">{customer.address}</p>
+                <p className="text-sm">
+                  Regular payment: <span className="font-medium">£{customer.price.toFixed(2)}</span>
+                </p>
+              </div>
+
+              <div className="text-sm text-muted-foreground space-y-1">
+                <p>• Your customer will enter their bank details securely</p>
+                <p>• Payments are collected automatically when jobs complete</p>
+                <p>• Funds typically arrive in 3-5 working days</p>
+              </div>
+
+              <Button
+                onClick={handleCreateMandate}
+                disabled={isLoading}
+                className="w-full min-h-[60px]"
+              >
+                {isLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                ) : null}
+                Generate Setup Link
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="bg-success/10 border border-success/20 rounded-lg p-4 flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 text-success shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-success">Setup link ready!</p>
+                  <p className="text-muted-foreground">Share it with your customer.</p>
+                </div>
+              </div>
+
+              <div className="bg-muted/50 rounded-lg p-3 text-sm break-all font-mono">
+                {authorisationUrl.substring(0, 50)}...
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                <Button
+                  onClick={handleCopyLink}
+                  variant="outline"
+                  className="min-h-[60px]"
+                >
+                  {copied ? (
+                    <CheckCircle2 className="w-5 h-5 mr-2 text-success" />
+                  ) : (
+                    <Copy className="w-5 h-5 mr-2" />
+                  )}
+                  {copied ? 'Copied!' : 'Copy Link'}
+                </Button>
+
+                {customer.mobile_phone && (
+                  <Button
+                    onClick={handleSendSms}
+                    variant="outline"
+                    className="min-h-[60px]"
+                  >
+                    <MessageSquare className="w-5 h-5 mr-2" />
+                    Send via SMS
+                  </Button>
+                )}
+
+                <Button
+                  onClick={handleOpenLink}
+                  className="min-h-[60px]"
+                >
+                  <ExternalLink className="w-5 h-5 mr-2" />
+                  Open Link
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DrawerFooter className="pt-2">
+          <DrawerClose asChild>
+            <Button variant="outline" className="min-h-[50px]">
+              {authorisationUrl ? 'Done' : 'Cancel'}
+            </Button>
+          </DrawerClose>
+        </DrawerFooter>
+      </DrawerContent>
+    </Drawer>
+  );
+}
