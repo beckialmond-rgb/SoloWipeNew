@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { CustomerNotesPreview } from './CustomerNotesPreview';
 import { Button } from './ui/button';
 import { useHaptics } from '@/hooks/useHaptics';
-
+import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 interface JobCardProps {
   job: JobWithCustomer;
   onComplete: (job: JobWithCustomer) => void;
@@ -23,6 +23,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
   const x = useMotionValue(0);
   const dragControls = useDragControls();
   const { lightTap, success } = useHaptics();
+  const { requireAuth } = useSoftPaywall();
   
   // Background colors based on swipe direction
   const backgroundColor = useTransform(
@@ -40,19 +41,23 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
   const handleDragEnd = (_: any, info: PanInfo) => {
     setIsDragging(false);
     if (info.offset.x < -SWIPE_THRESHOLD) {
+      if (!requireAuth('complete')) return;
       triggerHaptic('medium');
       onComplete(job);
     } else if (info.offset.x > SWIPE_THRESHOLD) {
+      if (!requireAuth('skip')) return;
       triggerHaptic('light');
       onSkip(job.id);
     }
   };
 
   const handleComplete = () => {
+    if (!requireAuth('complete')) return;
     onComplete(job);
   };
 
   const handleSkip = () => {
+    if (!requireAuth('skip')) return;
     onSkip(job.id);
   };
 

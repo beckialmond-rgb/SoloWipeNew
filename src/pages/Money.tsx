@@ -14,10 +14,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { ToastAction } from '@/components/ui/toast';
 import { JobWithCustomer } from '@/types/database';
+import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 
 const Money = () => {
   const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, batchMarkPaid, undoMarkPaid, isLoading } = useSupabaseData();
   const { toast, dismiss } = useToast();
+  const { requireAuth } = useSoftPaywall();
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
   const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
@@ -25,6 +27,7 @@ const Money = () => {
   const [batchModalOpen, setBatchModalOpen] = useState(false);
 
   const handleMarkPaid = (job: JobWithCustomer) => {
+    if (!requireAuth('mark-paid')) return;
     setSelectedJob(job);
     setIsMarkPaidOpen(true);
   };
