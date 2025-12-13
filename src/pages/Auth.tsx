@@ -26,6 +26,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   const [showPasswordFeedback, setShowPasswordFeedback] = useState(false);
   const [showVerificationResend, setShowVerificationResend] = useState(false);
   const [resendingEmail, setResendingEmail] = useState(false);
+  const [rateLimitedUntil, setRateLimitedUntil] = useState<Date | null>(null);
   
   const passwordsMatch = password === confirmPassword;
   const { user, loading: authLoading, signIn, signUp, signInWithOAuth, resendVerificationEmail } = useAuth();
@@ -56,6 +57,28 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
     }
   }, [isLogin, authLoading, user]);
 
+  // Rate limit countdown
+  const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
+  
+  useEffect(() => {
+    if (!rateLimitedUntil) {
+      setRateLimitSeconds(0);
+      return;
+    }
+    
+    const updateCountdown = () => {
+      const remaining = Math.max(0, Math.ceil((rateLimitedUntil.getTime() - Date.now()) / 1000));
+      setRateLimitSeconds(remaining);
+      if (remaining <= 0) {
+        setRateLimitedUntil(null);
+      }
+    };
+    
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [rateLimitedUntil]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -68,6 +91,14 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
           if (error.message?.toLowerCase().includes('email not confirmed')) {
             setShowVerificationResend(true);
           }
+          
+          // Check for rate limiting
+          if (error.message?.toLowerCase().includes('rate limit') || 
+              error.message?.toLowerCase().includes('too many requests') ||
+              error.message?.toLowerCase().includes('exceeded')) {
+            setRateLimitedUntil(new Date(Date.now() + 60000)); // 1 minute cooldown
+          }
+          
           toast({
             title: 'Sign in failed',
             description: error.message,
@@ -85,6 +116,13 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
       } else {
         const { error } = await signUp(email, password, businessName);
         if (error) {
+          // Check for rate limiting
+          if (error.message?.toLowerCase().includes('rate limit') || 
+              error.message?.toLowerCase().includes('too many requests') ||
+              error.message?.toLowerCase().includes('exceeded')) {
+            setRateLimitedUntil(new Date(Date.now() + 60000));
+          }
+          
           toast({
             title: 'Sign up failed',
             description: error.message,
@@ -288,9 +326,18 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
               </div>
             )}
 
+            {/* Rate limit warning */}
+            {rateLimitSeconds > 0 && (
+              <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                <p className="text-sm text-destructive text-center">
+                  Too many attempts. Please wait {rateLimitSeconds} second{rateLimitSeconds !== 1 ? 's' : ''} before trying again.
+                </p>
+              </div>
+            )}
+
             <Button
               type="submit"
-              disabled={loading || (!isLogin && (!emailValidation.isValid || passwordStrength.score < 3 || !passwordsMatch || !acceptedTerms))}
+              disabled={loading || rateLimitSeconds > 0 || (!isLogin && (!emailValidation.isValid || passwordStrength.score < 3 || !passwordsMatch || !acceptedTerms))}
               className={cn(
                 "w-full h-14 rounded-xl",
                 "bg-primary hover:bg-primary/90 text-primary-foreground",
@@ -299,6 +346,8 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
+              ) : rateLimitSeconds > 0 ? (
+                `Wait ${rateLimitSeconds}s`
               ) : isLogin ? (
                 'Sign In'
               ) : (
