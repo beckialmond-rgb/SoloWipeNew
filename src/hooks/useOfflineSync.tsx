@@ -3,12 +3,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { mutationQueue, localData, OfflineMutation } from '@/lib/offlineStorage';
 import { useOnlineStatus } from './useOnlineStatus';
+import { useHaptics } from './useHaptics';
 import { toast } from '@/hooks/use-toast';
 import { format, addWeeks } from 'date-fns';
 
 export function useOfflineSync() {
   const queryClient = useQueryClient();
   const { isOnline, wasOffline, acknowledgeReconnection } = useOnlineStatus();
+  const { lightTap, success, warning } = useHaptics();
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const syncingRef = useRef(false);
@@ -195,6 +197,7 @@ export function useOfflineSync() {
       await updatePendingCount();
 
       if (successCount > 0) {
+        success(); // Haptic feedback on successful sync
         toast({
           title: `Synced ${successCount} offline change${successCount > 1 ? 's' : ''}`,
           description: 'Your data is now up to date.',
@@ -202,6 +205,7 @@ export function useOfflineSync() {
       }
 
       if (failCount > 0) {
+        warning(); // Haptic warning on failed sync
         toast({
           title: `${failCount} change${failCount > 1 ? 's' : ''} failed to sync`,
           description: 'Some offline changes could not be saved.',
@@ -234,9 +238,10 @@ export function useOfflineSync() {
     type: OfflineMutation['type'],
     payload: Record<string, unknown>
   ) => {
+    lightTap(); // Haptic feedback when queuing offline action
     await mutationQueue.add({ type, payload });
     await updatePendingCount();
-  }, [updatePendingCount]);
+  }, [updatePendingCount, lightTap]);
 
   return {
     isOnline,
