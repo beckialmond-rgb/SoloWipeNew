@@ -88,6 +88,25 @@ export const mutationQueue = {
   },
 };
 
+// Last sync timestamp storage
+export const syncStatus = {
+  setLastSynced: async (timestamp: string): Promise<void> => {
+    try {
+      localStorage.setItem('solowipe_last_synced', timestamp);
+    } catch (error) {
+      console.warn('Failed to save last synced timestamp:', error);
+    }
+  },
+  
+  getLastSynced: (): string | null => {
+    try {
+      return localStorage.getItem('solowipe_last_synced');
+    } catch {
+      return null;
+    }
+  },
+};
+
 // Local optimistic data store for offline changes
 const localDataStore = createStore('solowipe-local', 'optimistic-data');
 
