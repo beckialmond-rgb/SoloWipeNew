@@ -69,25 +69,41 @@ serve(async (req) => {
     const customerId = customers.data[0].id;
     logStep("Found Stripe customer", { customerId });
 
+    // Check for active or trialing subscriptions
     const subscriptions = await stripe.subscriptions.list({
       customer: customerId,
-      status: "active",
-      limit: 1,
+      limit: 10,
     });
     
-    const hasActiveSub = subscriptions.data.length > 0;
+    // Filter for active or trialing status
+    const activeSubscription = subscriptions.data.find(
+      (sub: { status: string }) => sub.status === 'active' || sub.status === 'trialing'
+    );
+    
+    const hasActiveSub = !!activeSubscription;
     let subscriptionId = null;
     let subscriptionEnd = null;
     let subscriptionStatus = 'inactive';
     let productId = null;
+    let trialEnd = null;
 
-    if (hasActiveSub) {
-      const subscription = subscriptions.data[0];
-      subscriptionId = subscription.id;
-      subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
-      subscriptionStatus = 'active';
-      productId = subscription.items.data[0]?.price?.product || null;
-      logStep("Active subscription found", { subscriptionId, endDate: subscriptionEnd, productId });
+    if (hasActiveSub && activeSubscription) {
+      subscriptionId = activeSubscription.id;
+      subscriptionEnd = new Date(activeSubscription.current_period_end * 1000).toISOString();
+      subscriptionStatus = activeSubscription.status; // 'active' or 'trialing'
+      productId = activeSubscription.items.data[0]?.price?.product || null;
+      
+      if (activeSubscription.trial_end) {
+        trialEnd = new Date(activeSubscription.trial_end * 1000).toISOString();
+      }
+      
+      logStep("Subscription found", { 
+        subscriptionId, 
+        status: subscriptionStatus, 
+        endDate: subscriptionEnd, 
+        trialEnd,
+        productId 
+      });
     } else {
       logStep("No active subscription found");
     }
@@ -110,7 +126,8 @@ serve(async (req) => {
       subscription_status: subscriptionStatus,
       subscription_end: subscriptionEnd,
       customer_id: customerId,
-      product_id: productId
+      product_id: productId,
+      trial_end: trialEnd
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,

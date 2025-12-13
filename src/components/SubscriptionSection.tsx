@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Crown, Check, Loader2, ExternalLink } from 'lucide-react';
+import { Crown, Check, Loader2, ExternalLink, Sparkles } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
 import { SUBSCRIPTION_TIERS } from '@/constants/subscription';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, differenceInDays } from 'date-fns';
 
 export function SubscriptionSection() {
-  const { subscribed, tier, subscriptionEnd, loading, createCheckout, openCustomerPortal, checkSubscription } = useSubscription();
+  const { subscribed, tier, subscriptionEnd, status, trialEnd, loading, createCheckout, openCustomerPortal, checkSubscription } = useSubscription();
   const { toast } = useToast();
   const [checkoutLoading, setCheckoutLoading] = useState<'monthly' | 'annual' | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+
+  const isTrialing = status === 'trialing';
+  const trialDaysRemaining = trialEnd ? differenceInDays(new Date(trialEnd), new Date()) : 0;
 
   const handleSubscribe = async (priceType: 'monthly' | 'annual') => {
     setCheckoutLoading(priceType);
@@ -58,7 +61,7 @@ export function SubscriptionSection() {
     );
   }
 
-  // Subscribed state
+  // Subscribed state (active or trialing)
   if (subscribed) {
     const tierConfig = tier ? SUBSCRIPTION_TIERS[tier] : null;
     
@@ -66,26 +69,55 @@ export function SubscriptionSection() {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-card rounded-xl border-2 border-primary p-6 space-y-4"
+        className={cn(
+          "bg-card rounded-xl p-6 space-y-4",
+          isTrialing ? "border-2 border-amber-500" : "border-2 border-primary"
+        )}
       >
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <Crown className="w-6 h-6 text-primary" />
+          <div className={cn(
+            "w-12 h-12 rounded-full flex items-center justify-center",
+            isTrialing ? "bg-amber-500/10" : "bg-primary/10"
+          )}>
+            {isTrialing ? (
+              <Sparkles className="w-6 h-6 text-amber-500" />
+            ) : (
+              <Crown className="w-6 h-6 text-primary" />
+            )}
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-foreground">SoloWipe Pro</h3>
-              <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs font-medium rounded-full">
-                Active
+              <span className={cn(
+                "px-2 py-0.5 text-xs font-medium rounded-full",
+                isTrialing 
+                  ? "bg-amber-500/10 text-amber-600" 
+                  : "bg-primary/10 text-primary"
+              )}>
+                {isTrialing ? 'Free Trial' : 'Active'}
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              {tierConfig ? `${tierConfig.currency}${tierConfig.price}/${tierConfig.interval}` : 'Subscription active'}
+              {isTrialing 
+                ? `${trialDaysRemaining} day${trialDaysRemaining !== 1 ? 's' : ''} remaining`
+                : tierConfig 
+                  ? `${tierConfig.currency}${tierConfig.price}/${tierConfig.interval}` 
+                  : 'Subscription active'
+              }
             </p>
           </div>
         </div>
 
-        {subscriptionEnd && (
+        {isTrialing && trialEnd && (
+          <div className="bg-amber-500/10 rounded-lg p-3">
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              Your free trial ends on {format(new Date(trialEnd), 'd MMMM yyyy')}. 
+              You won't be charged until then.
+            </p>
+          </div>
+        )}
+
+        {!isTrialing && subscriptionEnd && (
           <p className="text-sm text-muted-foreground">
             Renews on {format(new Date(subscriptionEnd), 'd MMMM yyyy')}
           </p>
@@ -122,8 +154,16 @@ export function SubscriptionSection() {
           </div>
           <div>
             <h3 className="font-semibold text-foreground">Upgrade to Pro</h3>
-            <p className="text-sm text-muted-foreground">Unlock all premium features</p>
+            <p className="text-sm text-muted-foreground">Start your 14-day free trial</p>
           </div>
+        </div>
+
+        {/* Free Trial Banner */}
+        <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+          <p className="text-sm text-foreground">
+            <span className="font-medium">14 days free</span> — no payment until trial ends
+          </p>
         </div>
 
         {/* Monthly Plan */}
@@ -139,13 +179,14 @@ export function SubscriptionSection() {
           </div>
           <Button
             className="w-full min-h-[44px]"
+            variant="outline"
             onClick={() => handleSubscribe('monthly')}
             disabled={checkoutLoading !== null}
           >
             {checkoutLoading === 'monthly' ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : null}
-            Subscribe Monthly
+            Start Free Trial — then £15/month
           </Button>
         </div>
 
@@ -173,7 +214,7 @@ export function SubscriptionSection() {
             {checkoutLoading === 'annual' ? (
               <Loader2 className="w-4 h-4 animate-spin mr-2" />
             ) : null}
-            Subscribe Annually
+            Start Free Trial — then £150/year
           </Button>
         </div>
 
