@@ -4,6 +4,7 @@ import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { CustomerNotesPreview } from './CustomerNotesPreview';
+import { Button } from './ui/button';
 
 interface JobCardProps {
   job: JobWithCustomer;
@@ -23,7 +24,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
   const backgroundColor = useTransform(
     x,
     [-SWIPE_THRESHOLD, 0, SWIPE_THRESHOLD],
-    ['hsl(var(--accent))', 'hsl(var(--card))', 'hsl(var(--muted))']
+    ['hsl(var(--success))', 'hsl(var(--card))', 'hsl(var(--muted))']
   );
 
   const triggerHaptic = (type: 'light' | 'medium') => {
@@ -53,17 +54,12 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
 
   const handleNavigate = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Encode the address for URL
     const encodedAddress = encodeURIComponent(job.customer.address);
-    
-    // Try to detect if user is on iOS or Android for best map experience
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     
     if (isIOS) {
-      // Apple Maps
       window.open(`maps://maps.apple.com/?daddr=${encodedAddress}`, '_blank');
     } else {
-      // Google Maps (works on Android and web)
       window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, '_blank');
     }
   };
@@ -82,20 +78,20 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
       exit={{ opacity: 0, x: -100, scale: 0.9 }}
       transition={{ delay: index * 0.1, duration: 0.3 }}
       className={cn(
-        "relative rounded-2xl overflow-hidden fat-card",
+        "relative rounded-xl overflow-hidden",
         isNextUp && "ring-2 ring-primary ring-offset-2 ring-offset-background"
       )}
     >
       {/* Next Up Badge */}
       {isNextUp && (
-        <div className="absolute -top-2 left-4 z-10 px-2 py-0.5 bg-primary text-primary-foreground text-xs font-bold rounded-full">
+        <div className="absolute -top-2 left-4 z-10 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full shadow-sm">
           NEXT UP
         </div>
       )}
 
       {/* Swipe action backgrounds */}
       <motion.div 
-        className="absolute inset-0 rounded-2xl"
+        className="absolute inset-0 rounded-xl"
         style={{ backgroundColor }}
       />
       
@@ -110,7 +106,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
       
       {/* Complete indicator (left swipe) */}
       <motion.div 
-        className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-accent-foreground"
+        className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-success-foreground"
         style={{ opacity: useTransform(x, [-SWIPE_THRESHOLD, 0], [1, 0]) }}
       >
         <span className="font-medium text-sm">Done</span>
@@ -126,7 +122,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
         onDragEnd={handleDragEnd}
         style={{ x }}
         className={cn(
-          "bg-card rounded-2xl shadow-sm border border-border",
+          "bg-card rounded-xl shadow-sm border border-border",
           "border-l-4 border-l-primary",
           "flex items-stretch overflow-hidden relative",
           isDragging && "cursor-grabbing",
@@ -142,7 +138,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
             </h3>
           </div>
           <div className="flex items-center gap-3 mt-2">
-            <span className="text-lg font-bold text-foreground">
+            <span className="text-xl font-bold text-foreground">
               £{job.customer.price}
             </span>
             <span className="text-sm text-muted-foreground">
@@ -151,28 +147,29 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
           </div>
 
           {/* Quick action buttons */}
-          <div className="flex items-center gap-2 mt-3">
-            {/* Navigate */}
-            <button
+          <div className="flex items-center gap-2 mt-4">
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleNavigate}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-lg text-xs font-medium hover:bg-primary/20 transition-colors"
+              className="gap-1.5 text-primary border-primary/20 hover:bg-primary/10"
             >
-              <Navigation className="w-3.5 h-3.5" />
+              <Navigation className="w-4 h-4" />
               Navigate
-            </button>
+            </Button>
             
-            {/* Call */}
             {job.customer.mobile_phone && (
-              <button
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleCall}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 text-accent rounded-lg text-xs font-medium hover:bg-accent/20 transition-colors"
+                className="gap-1.5 text-success border-success/20 hover:bg-success/10"
               >
-                <Phone className="w-3.5 h-3.5" />
+                <Phone className="w-4 h-4" />
                 Call
-              </button>
+              </Button>
             )}
             
-            {/* Notes preview */}
             {job.customer.notes && (
               <CustomerNotesPreview notes={job.customer.notes} customerName={job.customer.name} />
             )}
@@ -184,7 +181,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
           whileTap={{ scale: 0.95 }}
           onClick={handleSkip}
           className={cn(
-            "w-16 flex items-center justify-center",
+            "w-16 flex items-center justify-center touch-lg",
             "bg-muted hover:bg-muted/80 transition-colors border-r border-border",
             "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
           )}
@@ -198,13 +195,13 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
           whileTap={{ scale: 0.95 }}
           onClick={handleComplete}
           className={cn(
-            "w-20 flex items-center justify-center",
-            "bg-accent hover:bg-accent/90 transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2"
+            "w-20 flex items-center justify-center touch-lg",
+            "bg-success hover:bg-success/90 transition-colors",
+            "focus:outline-none focus:ring-2 focus:ring-success focus:ring-offset-2"
           )}
           aria-label={`Mark ${job.customer.name} as complete`}
         >
-          <Check className="w-8 h-8 text-accent-foreground" strokeWidth={3} />
+          <Check className="w-8 h-8 text-success-foreground" strokeWidth={3} />
         </motion.button>
       </motion.div>
     </motion.div>
