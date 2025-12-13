@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { MapPin, Phone, PoundSterling } from 'lucide-react';
+import { MapPin, Phone, PoundSterling, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { JobWithCustomer } from '@/types/database';
 import { format } from 'date-fns';
@@ -29,9 +29,17 @@ export function UnpaidJobCard({ job, index, onMarkPaid }: UnpaidJobCardProps) {
       <div className="p-4">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-foreground truncate text-lg">
-              {job.customer.name}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="font-semibold text-foreground truncate text-lg">
+                {job.customer.name}
+              </p>
+              {job.customer.gocardless_id && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                  <CreditCard className="w-3 h-3" />
+                  DD
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
               <MapPin className="w-4 h-4 flex-shrink-0" />
               <span className="truncate">{job.customer.address}</span>
