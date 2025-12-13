@@ -11,6 +11,12 @@
     --brand-grey: 220 21% 18%;
     --action-green: 142 71% 45%;
     
+    /* Semantic Status Colors */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
     --background: 210 20% 98%;
     --foreground: 220 21% 18%;
 
@@ -40,6 +46,10 @@
     --ring: 211 100% 50%;
 
     --radius: 1rem;
+    --radius-sm: 0.5rem;
+    --radius-md: 0.75rem;
+    --radius-lg: 1rem;
+    --radius-xl: 1.25rem;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -52,6 +62,11 @@
   }
 
   .dark {
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 20 14% 10%;
+    
     --background: 220 21% 8%;
     --foreground: 210 20% 98%;
 
@@ -112,9 +127,22 @@
 }
 
 @layer utilities {
-  /* Fat UI - minimum touch targets */
+  /* Touch Target Scale */
+  .touch-sm {
+    @apply min-h-[44px];
+  }
+  
+  .touch-md {
+    @apply min-h-[48px];
+  }
+  
+  .touch-lg {
+    @apply min-h-[60px];
+  }
+
+  /* Fat UI - minimum touch targets (legacy alias) */
   .fat-button {
-    @apply min-h-[60px] h-14;
+    @apply min-h-[60px];
   }
 
   .fat-card {
