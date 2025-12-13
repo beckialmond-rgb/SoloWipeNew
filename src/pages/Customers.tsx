@@ -17,7 +17,7 @@ import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 
 const Customers = () => {
   const { customers, businessName, isLoading, addCustomer, updateCustomer, archiveCustomer } = useSupabaseData();
-  const { requireAuth } = useSoftPaywall();
+  const { requirePremium } = useSoftPaywall();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -31,13 +31,13 @@ const Customers = () => {
   );
 
   const handleEditCustomer = (customer: Customer) => {
-    if (!requireAuth('edit')) return;
+    if (!requirePremium('edit')) return;
     setSelectedCustomer(null);
     setEditingCustomer(customer);
   };
 
   const handleArchiveCustomer = async (customerId: string) => {
-    if (!requireAuth('edit')) return;
+    if (!requirePremium('edit')) return;
     await archiveCustomer(customerId);
     setSelectedCustomer(null);
   };
@@ -48,7 +48,7 @@ const Customers = () => {
   };
 
   const handleAddClick = () => {
-    if (!requireAuth('add-customer')) return;
+    if (!requirePremium('add-customer')) return;
     setIsAddModalOpen(true);
   };
 
