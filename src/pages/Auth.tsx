@@ -73,8 +73,26 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   // Show loading while checking auth state
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+          <div className="w-full max-w-sm">
+            {/* Logo skeleton */}
+            <div className="text-center mb-10">
+              <div className="h-12 w-32 mx-auto mb-4 bg-muted rounded-lg animate-pulse" />
+              <div className="h-8 w-48 mx-auto mb-2 bg-muted rounded-lg animate-pulse" />
+              <div className="h-5 w-56 mx-auto bg-muted rounded-lg animate-pulse" />
+            </div>
+            {/* Form skeleton */}
+            <div className="space-y-4">
+              <div className="h-14 w-full bg-muted rounded-xl animate-pulse" />
+              <div className="h-14 w-full bg-muted rounded-xl animate-pulse" />
+              <div className="h-14 w-full bg-primary/20 rounded-xl animate-pulse" />
+            </div>
+            <div className="mt-6 flex justify-center">
+              <div className="h-5 w-48 bg-muted rounded-lg animate-pulse" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
