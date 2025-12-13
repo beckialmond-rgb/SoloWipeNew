@@ -1,13 +1,15 @@
 import { useState, useEffect, forwardRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Building, Loader2 } from 'lucide-react';
+import { Building, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { usePasswordStrength } from '@/hooks/usePasswordStrength';
+import { useEmailValidation } from '@/hooks/useEmailValidation';
 import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
 import { PasswordInput } from '@/components/PasswordInput';
+import { EmailInput } from '@/components/EmailInput';
 import { cn } from '@/lib/utils';
 
 const Auth = forwardRef<HTMLDivElement>((_, ref) => {
@@ -22,6 +24,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   const navigate = useNavigate();
   
   const passwordStrength = usePasswordStrength(password);
+  const emailValidation = useEmailValidation(email);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -123,22 +126,14 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
               </div>
             )}
 
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className={cn(
-                  "w-full h-14 pl-12 pr-4 rounded-xl",
-                  "bg-muted border-0",
-                  "text-foreground placeholder:text-muted-foreground",
-                  "focus:outline-none focus:ring-2 focus:ring-primary"
-                )}
-              />
-            </div>
+            <EmailInput
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              validation={emailValidation}
+              showValidation={!isLogin}
+              required
+            />
 
             <div className="space-y-2">
               <PasswordInput
