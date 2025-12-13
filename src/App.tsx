@@ -67,11 +67,11 @@ const App = () => (
           <OfflineProvider>
             <TooltipProvider>
               <OfflineIndicator />
-              <DemoModeBanner />
-              <TrialGateModal />
               <Toaster />
               <Sonner />
               <BrowserRouter>
+                <DemoModeBanner />
+                <TrialGateModal />
                 <KeyboardShortcutsProvider>
                   <Routes>
                     <Route path="/auth" element={<Auth />} />
