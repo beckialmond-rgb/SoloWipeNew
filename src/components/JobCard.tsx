@@ -23,7 +23,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
   const x = useMotionValue(0);
   const dragControls = useDragControls();
   const { lightTap, success } = useHaptics();
-  const { requireAuth } = useSoftPaywall();
+  const { requirePremium } = useSoftPaywall();
   
   // Background colors based on swipe direction
   const backgroundColor = useTransform(
@@ -41,23 +41,23 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
   const handleDragEnd = (_: any, info: PanInfo) => {
     setIsDragging(false);
     if (info.offset.x < -SWIPE_THRESHOLD) {
-      if (!requireAuth('complete')) return;
+      if (!requirePremium('complete')) return;
       triggerHaptic('medium');
       onComplete(job);
     } else if (info.offset.x > SWIPE_THRESHOLD) {
-      if (!requireAuth('skip')) return;
+      if (!requirePremium('skip')) return;
       triggerHaptic('light');
       onSkip(job.id);
     }
   };
 
   const handleComplete = () => {
-    if (!requireAuth('complete')) return;
+    if (!requirePremium('complete')) return;
     onComplete(job);
   };
 
   const handleSkip = () => {
-    if (!requireAuth('skip')) return;
+    if (!requirePremium('skip')) return;
     onSkip(job.id);
   };
 
