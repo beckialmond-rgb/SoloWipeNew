@@ -50,7 +50,7 @@ export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalPro
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[70vh] overflow-y-auto safe-bottom"
+          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto"
         >
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-2">
@@ -66,7 +66,7 @@ export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalPro
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          <div className="px-6 pb-8 pt-2">
+          <div className="px-6 pb-24 pt-2">
             <div className="flex items-center gap-2 mb-2">
               <StickyNote className="w-5 h-5 text-amber-500" />
               <h2 className="text-xl font-bold text-foreground">Job Notes</h2>

@@ -65,7 +65,7 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl safe-bottom"
+          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto"
         >
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-2">
@@ -81,7 +81,7 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          <form onSubmit={handleSubmit} className="px-6 pb-8 pt-2">
+          <form onSubmit={handleSubmit} className="px-6 pb-24 pt-2">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
                 <Zap className="w-4 h-4 text-accent" />

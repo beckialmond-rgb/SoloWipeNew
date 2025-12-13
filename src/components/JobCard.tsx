@@ -77,18 +77,8 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -100, scale: 0.9 }}
       transition={{ delay: index * 0.1, duration: 0.3 }}
-      className={cn(
-        "relative rounded-xl overflow-hidden",
-        isNextUp && "ring-2 ring-primary ring-offset-2 ring-offset-background"
-      )}
+      className="relative"
     >
-      {/* Next Up Badge */}
-      {isNextUp && (
-        <div className="absolute -top-2 left-4 z-10 px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-full shadow-sm">
-          NEXT UP
-        </div>
-      )}
-
       {/* Swipe action backgrounds */}
       <motion.div 
         className="absolute inset-0 rounded-xl"
@@ -122,87 +112,98 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
         onDragEnd={handleDragEnd}
         style={{ x }}
         className={cn(
-          "bg-card rounded-xl shadow-sm border border-border",
-          "border-l-4 border-l-primary",
-          "flex items-stretch overflow-hidden relative",
+          "bg-card rounded-xl shadow-sm border border-border overflow-hidden relative",
           isDragging && "cursor-grabbing",
-          isNextUp && "mt-2"
+          isNextUp && "border-2 border-primary shadow-md"
         )}
       >
-        {/* Content */}
-        <div className="flex-1 p-4 flex flex-col justify-center">
-          <div className="flex items-start gap-2 mb-1">
-            <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-            <h3 className="font-semibold text-foreground text-base leading-tight">
-              {job.customer.address}
-            </h3>
+        {/* Next Up Badge - Inside the card */}
+        {isNextUp && (
+          <div className="bg-primary/10 px-4 py-1.5 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-xs font-semibold text-primary uppercase tracking-wide">Next Up</span>
           </div>
-          <div className="flex items-center gap-3 mt-2">
-            <span className="text-xl font-bold text-foreground">
-              £{job.customer.price}
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {job.customer.name}
-            </span>
-          </div>
+        )}
 
-          {/* Quick action buttons */}
-          <div className="flex items-center gap-2 mt-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNavigate}
-              className="gap-1.5 text-primary border-primary/20 hover:bg-primary/10"
-            >
-              <Navigation className="w-4 h-4" />
-              Navigate
-            </Button>
-            
-            {job.customer.mobile_phone && (
+        <div className="flex items-stretch">
+          {/* Content */}
+          <div className="flex-1 p-4 flex flex-col justify-center">
+            <div className="flex items-start gap-2 mb-1">
+              <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <h3 className="font-semibold text-foreground text-base leading-tight">
+                {job.customer.address}
+              </h3>
+            </div>
+            <div className="flex items-center gap-3 mt-2">
+              <span className="text-xl font-bold text-foreground">
+                £{job.customer.price}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {job.customer.name}
+              </span>
+            </div>
+
+            {/* Quick action buttons */}
+            <div className="flex items-center gap-2 mt-3">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleCall}
-                className="gap-1.5 text-success border-success/20 hover:bg-success/10"
+                onClick={handleNavigate}
+                className="gap-1.5 text-primary border-primary/20 hover:bg-primary/10 h-9"
               >
-                <Phone className="w-4 h-4" />
-                Call
+                <Navigation className="w-4 h-4" />
+                Navigate
               </Button>
-            )}
-            
-            {job.customer.notes && (
-              <CustomerNotesPreview notes={job.customer.notes} customerName={job.customer.name} />
-            )}
+              
+              {job.customer.mobile_phone && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCall}
+                  className="gap-1.5 text-success border-success/20 hover:bg-success/10 h-9"
+                >
+                  <Phone className="w-4 h-4" />
+                  Call
+                </Button>
+              )}
+              
+              {job.customer.notes && (
+                <CustomerNotesPreview notes={job.customer.notes} customerName={job.customer.name} />
+              )}
+            </div>
+          </div>
+
+          {/* Action buttons column */}
+          <div className="flex flex-col border-l border-border">
+            {/* Skip Button */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={handleSkip}
+              className={cn(
+                "w-16 flex-1 flex items-center justify-center min-h-[52px]",
+                "bg-muted/50 hover:bg-muted transition-colors border-b border-border",
+                "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-muted"
+              )}
+              aria-label={`Skip ${job.customer.name}`}
+            >
+              <SkipForward className="w-5 h-5 text-muted-foreground" />
+            </motion.button>
+
+            {/* Complete Button */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={handleComplete}
+              className={cn(
+                "w-16 flex-1 flex items-center justify-center min-h-[52px]",
+                "bg-success hover:bg-success/90 transition-colors",
+                "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-success"
+              )}
+              aria-label={`Mark ${job.customer.name} as complete`}
+            >
+              <Check className="w-6 h-6 text-success-foreground" strokeWidth={3} />
+            </motion.button>
           </div>
         </div>
-
-        {/* Skip Button */}
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={handleSkip}
-          className={cn(
-            "w-16 flex items-center justify-center touch-lg",
-            "bg-muted hover:bg-muted/80 transition-colors border-r border-border",
-            "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
-          )}
-          aria-label={`Skip ${job.customer.name}`}
-        >
-          <SkipForward className="w-6 h-6 text-muted-foreground" />
-        </motion.button>
-
-        {/* Complete Button */}
-        <motion.button
-          whileTap={{ scale: 0.95 }}
-          onClick={handleComplete}
-          className={cn(
-            "w-20 flex items-center justify-center touch-lg",
-            "bg-success hover:bg-success/90 transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-success focus:ring-offset-2"
-          )}
-          aria-label={`Mark ${job.customer.name} as complete`}
-        >
-          <Check className="w-8 h-8 text-success-foreground" strokeWidth={3} />
-        </motion.button>
       </motion.div>
     </motion.div>
   );
