@@ -367,6 +367,28 @@ export function useSupabaseData() {
 
         if (updateError) throw updateError;
 
+        // If customer has Direct Debit, collect payment automatically
+        if (isGoCardless && job.customer.gocardless_id) {
+          try {
+            const { error: collectError } = await supabase.functions.invoke('gocardless-collect-payment', {
+              body: {
+                jobId,
+                customerId: job.customer_id,
+                amount: amountCollected,
+                description: `Window cleaning - ${job.customer.name}`,
+              },
+            });
+            
+            if (collectError) {
+              console.error('Failed to collect Direct Debit payment:', collectError);
+              // Don't fail the job completion, just log the error
+              // The job is still marked as paid since DD will process async
+            }
+          } catch (ddError) {
+            console.error('Direct Debit collection error:', ddError);
+          }
+        }
+
         const { data: newJob, error: insertError } = await supabase
           .from('jobs')
           .insert({
@@ -385,6 +407,7 @@ export function useSupabaseData() {
           collectedAmount: amountCollected,
           nextDate: format(nextDate, 'dd MMM yyyy'),
           customerName: job.customer.name,
+          isDirectDebit: isGoCardless,
         };
       } finally {
         completingJobIds.delete(jobId);

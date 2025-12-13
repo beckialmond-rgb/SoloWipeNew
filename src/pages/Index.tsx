@@ -224,11 +224,14 @@ const Index = () => {
     try {
       const result = await completeJob(jobId, amount, photoUrl);
       
+      const ddMessage = result.isDirectDebit ? ' (Direct Debit)' : '';
       const { id: toastId } = toast({
-        title: `£${result.collectedAmount} Collected!`,
-        description: `Next clean: ${result.nextDate}`,
+        title: `£${result.collectedAmount} Collected!${ddMessage}`,
+        description: result.isDirectDebit 
+          ? `Payment collecting via DD. Next clean: ${result.nextDate}`
+          : `Next clean: ${result.nextDate}`,
         duration: 5000,
-        action: (
+        action: !result.isDirectDebit ? (
           <ToastAction
             altText="Undo"
             onClick={async () => {
@@ -246,7 +249,7 @@ const Index = () => {
           >
             Undo
           </ToastAction>
-        ),
+        ) : undefined,
       });
     } catch (error) {
       // Rollback on error
