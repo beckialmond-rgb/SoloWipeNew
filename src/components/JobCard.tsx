@@ -1,5 +1,5 @@
-import { Check, MapPin, SkipForward, Navigation, Phone, StickyNote } from 'lucide-react';
-import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
+import { Check, MapPin, SkipForward, Navigation, Phone, GripVertical } from 'lucide-react';
+import { motion, useMotionValue, useTransform, PanInfo, Reorder, useDragControls } from 'framer-motion';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -18,7 +18,9 @@ const SWIPE_THRESHOLD = 100;
 
 export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: JobCardProps) {
   const [isDragging, setIsDragging] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
   const x = useMotionValue(0);
+  const dragControls = useDragControls();
   
   // Background colors based on swipe direction
   const backgroundColor = useTransform(
@@ -72,12 +74,18 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
   };
 
   return (
-    <motion.div
+    <Reorder.Item
+      value={job}
+      dragListener={false}
+      dragControls={dragControls}
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      animate={{ opacity: 1, y: 0, scale: isReordering ? 1.02 : 1 }}
       exit={{ opacity: 0, x: -100, scale: 0.9 }}
-      transition={{ delay: index * 0.1, duration: 0.3 }}
-      className="relative"
+      transition={{ delay: index * 0.05, duration: 0.2 }}
+      className={cn("relative", isReordering && "z-50")}
+      whileDrag={{ scale: 1.03, boxShadow: "0 10px 30px rgba(0,0,0,0.2)" }}
+      onDragStart={() => setIsReordering(true)}
+      onDragEnd={() => setIsReordering(false)}
     >
       {/* Swipe action backgrounds */}
       <motion.div 
@@ -126,6 +134,17 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
         )}
 
         <div className="flex items-stretch">
+          {/* Drag Handle */}
+          <div
+            className="w-10 flex items-center justify-center cursor-grab active:cursor-grabbing touch-none bg-muted/30 hover:bg-muted/50 transition-colors border-r border-border"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              dragControls.start(e);
+            }}
+          >
+            <GripVertical className="w-5 h-5 text-muted-foreground" />
+          </div>
+          
           {/* Content */}
           <div className="flex-1 p-4 flex flex-col justify-center">
             <div className="flex items-start gap-2 mb-1">
@@ -205,6 +224,6 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </Reorder.Item>
   );
 }
