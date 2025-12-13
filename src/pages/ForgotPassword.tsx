@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, ArrowLeft, Loader2, CheckCircle } from 'lucide-react';
@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-const ForgotPassword = () => {
+const ForgotPassword = forwardRef<HTMLDivElement>((_, ref) => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -37,7 +37,7 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div ref={ref} className="min-h-screen bg-background flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -124,6 +124,8 @@ const ForgotPassword = () => {
       </div>
     </div>
   );
-};
+});
+
+ForgotPassword.displayName = 'ForgotPassword';
 
 export default ForgotPassword;
