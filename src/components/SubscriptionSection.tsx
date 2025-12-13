@@ -22,7 +22,7 @@ export function SubscriptionSection() {
     try {
       const url = await createCheckout(priceType);
       if (url) {
-        window.open(url, '_blank');
+        window.location.href = url;
       }
     } catch (error) {
       toast({
@@ -40,7 +40,7 @@ export function SubscriptionSection() {
     try {
       const url = await openCustomerPortal();
       if (url) {
-        window.open(url, '_blank');
+        window.location.href = url;
       }
     } catch (error) {
       toast({
