@@ -15,9 +15,9 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "logo.png"],
+      includeAssets: ["favicon.ico", "logo.png", "app-icon.png"],
       manifest: {
-        name: "SoloWipe - Window Cleaning Jobs",
+        name: "SoloWipe",
         short_name: "SoloWipe",
         description: "Track jobs, manage customers, boost earnings",
         theme_color: "#007AFF",
@@ -26,17 +26,17 @@ export default defineConfig(({ mode }) => ({
         start_url: "/",
         icons: [
           {
-            src: "icon-192x192.png",
+            src: "app-icon.png",
             sizes: "192x192",
             type: "image/png",
           },
           {
-            src: "icon-512x512.png",
+            src: "app-icon.png",
             sizes: "512x512",
             type: "image/png",
           },
           {
-            src: "icon-512x512.png",
+            src: "app-icon.png",
             sizes: "512x512",
             type: "image/png",
             purpose: "maskable",
