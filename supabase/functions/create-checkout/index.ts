@@ -95,7 +95,7 @@ serve(async (req) => {
       ],
       mode: "subscription",
       subscription_data: {
-        trial_period_days: 14,
+        trial_period_days: 7,
       },
       success_url: `${origin}/settings?subscription=success`,
       cancel_url: `${origin}/settings?subscription=cancelled`,

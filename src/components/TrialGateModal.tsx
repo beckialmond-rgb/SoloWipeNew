@@ -133,7 +133,7 @@ export function TrialGateModal() {
               className="mt-6 inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2"
             >
               <Clock className="w-4 h-4" />
-              <span className="text-sm font-semibold">14 days free trial</span>
+              <span className="text-sm font-semibold">7 days free trial</span>
             </motion.div>
           )}
         </motion.div>
@@ -207,7 +207,7 @@ export function TrialGateModal() {
           <div className="flex items-center justify-center gap-4 pt-2">
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Check className="w-3.5 h-3.5 text-success" />
-              <span>14-day free trial</span>
+              <span>7-day free trial</span>
             </div>
             <div className="w-1 h-1 rounded-full bg-border" />
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

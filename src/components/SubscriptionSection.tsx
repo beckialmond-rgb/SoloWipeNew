@@ -19,9 +19,9 @@ export function SubscriptionSection() {
   const isTrialing = status === 'trialing';
   const trialDaysRemaining = trialEnd ? differenceInDays(new Date(trialEnd), new Date()) : 0;
   
-  // Calculate grace period (14-day trial from signup)
+  // Calculate grace period (7-day trial from signup)
   const gracePeriodDaysRemaining = user?.created_at 
-    ? Math.max(0, 14 - differenceInDays(new Date(), new Date(user.created_at)))
+    ? Math.max(0, 7 - differenceInDays(new Date(), new Date(user.created_at)))
     : 0;
   const isInGracePeriod = !subscribed && gracePeriodDaysRemaining > 0;
 
@@ -176,7 +176,7 @@ export function SubscriptionSection() {
           </div>
           <div className="bg-emerald-500/10 rounded-lg p-3">
             <p className="text-sm text-emerald-700 dark:text-emerald-400">
-              Your trial ends on {format(new Date(new Date(user?.created_at || '').getTime() + 14 * 24 * 60 * 60 * 1000), 'd MMMM yyyy')}. 
+              Your trial ends on {format(new Date(new Date(user?.created_at || '').getTime() + 7 * 24 * 60 * 60 * 1000), 'd MMMM yyyy')}. 
               Subscribe anytime to keep access.
             </p>
           </div>
@@ -193,7 +193,7 @@ export function SubscriptionSection() {
               {isInGracePeriod ? 'Subscribe to SoloWipe Pro' : 'Upgrade to Pro'}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {isInGracePeriod ? 'Lock in your access before trial ends' : 'Start your 14-day free trial'}
+              {isInGracePeriod ? 'Lock in your access before trial ends' : 'Start your 7-day free trial'}
             </p>
           </div>
         </div>
@@ -203,7 +203,7 @@ export function SubscriptionSection() {
           <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
             <p className="text-sm text-foreground">
-              <span className="font-medium">14 days free</span> — no payment until trial ends
+              <span className="font-medium">7 days free</span> — no payment until trial ends
             </p>
           </div>
         )}
