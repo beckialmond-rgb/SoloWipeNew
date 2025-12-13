@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { format } from 'date-fns';
 import { AnimatePresence, motion, Reorder } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Header } from '@/components/Header';
@@ -87,10 +88,56 @@ const Index = () => {
     },
   });
 
-  // Sync local jobs with fetched pending jobs
+  // Get today's date key for localStorage
+  const todayKey = `solowipe_job_order_${format(new Date(), 'yyyy-MM-dd')}`;
+
+  // Apply saved order to jobs
+  const applyPersistedOrder = useCallback((jobs: JobWithCustomer[]): JobWithCustomer[] => {
+    const savedOrder = localStorage.getItem(todayKey);
+    if (!savedOrder) return jobs;
+    
+    try {
+      const orderedIds: string[] = JSON.parse(savedOrder);
+      const jobMap = new Map(jobs.map(job => [job.id, job]));
+      const orderedJobs: JobWithCustomer[] = [];
+      
+      // Add jobs in saved order
+      for (const id of orderedIds) {
+        const job = jobMap.get(id);
+        if (job) {
+          orderedJobs.push(job);
+          jobMap.delete(id);
+        }
+      }
+      
+      // Add any new jobs not in saved order
+      for (const job of jobMap.values()) {
+        orderedJobs.push(job);
+      }
+      
+      return orderedJobs;
+    } catch {
+      return jobs;
+    }
+  }, [todayKey]);
+
+  // Save order to localStorage
+  const saveJobOrder = useCallback((jobs: JobWithCustomer[]) => {
+    const orderIds = jobs.map(job => job.id);
+    localStorage.setItem(todayKey, JSON.stringify(orderIds));
+  }, [todayKey]);
+
+  // Handle reorder with persistence
+  const handleReorder = useCallback((newOrder: JobWithCustomer[]) => {
+    setLocalJobs(newOrder);
+    saveJobOrder(newOrder);
+  }, [saveJobOrder]);
+
+  // Sync local jobs with fetched pending jobs, applying saved order
   useEffect(() => {
-    setLocalJobs(pendingJobs);
-  }, [pendingJobs]);
+    const orderedJobs = applyPersistedOrder(pendingJobs);
+    setLocalJobs(orderedJobs);
+  }, [pendingJobs, applyPersistedOrder]);
 
   // Show welcome flow for new users
   useEffect(() => {
@@ -455,12 +502,12 @@ const Index = () => {
             {/* Route optimization */}
             {localJobs.length >= 2 && (
               <div className="mb-4">
-                <OptimizeRouteButton jobs={localJobs} onReorder={setLocalJobs} />
+                <OptimizeRouteButton jobs={localJobs} onReorder={handleReorder} />
               </div>
             )}
 
             {/* Jobs list - Drag to reorder */}
-            <Reorder.Group axis="y" values={localJobs} onReorder={setLocalJobs} className="space-y-4">
+            <Reorder.Group axis="y" values={localJobs} onReorder={handleReorder} className="space-y-4">
               <AnimatePresence mode="popLayout">
                 {localJobs.map((job, index) => (
                   <JobCard
