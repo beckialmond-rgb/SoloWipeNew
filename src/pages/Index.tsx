@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, Reorder } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -459,8 +459,8 @@ const Index = () => {
               </div>
             )}
 
-            {/* Jobs list */}
-            <div className="space-y-4">
+            {/* Jobs list - Drag to reorder */}
+            <Reorder.Group axis="y" values={localJobs} onReorder={setLocalJobs} className="space-y-4">
               <AnimatePresence mode="popLayout">
                 {localJobs.map((job, index) => (
                   <JobCard
@@ -473,7 +473,7 @@ const Index = () => {
                   />
                 ))}
               </AnimatePresence>
-            </div>
+            </Reorder.Group>
 
             {/* Empty state for today */}
             {localJobs.length === 0 && completedToday.length === 0 && customers.length > 0 && (
