@@ -20,6 +20,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'apple' | null>(null);
   const [rememberMe, setRememberMe] = useState(true);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -451,7 +452,45 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
             </Button>
           </div>
 
-          {/* Forgot Password Link (only show on login) */}
+          {/* Demo Login Button */}
+          <div className="mt-4">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={demoLoading || loading}
+              onClick={async () => {
+                setDemoLoading(true);
+                try {
+                  const { error } = await signIn('demo@solowipe.com', 'demo123456');
+                  if (error) {
+                    toast({
+                      title: 'Demo login unavailable',
+                      description: 'Please create an account to try the app.',
+                      variant: 'destructive',
+                    });
+                  } else {
+                    toast({
+                      title: 'Welcome to Demo Mode!',
+                      description: 'Explore the app with sample data.',
+                    });
+                    navigate('/');
+                  }
+                } finally {
+                  setDemoLoading(false);
+                }
+              }}
+              className="w-full h-12 rounded-xl text-muted-foreground hover:text-foreground"
+            >
+              {demoLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M13.8 12H3" />
+                </svg>
+              )}
+              Try Demo Account
+            </Button>
+          </div>
           {isLogin && (
             <div className="mt-4 text-center space-y-2">
               <Link
