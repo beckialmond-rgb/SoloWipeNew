@@ -532,7 +532,7 @@ const Settings = () => {
 
         {/* App Version */}
         <p className="text-center text-xs text-muted-foreground mt-12">
-          SoloWipe v1.1.0
+          SoloWipe v1.2.0 • Build {__BUILD_DATE__}
         </p>
       </main>
 
