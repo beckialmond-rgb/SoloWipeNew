@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { mutationQueue, localData, OfflineMutation } from '@/lib/offlineStorage';
+import { mutationQueue, localData, OfflineMutation, syncStatus } from '@/lib/offlineStorage';
 import { useOnlineStatus } from './useOnlineStatus';
 import { useHaptics } from './useHaptics';
 import { toast } from '@/hooks/use-toast';
@@ -197,6 +197,7 @@ export function useOfflineSync() {
       await updatePendingCount();
 
       if (successCount > 0) {
+        syncStatus.setLastSynced(new Date().toISOString());
         success(); // Haptic feedback on successful sync
         toast({
           title: `Synced ${successCount} offline change${successCount > 1 ? 's' : ''}`,
