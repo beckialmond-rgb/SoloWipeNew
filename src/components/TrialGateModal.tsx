@@ -64,7 +64,7 @@ export function TrialGateModal() {
     try {
       const url = await createCheckout(priceType);
       if (url) {
-        window.open(url, '_blank');
+        window.location.href = url;
         closePaywall();
       }
     } catch (error) {
