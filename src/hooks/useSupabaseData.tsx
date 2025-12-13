@@ -6,6 +6,112 @@ import { format, addWeeks, startOfWeek, subWeeks } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { mutationQueue, localData } from '@/lib/offlineStorage';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { useMemo } from 'react';
+
+// Demo data for unauthenticated users
+const generateDemoCustomers = (): Customer[] => [
+  {
+    id: 'demo-1',
+    profile_id: 'demo',
+    name: 'Mrs. Thompson',
+    address: '14 High Street, Manchester',
+    mobile_phone: '+447700900123',
+    price: 25,
+    frequency_weeks: 4,
+    status: 'active',
+    gocardless_id: null,
+    notes: 'Gate code: 1234. Friendly dog.',
+    archived_at: null,
+    latitude: null,
+    longitude: null,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-2',
+    profile_id: 'demo',
+    name: 'Mr. Williams',
+    address: '22 Maple Drive, Leeds',
+    mobile_phone: '+447700900456',
+    price: 20,
+    frequency_weeks: 4,
+    status: 'active',
+    gocardless_id: null,
+    notes: null,
+    archived_at: null,
+    latitude: null,
+    longitude: null,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-3',
+    profile_id: 'demo',
+    name: 'The Patels',
+    address: '8 Oak Avenue, Birmingham',
+    mobile_phone: '+447700900789',
+    price: 35,
+    frequency_weeks: 2,
+    status: 'active',
+    gocardless_id: null,
+    notes: 'Back garden access via side gate.',
+    archived_at: null,
+    latitude: null,
+    longitude: null,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-4',
+    profile_id: 'demo',
+    name: "Mrs. O'Brien",
+    address: '45 Church Lane, Liverpool',
+    mobile_phone: '+447700900321',
+    price: 18,
+    frequency_weeks: 4,
+    status: 'active',
+    gocardless_id: null,
+    notes: null,
+    archived_at: null,
+    latitude: null,
+    longitude: null,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'demo-5',
+    profile_id: 'demo',
+    name: 'Dr. Singh',
+    address: '101 Victoria Road, Sheffield',
+    mobile_phone: '+447700900654',
+    price: 30,
+    frequency_weeks: 3,
+    status: 'active',
+    gocardless_id: null,
+    notes: 'Conservatory at back.',
+    archived_at: null,
+    latitude: null,
+    longitude: null,
+    created_at: new Date().toISOString(),
+  },
+];
+
+const generateDemoJobs = (customers: Customer[]): JobWithCustomer[] => {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  return customers.map((customer, index) => ({
+    id: `demo-job-${index + 1}`,
+    customer_id: customer.id,
+    scheduled_date: today,
+    status: 'pending' as const,
+    completed_at: null,
+    amount_collected: null,
+    payment_status: 'unpaid' as const,
+    payment_method: null,
+    payment_date: null,
+    invoice_number: null,
+    notes: null,
+    cancelled_at: null,
+    photo_url: null,
+    created_at: new Date().toISOString(),
+    customer,
+  }));
+};
 
 export function useSupabaseData() {
   const { user } = useAuth();
@@ -13,6 +119,11 @@ export function useSupabaseData() {
   const { isOnline } = useOnlineStatus();
   const today = format(new Date(), 'yyyy-MM-dd');
   const fourWeeksFromNow = format(addWeeks(new Date(), 4), 'yyyy-MM-dd');
+
+  // Demo data for unauthenticated users
+  const demoCustomers = useMemo(() => generateDemoCustomers(), []);
+  const demoPendingJobs = useMemo(() => generateDemoJobs(demoCustomers), [demoCustomers]);
+  const isDemoMode = !user;
 
   // Fetch customers
   const { data: customers = [], isLoading: customersLoading } = useQuery({
@@ -1188,15 +1299,69 @@ export function useSupabaseData() {
 
   const businessName = profile?.business_name || 'My Window Cleaning';
   const googleReviewLink = profile?.google_review_link;
-  const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading || archivedLoading;
+  const isLoading = !isDemoMode && (customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading || archivedLoading);
 
   const refetchAll = async () => {
+    if (isDemoMode) return;
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] }),
       queryClient.invalidateQueries({ queryKey: ['completedToday'] }),
       queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] }),
     ]);
   };
+
+  // Return demo data if not authenticated
+  if (isDemoMode) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const noOp = async (..._args: unknown[]) => {};
+    const noOpCompleteJob = async () => ({ 
+      jobId: '', 
+      newJobId: '', 
+      collectedAmount: 0, 
+      nextDate: '',
+      customerName: ''
+    });
+    const noOpSkipJob = async () => ({ 
+      jobId: '', 
+      originalDate: '', 
+      nextDate: '', 
+      customerName: '' 
+    });
+    
+    return {
+      customers: demoCustomers,
+      pendingJobs: demoPendingJobs,
+      upcomingJobs: [] as JobWithCustomer[],
+      completedToday: [] as JobWithCustomer[],
+      todayEarnings: 0,
+      weeklyEarnings: [] as { weekStart: Date; weekLabel: string; total: number; jobCount: number }[],
+      unpaidJobs: [] as JobWithCustomer[],
+      paidThisWeek: [] as JobWithCustomer[],
+      totalOutstanding: 0,
+      recentlyArchivedCustomers: [] as Customer[],
+      businessName: 'SoloWipe Demo',
+      profile: null,
+      completeJob: noOpCompleteJob,
+      addCustomer: noOp,
+      updateCustomer: noOp,
+      archiveCustomer: noOp,
+      unarchiveCustomer: noOp,
+      updateBusinessName: noOp,
+      updateGoogleReviewLink: noOp,
+      rescheduleJob: noOp,
+      skipJob: noOpSkipJob,
+      markJobPaid: noOp,
+      batchMarkPaid: noOp,
+      updateJobNotes: noOp,
+      undoCompleteJob: noOp,
+      undoMarkPaid: noOp,
+      undoSkipJob: noOp,
+      refetchAll,
+      isLoading: false,
+      isOnline,
+      userEmail: '',
+    };
+  }
 
   return {
     customers,
