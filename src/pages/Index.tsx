@@ -23,6 +23,8 @@ import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useToast } from '@/hooks/use-toast';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useJobReminders } from '@/hooks/useJobReminders';
+import { useHaptics } from '@/hooks/useHaptics';
+import { syncStatus } from '@/lib/offlineStorage';
 import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import { ToastAction } from '@/components/ui/toast';
@@ -43,6 +45,7 @@ const Index = () => {
   const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading, markJobPaid, profile } = useSupabaseData();
   const { toast, dismiss } = useToast();
   const { showTour, completeTour } = useWelcomeTour();
+  const { success } = useHaptics();
   
   // Enable job reminders for upcoming jobs
   const allUpcomingJobs = [...pendingJobs, ...upcomingJobs];
@@ -70,13 +73,15 @@ const Index = () => {
     return localStorage.getItem('solowipe_welcome_dismissed') === 'true';
   });
 
-  // Pull to refresh
+  // Pull to refresh - full cloud sync
   const { isPulling, isRefreshing, pullDistance, handlers } = usePullToRefresh({
     onRefresh: async () => {
       await refetchAll();
+      syncStatus.setLastSynced(new Date().toISOString());
+      success(); // Haptic feedback
       toast({
-        title: 'Refreshed',
-        description: 'Jobs updated',
+        title: 'Synced with cloud',
+        description: 'All data refreshed from server',
         duration: 2000,
       });
     },
