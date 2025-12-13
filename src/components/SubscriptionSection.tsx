@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Crown, Check, Loader2, ExternalLink, Sparkles } from 'lucide-react';
+import { Crown, Check, Loader2, ExternalLink, Sparkles, Clock } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useAuth } from '@/hooks/useAuth';
 import { SUBSCRIPTION_TIERS } from '@/constants/subscription';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -10,12 +11,19 @@ import { format, differenceInDays } from 'date-fns';
 
 export function SubscriptionSection() {
   const { subscribed, tier, subscriptionEnd, status, trialEnd, loading, createCheckout, openCustomerPortal, checkSubscription } = useSubscription();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [checkoutLoading, setCheckoutLoading] = useState<'monthly' | 'annual' | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
 
   const isTrialing = status === 'trialing';
   const trialDaysRemaining = trialEnd ? differenceInDays(new Date(trialEnd), new Date()) : 0;
+  
+  // Calculate grace period (14-day trial from signup)
+  const gracePeriodDaysRemaining = user?.created_at 
+    ? Math.max(0, 14 - differenceInDays(new Date(), new Date(user.created_at)))
+    : 0;
+  const isInGracePeriod = !subscribed && gracePeriodDaysRemaining > 0;
 
   const handleSubscribe = async (priceType: 'monthly' | 'annual') => {
     setCheckoutLoading(priceType);
@@ -147,24 +155,58 @@ export function SubscriptionSection() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4"
     >
+      {/* Grace Period Status Card */}
+      {isInGracePeriod && (
+        <div className="bg-card rounded-xl border-2 border-emerald-500 p-6 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
+              <Clock className="w-6 h-6 text-emerald-500" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-foreground">Free Trial Active</h3>
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-600">
+                  {gracePeriodDaysRemaining} day{gracePeriodDaysRemaining !== 1 ? 's' : ''} left
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Explore all Pro features free
+              </p>
+            </div>
+          </div>
+          <div className="bg-emerald-500/10 rounded-lg p-3">
+            <p className="text-sm text-emerald-700 dark:text-emerald-400">
+              Your trial ends on {format(new Date(new Date(user?.created_at || '').getTime() + 14 * 24 * 60 * 60 * 1000), 'd MMMM yyyy')}. 
+              Subscribe anytime to keep access.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="bg-card rounded-xl border border-border p-6 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
             <Crown className="w-6 h-6 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold text-foreground">Upgrade to Pro</h3>
-            <p className="text-sm text-muted-foreground">Start your 14-day free trial</p>
+            <h3 className="font-semibold text-foreground">
+              {isInGracePeriod ? 'Subscribe to SoloWipe Pro' : 'Upgrade to Pro'}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {isInGracePeriod ? 'Lock in your access before trial ends' : 'Start your 14-day free trial'}
+            </p>
           </div>
         </div>
 
-        {/* Free Trial Banner */}
-        <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
-          <p className="text-sm text-foreground">
-            <span className="font-medium">14 days free</span> — no payment until trial ends
-          </p>
-        </div>
+        {/* Free Trial Banner - only show if not in grace period */}
+        {!isInGracePeriod && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
+            <p className="text-sm text-foreground">
+              <span className="font-medium">14 days free</span> — no payment until trial ends
+            </p>
+          </div>
+        )}
 
         {/* Monthly Plan */}
         <div className="bg-muted/50 rounded-lg p-4 space-y-3">
