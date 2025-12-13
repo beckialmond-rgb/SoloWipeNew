@@ -69,21 +69,24 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
           </div>
         </DrawerHeader>
 
-        <form onSubmit={handleSubmit} className="px-6 pb-10 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} autoComplete="off" className="px-6 pb-10 overflow-y-auto flex-1">
           <div className="space-y-3">
             {/* Name */}
             <div>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground mb-1.5">
+              <label htmlFor="quick-add-name" className="flex items-center gap-2 text-sm text-muted-foreground mb-1.5">
                 <User className="w-4 h-4" />
                 Name
               </label>
               <input
+                id="quick-add-name"
+                name="customer_name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Customer name"
                 required
                 autoFocus
+                autoComplete="off"
                 className={cn(
                   "w-full h-14 px-4 rounded-xl",
                   "bg-muted border-0",
@@ -95,16 +98,19 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
 
             {/* Address */}
             <div>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground mb-1.5">
+              <label htmlFor="quick-add-address" className="flex items-center gap-2 text-sm text-muted-foreground mb-1.5">
                 <MapPin className="w-4 h-4" />
                 Address
               </label>
               <input
+                id="quick-add-address"
+                name="customer_address"
                 type="text"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Full address"
                 required
+                autoComplete="off"
                 className={cn(
                   "w-full h-14 px-4 rounded-xl",
                   "bg-muted border-0",
@@ -116,17 +122,20 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
 
             {/* Price */}
             <div>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground mb-1.5">
+              <label htmlFor="quick-add-price" className="flex items-center gap-2 text-sm text-muted-foreground mb-1.5">
                 <PoundSterling className="w-4 h-4" />
                 Price
               </label>
               <input
+                id="quick-add-price"
+                name="customer_price"
                 type="number"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 min="0"
                 step="0.01"
                 required
+                autoComplete="off"
                 className={cn(
                   "w-full h-14 px-4 rounded-xl",
                   "bg-muted border-0",
