@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, forwardRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building, Loader2 } from 'lucide-react';
@@ -461,11 +462,25 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
               onClick={async () => {
                 setDemoLoading(true);
                 try {
-                  const { error } = await signIn('demo@solowipe.com', 'demo123456');
+                  // First, set up the demo account and data
+                  const { data: setupData, error: setupError } = await supabase.functions.invoke('setup-demo-account');
+                  
+                  if (setupError) {
+                    console.error('Demo setup error:', setupError);
+                    toast({
+                      title: 'Demo setup failed',
+                      description: 'Could not create demo account. Please try again.',
+                      variant: 'destructive',
+                    });
+                    return;
+                  }
+
+                  // Now sign in with the demo credentials
+                  const { error } = await signIn(setupData.email, setupData.password);
                   if (error) {
                     toast({
-                      title: 'Demo login unavailable',
-                      description: 'Please create an account to try the app.',
+                      title: 'Demo login failed',
+                      description: error.message,
                       variant: 'destructive',
                     });
                   } else {
@@ -475,6 +490,13 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
                     });
                     navigate('/');
                   }
+                } catch (err) {
+                  console.error('Demo login error:', err);
+                  toast({
+                    title: 'Demo unavailable',
+                    description: 'Please create an account to try the app.',
+                    variant: 'destructive',
+                  });
                 } finally {
                   setDemoLoading(false);
                 }
