@@ -35,7 +35,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    // Handle "remember me" - clear session on browser close if not checked
+    const handleBeforeUnload = () => {
+      if (sessionStorage.getItem('clearSessionOnClose') === 'true') {
+        supabase.auth.signOut();
+        sessionStorage.removeItem('clearSessionOnClose');
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
