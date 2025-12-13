@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff, RefreshCw, CloudOff, Cloud } from 'lucide-react';
 import { useOffline } from '@/contexts/OfflineContext';
 import { syncStatus } from '@/lib/offlineStorage';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -12,10 +12,13 @@ import { EditGoogleReviewLinkModal } from '@/components/EditGoogleReviewLinkModa
 import { ExportEarningsModal } from '@/components/ExportEarningsModal';
 import { BusinessInsights } from '@/components/BusinessInsights';
 import { WelcomeTour, useWelcomeTour } from '@/components/WelcomeTour';
+import { SubscriptionSection } from '@/components/SubscriptionSection';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useSubscription } from '@/hooks/useSubscription';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
@@ -25,7 +28,10 @@ const Settings = () => {
   const { businessName, userEmail, updateBusinessName, updateGoogleReviewLink, recentlyArchivedCustomers, unarchiveCustomer, weeklyEarnings, customers, profile } = useSupabaseData();
   const { signOut } = useAuth();
   const { isOnline, isSyncing, pendingCount, syncPendingMutations } = useOffline();
+  const { checkSubscription } = useSubscription();
+  const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isInstalled } = useInstallPrompt();
   const { isSupported: notificationsSupported, isEnabled: notificationsEnabled, requestPermission, disableNotifications } = useNotifications();
   const { theme, setTheme } = useTheme();
@@ -41,6 +47,26 @@ const Settings = () => {
   useEffect(() => {
     setLastSynced(syncStatus.getLastSynced());
   }, [isSyncing]); // Refresh when sync completes
+
+  // Handle subscription callback from Stripe
+  useEffect(() => {
+    const subscription = searchParams.get('subscription');
+    if (subscription === 'success') {
+      toast({
+        title: "Subscription activated!",
+        description: "Welcome to SoloWipe Pro. Enjoy all premium features.",
+      });
+      checkSubscription();
+      setSearchParams({});
+    } else if (subscription === 'cancelled') {
+      toast({
+        title: "Subscription cancelled",
+        description: "You can subscribe anytime to unlock Pro features.",
+        variant: "destructive",
+      });
+      setSearchParams({});
+    }
+  }, [searchParams, toast, checkSubscription, setSearchParams]);
 
   const formatLastSynced = () => {
     if (!lastSynced) return 'Never';
@@ -130,6 +156,9 @@ const Settings = () => {
               />
             </CollapsibleContent>
           </Collapsible>
+
+          {/* Subscription Section */}
+          <SubscriptionSection />
 
           {/* Business Name - Clickable */}
           <motion.button

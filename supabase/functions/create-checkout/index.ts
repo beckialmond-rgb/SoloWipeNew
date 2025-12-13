@@ -7,8 +7,11 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// SoloWipe Pro Subscription - £19/month
-const SOLOWIPE_PRO_PRICE_ID = "price_1Sds7z4hy5D3Fg1b6XXXXXXXXXXXXXFIXME"; // TODO: Replace with actual price ID from Stripe
+// SoloWipe Pro Subscription Pricing
+const PRICES = {
+  monthly: "price_1SdstJ4hy5D3Fg1bnepMLpw6", // £15/month
+  annual: "price_1SdstJ4hy5D3Fg1bliu55p34",  // £150/year (save £30)
+};
 
 const logStep = (step: string, details?: Record<string, unknown>) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
@@ -41,6 +44,17 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
+    // Parse request body for price type
+    const body = await req.json().catch(() => ({}));
+    const priceType = body.priceType || "monthly";
+    
+    if (!PRICES[priceType as keyof typeof PRICES]) {
+      throw new Error(`Invalid price type: ${priceType}`);
+    }
+    
+    const priceId = PRICES[priceType as keyof typeof PRICES];
+    logStep("Price selected", { priceType, priceId });
+
     const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
     
     // Check if customer exists
@@ -60,7 +74,7 @@ serve(async (req) => {
       if (subscriptions.data.length > 0) {
         logStep("User already has active subscription");
         return new Response(JSON.stringify({ 
-          error: "You already have an active subscription" 
+          error: "You already have an active subscription. Use the customer portal to manage it." 
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 400,
@@ -75,7 +89,7 @@ serve(async (req) => {
       customer_email: customerId ? undefined : user.email,
       line_items: [
         {
-          price: SOLOWIPE_PRO_PRICE_ID,
+          price: priceId,
           quantity: 1,
         },
       ],
