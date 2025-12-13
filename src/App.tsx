@@ -12,6 +12,7 @@ import { TrialGateModal } from "@/components/TrialGateModal";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
+import { ReloadPrompt } from "@/components/ReloadPrompt";
 import { queryPersister, CACHE_TIME, STALE_TIME } from "@/lib/queryPersister";
 import Index from "./pages/Index";
 import Customers from "./pages/Customers";
@@ -65,6 +66,7 @@ const App = () => (
           <OfflineProvider>
             <TooltipProvider>
               <OfflineIndicator />
+              <ReloadPrompt />
               <Toaster />
               <Sonner />
               <BrowserRouter>
