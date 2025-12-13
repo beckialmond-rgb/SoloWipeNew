@@ -1,11 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Building, Loader2 } from 'lucide-react';
+import { Mail, Lock, Building, Loader2, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+
+// Password strength validation
+const getPasswordStrength = (password: string) => {
+  const checks = {
+    minLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasLowercase: /[a-z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+    hasSpecial: /[!@#$%^&*(),.?":{}|<>]/.test(password),
+  };
+  
+  const score = Object.values(checks).filter(Boolean).length;
+  
+  let strength: 'weak' | 'fair' | 'good' | 'strong' = 'weak';
+  if (score >= 5) strength = 'strong';
+  else if (score >= 4) strength = 'good';
+  else if (score >= 3) strength = 'fair';
+  
+  return { checks, score, strength };
+};
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,9 +33,12 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPasswordFeedback, setShowPasswordFeedback] = useState(false);
   const { user, loading: authLoading, signIn, signUp } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  const passwordStrength = useMemo(() => getPasswordStrength(password), [password]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -134,22 +157,91 @@ const Auth = () => {
               />
             </div>
 
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className={cn(
-                  "w-full h-14 pl-12 pr-4 rounded-xl",
-                  "bg-muted border-0",
-                  "text-foreground placeholder:text-muted-foreground",
-                  "focus:outline-none focus:ring-2 focus:ring-primary"
-                )}
-              />
+            <div className="space-y-2">
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => !isLogin && setShowPasswordFeedback(true)}
+                  onBlur={() => setShowPasswordFeedback(false)}
+                  required
+                  minLength={8}
+                  className={cn(
+                    "w-full h-14 pl-12 pr-4 rounded-xl",
+                    "bg-muted border-0",
+                    "text-foreground placeholder:text-muted-foreground",
+                    "focus:outline-none focus:ring-2 focus:ring-primary"
+                  )}
+                />
+              </div>
+              
+              {/* Password Strength Indicator - only show on signup */}
+              {!isLogin && password.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-2"
+                >
+                  {/* Strength bar */}
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4].map((level) => (
+                      <div
+                        key={level}
+                        className={cn(
+                          "h-1.5 flex-1 rounded-full transition-colors",
+                          passwordStrength.score >= level
+                            ? passwordStrength.strength === 'strong' ? 'bg-success'
+                              : passwordStrength.strength === 'good' ? 'bg-success/70'
+                              : passwordStrength.strength === 'fair' ? 'bg-warning'
+                              : 'bg-destructive'
+                            : 'bg-muted-foreground/20'
+                        )}
+                      />
+                    ))}
+                  </div>
+                  
+                  {/* Strength label */}
+                  <p className={cn(
+                    "text-xs font-medium",
+                    passwordStrength.strength === 'strong' ? 'text-success'
+                      : passwordStrength.strength === 'good' ? 'text-success/80'
+                      : passwordStrength.strength === 'fair' ? 'text-warning'
+                      : 'text-destructive'
+                  )}>
+                    Password strength: {passwordStrength.strength}
+                  </p>
+                  
+                  {/* Requirements checklist - show when focused or weak */}
+                  {(showPasswordFeedback || passwordStrength.score < 4) && (
+                    <div className="grid grid-cols-2 gap-1 text-xs">
+                      <div className={cn("flex items-center gap-1", passwordStrength.checks.minLength ? "text-success" : "text-muted-foreground")}>
+                        {passwordStrength.checks.minLength ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                        8+ characters
+                      </div>
+                      <div className={cn("flex items-center gap-1", passwordStrength.checks.hasUppercase ? "text-success" : "text-muted-foreground")}>
+                        {passwordStrength.checks.hasUppercase ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                        Uppercase
+                      </div>
+                      <div className={cn("flex items-center gap-1", passwordStrength.checks.hasLowercase ? "text-success" : "text-muted-foreground")}>
+                        {passwordStrength.checks.hasLowercase ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                        Lowercase
+                      </div>
+                      <div className={cn("flex items-center gap-1", passwordStrength.checks.hasNumber ? "text-success" : "text-muted-foreground")}>
+                        {passwordStrength.checks.hasNumber ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                        Number
+                      </div>
+                      <div className={cn("flex items-center gap-1 col-span-2", passwordStrength.checks.hasSpecial ? "text-success" : "text-muted-foreground")}>
+                        {passwordStrength.checks.hasSpecial ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
+                        Special character (!@#$%...)
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              )}
             </div>
 
             <Button
