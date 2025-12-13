@@ -1,4 +1,4 @@
-import { Check, MapPin, SkipForward, Navigation, Phone, GripVertical } from 'lucide-react';
+import { Check, MapPin, SkipForward, Navigation, Phone, GripVertical, CreditCard } from 'lucide-react';
 import { motion, useMotionValue, useTransform, PanInfo, Reorder, useDragControls } from 'framer-motion';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -173,6 +173,12 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
               <span className="text-sm text-muted-foreground">
                 {job.customer.name}
               </span>
+              {job.customer.gocardless_id && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                  <CreditCard className="w-3 h-3" />
+                  DD
+                </span>
+              )}
             </div>
 
             {/* Quick action buttons */}
