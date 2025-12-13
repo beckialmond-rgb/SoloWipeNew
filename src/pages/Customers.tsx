@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 
 const Customers = () => {
-  const { customers, businessName, isLoading, addCustomer, updateCustomer, archiveCustomer } = useSupabaseData();
+  const { customers, businessName, profile, isLoading, addCustomer, updateCustomer, archiveCustomer, refetchAll } = useSupabaseData();
   const { requirePremium } = useSoftPaywall();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -169,10 +169,12 @@ const Customers = () => {
         <CustomerDetailModal
           customer={selectedCustomer}
           businessName={businessName}
+          profile={profile as any}
           onClose={() => setSelectedCustomer(null)}
           onEdit={handleEditCustomer}
           onArchive={handleArchiveCustomer}
           onViewHistory={handleViewHistory}
+          onRefresh={refetchAll}
         />
       )}
 

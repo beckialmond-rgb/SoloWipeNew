@@ -21,6 +21,7 @@ export type Database = {
           created_at: string
           frequency_weeks: number
           gocardless_id: string | null
+          gocardless_mandate_status: string | null
           id: string
           latitude: number | null
           longitude: number | null
@@ -37,6 +38,7 @@ export type Database = {
           created_at?: string
           frequency_weeks?: number
           gocardless_id?: string | null
+          gocardless_mandate_status?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -53,6 +55,7 @@ export type Database = {
           created_at?: string
           frequency_weeks?: number
           gocardless_id?: string | null
+          gocardless_mandate_status?: string | null
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -80,6 +83,8 @@ export type Database = {
           completed_at: string | null
           created_at: string
           customer_id: string
+          gocardless_payment_id: string | null
+          gocardless_payment_status: string | null
           id: string
           invoice_number: string | null
           notes: string | null
@@ -96,6 +101,8 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           customer_id: string
+          gocardless_payment_id?: string | null
+          gocardless_payment_status?: string | null
           id?: string
           invoice_number?: string | null
           notes?: string | null
@@ -112,6 +119,8 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           customer_id?: string
+          gocardless_payment_id?: string | null
+          gocardless_payment_status?: string | null
           id?: string
           invoice_number?: string | null
           notes?: string | null

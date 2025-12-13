@@ -13,6 +13,7 @@ import { ExportEarningsModal } from '@/components/ExportEarningsModal';
 import { BusinessInsights } from '@/components/BusinessInsights';
 import { WelcomeTour, useWelcomeTour } from '@/components/WelcomeTour';
 import { SubscriptionSection } from '@/components/SubscriptionSection';
+import { GoCardlessSection } from '@/components/GoCardlessSection';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
@@ -23,9 +24,10 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { supabase } from '@/integrations/supabase/client';
 
 const Settings = () => {
-  const { businessName, userEmail, updateBusinessName, updateGoogleReviewLink, recentlyArchivedCustomers, unarchiveCustomer, weeklyEarnings, customers, profile } = useSupabaseData();
+  const { businessName, userEmail, updateBusinessName, updateGoogleReviewLink, recentlyArchivedCustomers, unarchiveCustomer, weeklyEarnings, customers, profile, refetchAll } = useSupabaseData();
   const { signOut } = useAuth();
   const { isOnline, isSyncing, pendingCount, syncPendingMutations } = useOffline();
   const { checkSubscription } = useSubscription();
@@ -67,6 +69,45 @@ const Settings = () => {
       setSearchParams({});
     }
   }, [searchParams, toast, checkSubscription, setSearchParams]);
+
+  // Handle GoCardless OAuth callback
+  useEffect(() => {
+    const gocardless = searchParams.get('gocardless');
+    const code = searchParams.get('code');
+    
+    if (gocardless === 'callback' && code) {
+      const handleCallback = async () => {
+        const redirectUrl = localStorage.getItem('gocardless_redirect_url');
+        
+        try {
+          const { data, error } = await supabase.functions.invoke('gocardless-callback', {
+            body: { code, redirectUrl },
+          });
+
+          if (error) throw error;
+
+          toast({
+            title: "GoCardless connected!",
+            description: "You can now set up Direct Debits for your customers.",
+          });
+          refetchAll();
+        } catch (error) {
+          console.error('GoCardless callback error:', error);
+          toast({
+            title: "Connection failed",
+            description: "Failed to connect GoCardless. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          localStorage.removeItem('gocardless_state');
+          localStorage.removeItem('gocardless_redirect_url');
+          setSearchParams({});
+        }
+      };
+      
+      handleCallback();
+    }
+  }, [searchParams, setSearchParams, toast, refetchAll]);
 
   const formatLastSynced = () => {
     if (!lastSynced) return 'Never';
@@ -159,6 +200,9 @@ const Settings = () => {
 
           {/* Subscription Section */}
           <SubscriptionSection />
+
+          {/* GoCardless Section */}
+          <GoCardlessSection profile={profile as any} onRefresh={refetchAll} />
 
           {/* Business Name - Clickable */}
           <motion.button
