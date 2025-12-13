@@ -201,14 +201,16 @@ export function useSupabaseData() {
     queryFn: async () => {
       if (!user) return [];
       
+      // Filter out jobs from archived customers (status = 'inactive')
       const { data, error } = await supabase
         .from('jobs')
         .select(`
           *,
-          customer:customers(*)
+          customer:customers!inner(*)
         `)
         .eq('status', 'completed')
         .eq('payment_status', 'unpaid')
+        .eq('customer.status', 'active')
         .order('completed_at', { ascending: false });
       
       if (error) throw error;
@@ -277,63 +279,89 @@ export function useSupabaseData() {
   });
 
   // Complete job mutation with optional custom amount and photo
+  // Track in-flight job completions to prevent double-submission
+  const completingJobIds = new Set<string>();
+
   const completeJobMutation = useMutation({
     mutationFn: async ({ jobId, customAmount, photoUrl }: { jobId: string; customAmount?: number; photoUrl?: string }) => {
-      const job = pendingJobs.find(j => j.id === jobId);
-      if (!job) throw new Error('Job not found');
+      // CRITICAL: Prevent double-submission of the same job
+      if (completingJobIds.has(jobId)) {
+        throw new Error('Job completion already in progress');
+      }
+      completingJobIds.add(jobId);
 
-      const now = new Date();
-      const completedAt = now.toISOString();
-      
-      // Calculate next date from TODAY + frequency_weeks (not from old scheduled date)
-      const nextDate = addWeeks(now, job.customer.frequency_weeks);
-      const nextScheduledDate = format(nextDate, 'yyyy-MM-dd');
+      try {
+        const job = pendingJobs.find(j => j.id === jobId);
+        if (!job) throw new Error('Job not found');
 
-      // Determine payment status based on GoCardless
-      const isGoCardless = !!job.customer.gocardless_id;
-      const paymentStatus = isGoCardless ? 'paid' : 'unpaid';
-      const paymentMethod = isGoCardless ? 'gocardless' : null;
-      const paymentDate = isGoCardless ? completedAt : null;
+        // Double-check the job hasn't already been completed (race condition guard)
+        const { data: currentJob } = await supabase
+          .from('jobs')
+          .select('status')
+          .eq('id', jobId)
+          .single();
+        
+        if (currentJob?.status === 'completed') {
+          throw new Error('Job already completed');
+        }
 
-      // Use custom amount if provided, otherwise use customer's default price
-      const amountCollected = customAmount ?? job.customer.price;
+        const now = new Date();
+        const completedAt = now.toISOString();
+        
+        // Calculate next date from TODAY + frequency_weeks (not from old scheduled date)
+        const nextDate = addWeeks(now, job.customer.frequency_weeks);
+        const nextScheduledDate = format(nextDate, 'yyyy-MM-dd');
 
-      // 1. Update current job to completed
-      const { error: updateError } = await supabase
-        .from('jobs')
-        .update({
-          status: 'completed',
-          completed_at: completedAt,
-          amount_collected: amountCollected,
-          payment_status: paymentStatus,
-          payment_method: paymentMethod,
-          payment_date: paymentDate,
-          photo_url: photoUrl || null,
-        })
-        .eq('id', jobId);
+        // Determine payment status based on GoCardless
+        const isGoCardless = !!job.customer.gocardless_id;
+        const paymentStatus = isGoCardless ? 'paid' : 'unpaid';
+        const paymentMethod = isGoCardless ? 'gocardless' : null;
+        const paymentDate = isGoCardless ? completedAt : null;
 
-      if (updateError) throw updateError;
+        // Use custom amount if provided, otherwise use customer's default price
+        const amountCollected = customAmount ?? job.customer.price;
 
-      // 2. Create new job for the future
-      const { data: newJob, error: insertError } = await supabase
-        .from('jobs')
-        .insert({
-          customer_id: job.customer_id,
-          scheduled_date: nextScheduledDate,
-          status: 'pending',
-        })
-        .select()
-        .single();
+        // 1. Update current job to completed
+        const { error: updateError } = await supabase
+          .from('jobs')
+          .update({
+            status: 'completed',
+            completed_at: completedAt,
+            amount_collected: amountCollected,
+            payment_status: paymentStatus,
+            payment_method: paymentMethod,
+            payment_date: paymentDate,
+            photo_url: photoUrl || null,
+          })
+          .eq('id', jobId)
+          .eq('status', 'pending'); // Only update if still pending (atomic guard)
 
-      if (insertError) throw insertError;
+        if (updateError) throw updateError;
 
-      return {
-        jobId,
-        newJobId: newJob.id,
-        collectedAmount: amountCollected,
-        nextDate: format(nextDate, 'dd MMM yyyy'),
-        customerName: job.customer.name,
-      };
+        // 2. Create new job for the future
+        const { data: newJob, error: insertError } = await supabase
+          .from('jobs')
+          .insert({
+            customer_id: job.customer_id,
+            scheduled_date: nextScheduledDate,
+            status: 'pending',
+          })
+          .select()
+          .single();
+
+        if (insertError) throw insertError;
+
+        return {
+          jobId,
+          newJobId: newJob.id,
+          collectedAmount: amountCollected,
+          nextDate: format(nextDate, 'dd MMM yyyy'),
+          customerName: job.customer.name,
+        };
+      } finally {
+        // Always remove from tracking set when done
+        completingJobIds.delete(jobId);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
