@@ -3,13 +3,20 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { SubscriptionStatus, getTierFromProductId } from '@/constants/subscription';
 
+interface ExtendedSubscriptionStatus extends SubscriptionStatus {
+  status: 'active' | 'trialing' | 'inactive';
+  trialEnd: string | null;
+}
+
 export function useSubscription() {
   const { session } = useAuth();
-  const [subscription, setSubscription] = useState<SubscriptionStatus>({
+  const [subscription, setSubscription] = useState<ExtendedSubscriptionStatus>({
     subscribed: false,
     productId: null,
     subscriptionEnd: null,
     tier: null,
+    status: 'inactive',
+    trialEnd: null,
   });
   const [loading, setLoading] = useState(true);
 
@@ -20,6 +27,8 @@ export function useSubscription() {
         productId: null,
         subscriptionEnd: null,
         tier: null,
+        status: 'inactive',
+        trialEnd: null,
       });
       setLoading(false);
       return;
@@ -44,6 +53,8 @@ export function useSubscription() {
         productId,
         subscriptionEnd: data?.subscription_end || null,
         tier: getTierFromProductId(productId),
+        status: data?.subscription_status || 'inactive',
+        trialEnd: data?.trial_end || null,
       });
     } catch (err) {
       console.error('Failed to check subscription:', err);

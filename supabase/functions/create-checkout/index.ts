@@ -94,6 +94,9 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
+      subscription_data: {
+        trial_period_days: 14,
+      },
       success_url: `${origin}/settings?subscription=success`,
       cancel_url: `${origin}/settings?subscription=cancelled`,
       metadata: {
@@ -101,7 +104,7 @@ serve(async (req) => {
       },
     });
 
-    logStep("Checkout session created", { sessionId: session.id, url: session.url });
+    logStep("Checkout session created", { sessionId: session.id, url: session.url, trial: true });
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
