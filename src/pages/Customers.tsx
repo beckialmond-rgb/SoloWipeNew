@@ -106,7 +106,7 @@ const Customers = () => {
             {/* Customer count */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-5">
               <Users className="w-4 h-4" />
-              <span>{filteredCustomers.length} customers</span>
+              <span>{filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}</span>
             </div>
 
             {/* Customer list */}
