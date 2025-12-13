@@ -7,10 +7,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { SoftProtectedRoute } from "@/components/SoftProtectedRoute";
 import { SoftPaywallProvider } from "@/hooks/useSoftPaywall";
 import { TrialGateModal } from "@/components/TrialGateModal";
-import { DemoModeBanner } from "@/components/DemoModeBanner";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
@@ -70,7 +68,6 @@ const App = () => (
               <Toaster />
               <Sonner />
               <BrowserRouter>
-                <DemoModeBanner />
                 <TrialGateModal />
                 <KeyboardShortcutsProvider>
                   <Routes>
@@ -80,41 +77,41 @@ const App = () => (
                     <Route
                       path="/"
                       element={
-                        <SoftProtectedRoute>
+                        <ProtectedRoute>
                           <Index />
-                        </SoftProtectedRoute>
+                        </ProtectedRoute>
                       }
                     />
                     <Route
                       path="/customers"
                       element={
-                        <SoftProtectedRoute>
+                        <ProtectedRoute>
                           <Customers />
-                        </SoftProtectedRoute>
+                        </ProtectedRoute>
                       }
                     />
                     <Route
                       path="/money"
                       element={
-                        <SoftProtectedRoute>
+                        <ProtectedRoute>
                           <Money />
-                        </SoftProtectedRoute>
+                        </ProtectedRoute>
                       }
                     />
                     <Route
                       path="/earnings"
                       element={
-                        <SoftProtectedRoute>
+                        <ProtectedRoute>
                           <Earnings />
-                        </SoftProtectedRoute>
+                        </ProtectedRoute>
                       }
                     />
                     <Route
                       path="/calendar"
                       element={
-                        <SoftProtectedRoute>
+                        <ProtectedRoute>
                           <Calendar />
-                        </SoftProtectedRoute>
+                        </ProtectedRoute>
                       }
                     />
                     <Route
