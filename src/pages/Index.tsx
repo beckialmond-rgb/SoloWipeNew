@@ -91,10 +91,13 @@ const Index = () => {
   // Get today's date key for localStorage
   const todayKey = `solowipe_job_order_${format(new Date(), 'yyyy-MM-dd')}`;
 
+  // Track if order was restored (to show toast only once)
+  const [orderRestored, setOrderRestored] = useState(false);
+
   // Apply saved order to jobs
-  const applyPersistedOrder = useCallback((jobs: JobWithCustomer[]): JobWithCustomer[] => {
+  const applyPersistedOrder = useCallback((jobs: JobWithCustomer[]): { jobs: JobWithCustomer[], wasRestored: boolean } => {
     const savedOrder = localStorage.getItem(todayKey);
-    if (!savedOrder) return jobs;
+    if (!savedOrder) return { jobs, wasRestored: false };
     
     try {
       const orderedIds: string[] = JSON.parse(savedOrder);
@@ -115,9 +118,13 @@ const Index = () => {
         orderedJobs.push(job);
       }
       
-      return orderedJobs;
+      // Only count as restored if order actually differs
+      const wasRestored = orderedJobs.length > 0 && 
+        orderedJobs.some((job, i) => jobs[i]?.id !== job.id);
+      
+      return { jobs: orderedJobs, wasRestored };
     } catch {
-      return jobs;
+      return { jobs, wasRestored: false };
     }
   }, [todayKey]);
 
@@ -127,17 +134,32 @@ const Index = () => {
     localStorage.setItem(todayKey, JSON.stringify(orderIds));
   }, [todayKey]);
 
-  // Handle reorder with persistence
+  // Handle reorder with persistence and feedback
   const handleReorder = useCallback((newOrder: JobWithCustomer[]) => {
     setLocalJobs(newOrder);
     saveJobOrder(newOrder);
-  }, [saveJobOrder]);
+    toast({
+      title: 'Order saved',
+      description: 'Your job order has been saved',
+      duration: 1500,
+    });
+  }, [saveJobOrder, toast]);
 
   // Sync local jobs with fetched pending jobs, applying saved order
   useEffect(() => {
-    const orderedJobs = applyPersistedOrder(pendingJobs);
+    const { jobs: orderedJobs, wasRestored } = applyPersistedOrder(pendingJobs);
     setLocalJobs(orderedJobs);
-  }, [pendingJobs, applyPersistedOrder]);
+    
+    // Show toast only once when order is restored
+    if (wasRestored && !orderRestored && pendingJobs.length > 0) {
+      setOrderRestored(true);
+      toast({
+        title: 'Order restored',
+        description: 'Your custom job order has been applied',
+        duration: 2000,
+      });
+    }
+  }, [pendingJobs, applyPersistedOrder, orderRestored, toast]);
 
   // Show welcome flow for new users
   useEffect(() => {
