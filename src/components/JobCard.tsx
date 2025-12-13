@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { CustomerNotesPreview } from './CustomerNotesPreview';
 import { Button } from './ui/button';
+import { useHaptics } from '@/hooks/useHaptics';
 
 interface JobCardProps {
   job: JobWithCustomer;
@@ -21,6 +22,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
   const [isReordering, setIsReordering] = useState(false);
   const x = useMotionValue(0);
   const dragControls = useDragControls();
+  const { lightTap, success } = useHaptics();
   
   // Background colors based on swipe direction
   const backgroundColor = useTransform(
@@ -84,8 +86,14 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
       transition={{ delay: index * 0.05, duration: 0.2 }}
       className={cn("relative", isReordering && "z-50")}
       whileDrag={{ scale: 1.03, boxShadow: "0 10px 30px rgba(0,0,0,0.2)" }}
-      onDragStart={() => setIsReordering(true)}
-      onDragEnd={() => setIsReordering(false)}
+      onDragStart={() => {
+        setIsReordering(true);
+        lightTap();
+      }}
+      onDragEnd={() => {
+        setIsReordering(false);
+        success();
+      }}
     >
       {/* Swipe action backgrounds */}
       <motion.div 
