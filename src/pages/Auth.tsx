@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, forwardRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building, Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +19,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   const [password, setPassword] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPasswordFeedback, setShowPasswordFeedback] = useState(false);
   const { user, loading: authLoading, signIn, signUp } = useAuth();
   const { toast } = useToast();
@@ -61,6 +63,12 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
             variant: 'destructive',
           });
         } else {
+          // Store remember me preference
+          if (!rememberMe) {
+            sessionStorage.setItem('clearSessionOnClose', 'true');
+          } else {
+            sessionStorage.removeItem('clearSessionOnClose');
+          }
           navigate('/');
         }
       } else {
@@ -188,6 +196,24 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
                 />
               )}
             </div>
+
+            {/* Remember me checkbox - only show on login */}
+            {isLogin && (
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="rememberMe"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                  className="h-5 w-5"
+                />
+                <label 
+                  htmlFor="rememberMe" 
+                  className="text-sm text-muted-foreground cursor-pointer select-none"
+                >
+                  Remember me
+                </label>
+              </div>
+            )}
 
             <Button
               type="submit"
