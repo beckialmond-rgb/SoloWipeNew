@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef } from 'react';
+import { useState, useEffect, useRef, forwardRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building, Loader2 } from 'lucide-react';
@@ -23,6 +23,9 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   
+  const businessNameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  
   const passwordStrength = usePasswordStrength(password);
   const emailValidation = useEmailValidation(email);
 
@@ -32,6 +35,17 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
       navigate('/');
     }
   }, [user, authLoading, navigate]);
+
+  // Auto-focus first input when form loads or mode changes
+  useEffect(() => {
+    if (!authLoading && !user) {
+      if (isLogin) {
+        emailRef.current?.focus();
+      } else {
+        businessNameRef.current?.focus();
+      }
+    }
+  }, [isLogin, authLoading, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,6 +143,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
               <div className="relative">
                 <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
+                  ref={businessNameRef}
                   type="text"
                   placeholder="Business Name"
                   value={businessName}
@@ -145,6 +160,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
             )}
 
             <EmailInput
+              ref={emailRef}
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
