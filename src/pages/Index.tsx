@@ -54,7 +54,7 @@ const Index = () => {
   
   // Calculate grace period for trial banner
   const gracePeriodDaysRemaining = user?.created_at 
-    ? Math.max(0, 14 - differenceInDays(new Date(), new Date(user.created_at)))
+    ? Math.max(0, 7 - differenceInDays(new Date(), new Date(user.created_at)))
     : 0;
   const isInGracePeriod = !subscribed && status !== 'trialing' && gracePeriodDaysRemaining > 0;
   const [trialBannerDismissed, setTrialBannerDismissed] = useState(() => {
