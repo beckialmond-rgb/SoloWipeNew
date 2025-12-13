@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Share, Plus, MoreVertical, Download, CheckCircle2 } from 'lucide-react';
+import { Share, Plus, MoreVertical, Download, CheckCircle2, ArrowDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
@@ -94,6 +94,14 @@ const Install = () => {
                   <p className="text-sm text-muted-foreground mt-2">
                     Located at the bottom of Safari
                   </p>
+                  {/* Animated arrow pointing down */}
+                  <motion.div
+                    animate={{ y: [0, 8, 0] }}
+                    transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                    className="flex justify-center mt-4"
+                  >
+                    <ArrowDown className="w-6 h-6 text-primary" />
+                  </motion.div>
                 </div>
               </div>
 
