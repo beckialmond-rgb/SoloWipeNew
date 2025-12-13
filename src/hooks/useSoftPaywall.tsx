@@ -24,7 +24,7 @@ export function SoftPaywallProvider({ children }: { children: ReactNode }) {
   const isWithinTrialPeriod = useCallback(() => {
     if (!user?.created_at) return false;
     const daysSinceSignup = differenceInDays(new Date(), new Date(user.created_at));
-    return daysSinceSignup <= 14;
+    return daysSinceSignup <= 7;
   }, [user?.created_at]);
 
   // Check if trial has expired (user exists, not subscribed, and past 14 days)
