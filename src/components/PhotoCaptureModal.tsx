@@ -1,6 +1,6 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Camera, RotateCcw, Check, Upload } from 'lucide-react';
+import { X, Camera, RotateCcw, Check, ImagePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -15,57 +15,11 @@ interface PhotoCaptureModalProps {
 export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCaptureModalProps) => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const startCamera = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' },
-        audio: false
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setIsStreaming(true);
-      }
-    } catch (error) {
-      console.error('Error accessing camera:', error);
-      toast({
-        title: 'Camera access denied',
-        description: 'Please allow camera access or upload a photo instead.',
-        variant: 'destructive',
-      });
-    }
-  }, [toast]);
-
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-      setIsStreaming(false);
-    }
-  }, []);
-
-  const capturePhoto = () => {
-    if (!videoRef.current) return;
-    
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(videoRef.current, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-      setCapturedImage(dataUrl);
-      stopCamera();
-    }
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -74,11 +28,12 @@ export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCa
       };
       reader.readAsDataURL(file);
     }
+    // Reset input so same file can be selected again
+    e.target.value = '';
   };
 
   const retake = () => {
     setCapturedImage(null);
-    startCamera();
   };
 
   const uploadPhoto = async () => {
@@ -123,7 +78,6 @@ export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCa
   };
 
   const handleClose = () => {
-    stopCamera();
     setCapturedImage(null);
     onClose();
   };
@@ -146,20 +100,12 @@ export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCa
           </button>
         </div>
 
-        {/* Camera/Preview area */}
-        <div className="flex-1 relative bg-black flex items-center justify-center">
+        {/* Preview area */}
+        <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
           {capturedImage ? (
             <img 
               src={capturedImage} 
               alt="Captured" 
-              className="max-w-full max-h-full object-contain"
-            />
-          ) : isStreaming ? (
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
               className="max-w-full max-h-full object-contain"
             />
           ) : (
@@ -167,36 +113,46 @@ export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCa
               <Camera className="w-16 h-16 text-white/50 mx-auto mb-4" />
               <p className="text-white/70 mb-6">Take a photo of the completed work</p>
               <div className="flex flex-col gap-3">
-                <Button 
-                  onClick={startCamera}
-                  className="bg-primary hover:bg-primary/90"
-                >
-                  <Camera className="w-5 h-5 mr-2" />
-                  Open Camera
-                </Button>
-                <Button 
-                  variant="outline"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-white/30 text-white hover:bg-white/10"
-                >
-                  <Upload className="w-5 h-5 mr-2" />
-                  Upload Photo
-                </Button>
+                {/* Hidden file inputs */}
                 <input
-                  ref={fileInputRef}
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+                <input
+                  ref={galleryInputRef}
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={handleFileUpload}
+                  onChange={handleFileSelect}
                 />
+                
+                <Button 
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="bg-primary hover:bg-primary/90 h-14"
+                >
+                  <Camera className="w-5 h-5 mr-2" />
+                  Take Photo
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="border-white/30 text-white hover:bg-white/10 h-14"
+                >
+                  <ImagePlus className="w-5 h-5 mr-2" />
+                  Choose from Library
+                </Button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Controls */}
-        <div className="p-4 bg-black/50 safe-area-inset-bottom">
-          {capturedImage ? (
+        {/* Controls - always visible at bottom */}
+        {capturedImage && (
+          <div className="p-4 pb-24 bg-black/50 safe-bottom">
             <div className="flex gap-3">
               <Button
                 variant="outline"
@@ -221,16 +177,8 @@ export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCa
                 )}
               </Button>
             </div>
-          ) : isStreaming ? (
-            <Button
-              className="w-full h-14 bg-white text-black hover:bg-white/90"
-              onClick={capturePhoto}
-            >
-              <Camera className="w-5 h-5 mr-2" />
-              Take Photo
-            </Button>
-          ) : null}
-        </div>
+          </div>
+        )}
       </motion.div>
     </AnimatePresence>
   );
