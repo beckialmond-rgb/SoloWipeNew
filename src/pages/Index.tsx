@@ -358,29 +358,29 @@ const Index = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-card rounded-xl border border-border p-4 mb-6"
+              className="bg-card rounded-xl border border-border p-5 mb-6"
             >
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
-                  <div className="w-10 h-10 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-2">
-                    <Clock className="w-5 h-5 text-primary" />
+                  <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                    <Clock className="w-6 h-6 text-primary" />
                   </div>
                   <p className="text-2xl font-bold text-foreground">{localJobs.length}</p>
-                  <p className="text-xs text-muted-foreground">Pending</p>
+                  <p className="text-sm text-muted-foreground mt-1">Pending</p>
                 </div>
                 <div className="text-center">
-                  <div className="w-10 h-10 mx-auto rounded-full bg-green-500/10 flex items-center justify-center mb-2">
-                    <CheckCircle className="w-5 h-5 text-green-500" />
+                  <div className="w-12 h-12 mx-auto rounded-full bg-success/10 flex items-center justify-center mb-3">
+                    <CheckCircle className="w-6 h-6 text-success" />
                   </div>
                   <p className="text-2xl font-bold text-foreground">{completedToday.length}</p>
-                  <p className="text-xs text-muted-foreground">Completed</p>
+                  <p className="text-sm text-muted-foreground mt-1">Completed</p>
                 </div>
                 <div className="text-center">
-                  <div className="w-10 h-10 mx-auto rounded-full bg-accent/10 flex items-center justify-center mb-2">
-                    <PoundSterling className="w-5 h-5 text-accent" />
+                  <div className="w-12 h-12 mx-auto rounded-full bg-success/10 flex items-center justify-center mb-3">
+                    <PoundSterling className="w-6 h-6 text-success" />
                   </div>
-                  <p className="text-2xl font-bold text-accent">£{todayEarnings}</p>
-                  <p className="text-xs text-muted-foreground">Earned</p>
+                  <p className="text-2xl font-bold text-success">£{todayEarnings}</p>
+                  <p className="text-sm text-muted-foreground mt-1">Earned</p>
                 </div>
               </div>
             </motion.div>
@@ -400,38 +400,38 @@ const Index = () => {
               </motion.div>
             )}
 
-            {/* Jobs count badge and Skip All button */}
+            {/* Jobs count badge and action buttons */}
             {localJobs.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6 flex items-center justify-between"
+                className="mb-6 flex items-center justify-between gap-4"
               >
-                <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full">
-                  <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary/10 text-primary rounded-xl">
+                  <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
                     {localJobs.length}
                   </span>
-                  <span className="font-medium text-sm">
+                  <span className="font-medium">
                     {localJobs.length === 1 ? 'job' : 'jobs'} today
                   </span>
                 </div>
                 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="default"
                     onClick={() => setQuickAddOpen(true)}
-                    className="gap-1.5"
+                    className="gap-2"
                   >
                     <UserPlus className="w-4 h-4" />
                     Quick Add
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="default"
                     onClick={handleSkipAllRequest}
                     disabled={isSkippingAll}
-                    className="gap-1.5"
+                    className="gap-2"
                   >
                     <SkipForward className="w-4 h-4" />
                     Skip All
