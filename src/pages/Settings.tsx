@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff, RefreshCw, CloudOff } from 'lucide-react';
+import { useOffline } from '@/contexts/OfflineContext';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
 import { Header } from '@/components/Header';
@@ -22,6 +23,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 const Settings = () => {
   const { businessName, userEmail, updateBusinessName, updateGoogleReviewLink, recentlyArchivedCustomers, unarchiveCustomer, weeklyEarnings, customers, profile } = useSupabaseData();
   const { signOut } = useAuth();
+  const { isOnline, isSyncing, pendingCount, syncPendingMutations } = useOffline();
   const navigate = useNavigate();
   const { isInstalled } = useInstallPrompt();
   const { isSupported: notificationsSupported, isEnabled: notificationsEnabled, requestPermission, disableNotifications } = useNotifications();
@@ -313,6 +315,48 @@ const Settings = () => {
               </div>
 
               <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </motion.button>
+          )}
+
+          {/* Sync Now Button - Show when there are pending changes */}
+          {pendingCount > 0 && (
+            <motion.button
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.24 }}
+              onClick={() => syncPendingMutations()}
+              disabled={!isOnline || isSyncing}
+              className={cn(
+                "w-full bg-card rounded-xl border border-border p-4",
+                "flex items-center gap-4 text-left",
+                "hover:bg-muted/50 transition-colors",
+                "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                "disabled:opacity-50 disabled:cursor-not-allowed"
+              )}
+            >
+              <div className={cn(
+                "w-10 h-10 rounded-full flex items-center justify-center",
+                isOnline ? "bg-amber-500/10" : "bg-muted"
+              )}>
+                {isOnline ? (
+                  <RefreshCw className={cn("w-5 h-5 text-amber-500", isSyncing && "animate-spin")} />
+                ) : (
+                  <CloudOff className="w-5 h-5 text-muted-foreground" />
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-muted-foreground">
+                  {pendingCount} pending change{pendingCount !== 1 ? 's' : ''}
+                </p>
+                <p className="font-medium text-foreground">
+                  {isSyncing ? 'Syncing...' : isOnline ? 'Sync Now' : 'Waiting for signal...'}
+                </p>
+              </div>
+
+              {isOnline && !isSyncing && (
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              )}
             </motion.button>
           )}
 
