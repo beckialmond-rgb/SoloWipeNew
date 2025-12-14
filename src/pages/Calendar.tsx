@@ -8,12 +8,14 @@ import { LoadingState } from '@/components/LoadingState';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { QuickScheduleModal } from '@/components/QuickScheduleModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { useHaptics } from '@/hooks/useHaptics';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 const Calendar = () => {
   const { pendingJobs, upcomingJobs, completedToday, customers, rescheduleJob, isLoading } = useSupabaseData();
+  const { lightTap } = useHaptics();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
@@ -295,7 +297,10 @@ const Calendar = () => {
         >
           <Button
             size="icon"
-            onClick={() => setQuickScheduleOpen(true)}
+            onClick={() => {
+              lightTap();
+              setQuickScheduleOpen(true);
+            }}
             className="h-14 w-14 rounded-full shadow-lg"
           >
             <Plus className="w-6 h-6" />
