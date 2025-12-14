@@ -25,15 +25,24 @@ const Calendar = () => {
   const [quickScheduleOpen, setQuickScheduleOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
 
-  // Active customers for quick schedule
+  // Active customers for quick schedule with frequency and last clean info
   const activeCustomers = useMemo(() => {
-    return customers.filter(c => c.status === 'active').map(c => ({
-      id: c.id,
-      name: c.name,
-      address: c.address,
-      price: Number(c.price)
-    }));
-  }, [customers]);
+    return customers.filter(c => c.status === 'active').map(c => {
+      // Find the most recent completed job for this customer
+      const customerCompletedJobs = [...pendingJobs, ...upcomingJobs, ...completedToday]
+        .filter(j => j.customer_id === c.id && j.status === 'completed' && j.completed_at)
+        .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime());
+      
+      return {
+        id: c.id,
+        name: c.name,
+        address: c.address,
+        price: Number(c.price),
+        frequency_weeks: c.frequency_weeks,
+        last_completed_date: customerCompletedJobs[0]?.completed_at || null
+      };
+    });
+  }, [customers, pendingJobs, upcomingJobs, completedToday]);
 
   // Combine all jobs for the calendar view
   const allJobs = useMemo(() => {
