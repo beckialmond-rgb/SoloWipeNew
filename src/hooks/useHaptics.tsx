@@ -11,14 +11,35 @@ export function useHaptics() {
     }
   }, []);
 
-  // Light tap - for queueing actions
-  const lightTap = useCallback(() => vibrate(30), [vibrate]);
+  // Light tap - for button presses
+  const lightTap = useCallback(() => vibrate(15), [vibrate]);
 
-  // Success - double pulse for sync complete
+  // Medium tap - for selections and toggles
+  const mediumTap = useCallback(() => vibrate(30), [vibrate]);
+
+  // Success - double pulse for completed actions
   const success = useCallback(() => vibrate([50, 50, 50]), [vibrate]);
 
   // Warning - longer pulse
   const warning = useCallback(() => vibrate(100), [vibrate]);
 
-  return { vibrate, lightTap, success, warning };
+  // Error - sharp double pulse
+  const error = useCallback(() => vibrate([100, 50, 100]), [vibrate]);
+
+  // Heavy - for important confirmations
+  const heavy = useCallback(() => vibrate(150), [vibrate]);
+
+  // Notification - gentle attention
+  const notification = useCallback(() => vibrate([30, 30, 30, 30]), [vibrate]);
+
+  return { 
+    vibrate, 
+    lightTap, 
+    mediumTap, 
+    success, 
+    warning, 
+    error, 
+    heavy,
+    notification,
+  };
 }
