@@ -28,7 +28,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useJobReminders } from '@/hooks/useJobReminders';
 import { useHaptics } from '@/hooks/useHaptics';
 import { syncStatus } from '@/lib/offlineStorage';
-import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation, X, Gift } from 'lucide-react';
+import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation, X, Gift, CreditCard, AlertTriangle } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import { ToastAction } from '@/components/ui/toast';
 import {
@@ -481,6 +481,27 @@ const Index = () => {
                     </p>
                   </div>
                 </div>
+              </motion.div>
+            )}
+
+            {/* GoCardless Status Indicator */}
+            {profile?.gocardless_organisation_id && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4"
+              >
+                {profile?.gocardless_access_token_encrypted ? (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-lg text-sm">
+                    <CreditCard className="w-4 h-4 text-success" />
+                    <span className="text-success font-medium">Direct Debit active</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-warning/10 border border-warning/20 rounded-lg text-sm">
+                    <AlertTriangle className="w-4 h-4 text-warning" />
+                    <span className="text-warning font-medium">Direct Debit needs reconnecting</span>
+                  </div>
+                )}
               </motion.div>
             )}
 
