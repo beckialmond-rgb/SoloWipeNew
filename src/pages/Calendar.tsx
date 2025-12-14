@@ -116,6 +116,15 @@ const Calendar = () => {
     setSelectedDate(null);
   };
 
+  const handleSwipe = (direction: 'left' | 'right') => {
+    lightTap();
+    if (direction === 'left') {
+      handleNext();
+    } else {
+      handlePrev();
+    }
+  };
+
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   const getHeaderText = () => {
@@ -201,8 +210,21 @@ const Calendar = () => {
               </Button>
             </div>
 
-            {/* Calendar Grid */}
-            <div className="bg-card rounded-xl border border-border p-4 mb-6">
+            {/* Calendar Grid with Swipe */}
+            <motion.div 
+              className="bg-card rounded-xl border border-border p-4 mb-6 touch-pan-y"
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.2}
+              onDragEnd={(_, info) => {
+                const threshold = 50;
+                if (info.offset.x > threshold) {
+                  handleSwipe('right');
+                } else if (info.offset.x < -threshold) {
+                  handleSwipe('left');
+                }
+              }}
+            >
               {/* Week day headers */}
               <div className="grid grid-cols-7 gap-1 mb-2">
                 {weekDays.map(day => (
@@ -338,7 +360,7 @@ const Calendar = () => {
                   <span className="text-xs text-muted-foreground">Completed</span>
                 </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* Selected Date Jobs */}
             <AnimatePresence mode="wait">
