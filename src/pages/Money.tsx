@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, CheckCircle, Clock, CheckSquare, Square } from 'lucide-react';
+import { Wallet, CheckCircle, Clock, CheckSquare, Square, CreditCard } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingState } from '@/components/LoadingState';
@@ -25,6 +25,13 @@ const Money = () => {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
   const [batchModalOpen, setBatchModalOpen] = useState(false);
+
+  // Calculate DD earnings summary
+  const ddEarnings = useMemo(() => {
+    const ddJobs = paidThisWeek.filter(job => job.payment_method === 'gocardless');
+    const total = ddJobs.reduce((sum, job) => sum + (job.amount_collected || 0), 0);
+    return { count: ddJobs.length, total };
+  }, [paidThisWeek]);
 
   const handleMarkPaid = (job: JobWithCustomer) => {
     if (!requirePremium('mark-paid')) return;
@@ -121,6 +128,33 @@ const Money = () => {
             {unpaidJobs.length} unpaid {unpaidJobs.length === 1 ? 'job' : 'jobs'}
           </p>
         </motion.div>
+
+        {/* DD Earnings Summary - only show if there are DD payments */}
+        {ddEarnings.count > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-4 border border-primary/20"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                  <CreditCard className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Direct Debit this week</p>
+                  <p className="text-lg font-bold text-foreground">£{ddEarnings.total.toFixed(2)}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full font-medium">
+                  {ddEarnings.count} payment{ddEarnings.count !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Tabs */}
         <Tabs defaultValue="unpaid" className="w-full">
