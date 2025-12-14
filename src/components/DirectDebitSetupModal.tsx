@@ -56,12 +56,23 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
     
     try {
     // Use production domain for customer redirects, detect based on current origin
-    const isProduction = window.location.hostname === 'solowipe.co.uk' || window.location.hostname === 'www.solowipe.co.uk';
+    const currentHostname = window.location.hostname;
+    const isProduction = currentHostname === 'solowipe.co.uk' || currentHostname === 'www.solowipe.co.uk';
     const REDIRECT_DOMAIN = isProduction ? 'https://solowipe.co.uk' : window.location.origin;
     const exitUrl = `${REDIRECT_DOMAIN}/customers`;
     const successUrl = `${REDIRECT_DOMAIN}/customers?mandate=success&customer=${customer.id}`;
 
+      // Debug logging for redirect domain detection
+      console.log('[DD Setup] Domain Detection:', {
+        currentHostname,
+        isProduction,
+        redirectDomain: REDIRECT_DOMAIN,
+        exitUrl,
+        successUrl
+      });
+
       addDebugLog('Create Mandate', `Customer: ${customer.name} (${customer.id})`, 'info');
+      addDebugLog('Domain', `${isProduction ? 'PRODUCTION' : 'PREVIEW'}: ${REDIRECT_DOMAIN}`, 'info');
       addDebugLog('URLs', `Exit: ${exitUrl}, Success: ${successUrl}`, 'info');
 
       const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
