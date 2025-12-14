@@ -169,29 +169,40 @@ serve(async (req) => {
     const encryptedToken = btoa(`gc_token_${accessToken}`);
     console.log('[GC-CALLBACK] Token encrypted, length:', encryptedToken.length);
 
-    // Store credentials in user's profile using service role client
+    // Store credentials in user's profile using service role client with retry logic
     console.log('[GC-CALLBACK] Updating profile for user:', user.id);
     
-    const { data: updateData, error: updateError } = await adminClient
-      .from('profiles')
-      .update({
-        gocardless_access_token_encrypted: encryptedToken,
-        gocardless_organisation_id: organisationId,
-        gocardless_connected_at: new Date().toISOString(),
-      })
-      .eq('id', user.id)
-      .select();
+    let updateSuccess = false;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!updateSuccess && retryCount < maxRetries) {
+      const { data: updateData, error: updateError } = await adminClient
+        .from('profiles')
+        .update({
+          gocardless_access_token_encrypted: encryptedToken,
+          gocardless_organisation_id: organisationId,
+          gocardless_connected_at: new Date().toISOString(),
+        })
+        .eq('id', user.id)
+        .select();
 
-    if (updateError) {
-      console.error('[GC-CALLBACK] Failed to store credentials:', updateError);
-      console.error('[GC-CALLBACK] Update error details:', JSON.stringify(updateError));
-      return new Response(JSON.stringify({ error: 'Failed to store credentials', details: updateError.message }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      if (updateError) {
+        retryCount++;
+        console.error(`[GC-CALLBACK] Update attempt ${retryCount} failed:`, updateError);
+        if (retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+          continue;
+        }
+        return new Response(JSON.stringify({ error: 'Failed to store credentials', details: updateError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      
+      console.log('[GC-CALLBACK] Profile update result:', JSON.stringify(updateData));
+      updateSuccess = true;
     }
-
-    console.log('[GC-CALLBACK] Profile update result:', JSON.stringify(updateData));
 
     // Verify the update was successful by re-reading
     const { data: verifyProfile, error: verifyError } = await adminClient
@@ -201,17 +212,21 @@ serve(async (req) => {
       .single();
 
     if (verifyError || !verifyProfile?.gocardless_access_token_encrypted) {
-      console.error('[GC-CALLBACK] Verification failed - token not stored');
+      console.error('[GC-CALLBACK] ❌ Verification failed - token not stored');
       console.error('[GC-CALLBACK] Verify error:', verifyError);
-      console.error('[GC-CALLBACK] Verify profile:', verifyProfile);
-      return new Response(JSON.stringify({ error: 'Token storage verification failed' }), {
+      console.error('[GC-CALLBACK] Verify profile:', JSON.stringify(verifyProfile));
+      return new Response(JSON.stringify({ 
+        error: 'Token storage verification failed',
+        details: 'The token was not stored correctly. Please try connecting again.'
+      }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     console.log('[GC-CALLBACK] ✅ GoCardless connected and verified for user:', user.id);
-    console.log('[GC-CALLBACK] Stored token length:', verifyProfile.gocardless_access_token_encrypted.length);
+    console.log('[GC-CALLBACK] ✅ Stored token length:', verifyProfile.gocardless_access_token_encrypted.length);
+    console.log('[GC-CALLBACK] ✅ Connected at:', verifyProfile.gocardless_connected_at);
 
     return new Response(JSON.stringify({ 
       success: true, 
