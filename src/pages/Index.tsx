@@ -62,6 +62,15 @@ const Index = () => {
   const [trialBannerDismissed, setTrialBannerDismissed] = useState(() => {
     return localStorage.getItem('solowipe_trial_banner_dismissed') === 'true';
   });
+  const [ddPromptDismissed, setDdPromptDismissed] = useState(() => {
+    return localStorage.getItem('solowipe_dd_prompt_dismissed') === 'true';
+  });
+
+  const handleDismissDdPrompt = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDdPromptDismissed(true);
+    localStorage.setItem('solowipe_dd_prompt_dismissed', 'true');
+  };
   
   // Enable job reminders for upcoming jobs
   const allUpcomingJobs = [...pendingJobs, ...upcomingJobs];
@@ -517,22 +526,32 @@ const Index = () => {
                   </button>
                 )}
               </motion.div>
-            ) : customers.length >= 3 && (
+            ) : customers.length >= 3 && !ddPromptDismissed && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
                 className="mb-4"
               >
-                <button
-                  onClick={() => navigate('/settings')}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-primary/10 border border-primary/20 rounded-lg text-sm hover:bg-primary/20 transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-primary" />
-                    <span className="text-primary font-medium">Set up Direct Debit to get paid automatically</span>
-                  </div>
-                  <ChevronDown className="w-4 h-4 text-primary -rotate-90" />
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => navigate('/settings')}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 pr-10 bg-primary/10 border border-primary/20 rounded-lg text-sm hover:bg-primary/20 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-primary" />
+                      <span className="text-primary font-medium">Set up Direct Debit to get paid automatically</span>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-primary -rotate-90" />
+                  </button>
+                  <button
+                    onClick={handleDismissDdPrompt}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-primary/20 transition-colors"
+                    aria-label="Dismiss"
+                  >
+                    <X className="w-4 h-4 text-primary/60" />
+                  </button>
+                </div>
               </motion.div>
             )}
 
