@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Link2, Link2Off, CheckCircle2, ExternalLink, Bug, RefreshCw } from 'lucide-react';
+import { Loader2, Link2, Link2Off, CheckCircle2, ExternalLink, Bug, RefreshCw, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Profile } from '@/types/database';
@@ -34,12 +34,24 @@ interface DebugLog {
   status: 'info' | 'success' | 'error' | 'warning';
 }
 
+interface HealthCheckResult {
+  status: 'ok' | 'error' | 'checking' | 'unknown';
+  message: string;
+  lastChecked: Date | null;
+}
+
 export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
+  const [healthCheck, setHealthCheck] = useState<HealthCheckResult>({
+    status: 'unknown',
+    message: 'Not checked yet',
+    lastChecked: null,
+  });
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
   // Check both organisation ID and access token - if token is missing, connection is incomplete
   const isConnected = !!profile?.gocardless_organisation_id && !!profile?.gocardless_access_token_encrypted;
@@ -68,6 +80,58 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
     localStorage.setItem('gocardless_debug', String(newValue));
     if (newValue) {
       addDebugLog('Debug Mode', 'Enabled', 'info');
+    }
+  };
+
+  // Health check function to verify webhook endpoint
+  const checkWebhookHealth = async () => {
+    setIsCheckingHealth(true);
+    addDebugLog('Health Check', 'Checking webhook endpoint...', 'info');
+    
+    try {
+      const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gocardless-webhook`;
+      const response = await fetch(webhookUrl, { method: 'GET' });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setHealthCheck({
+          status: 'ok',
+          message: data.message || 'Webhook endpoint is reachable',
+          lastChecked: new Date(),
+        });
+        addDebugLog('Health Check', 'Webhook endpoint is healthy', 'success');
+        toast({
+          title: 'Connection healthy',
+          description: 'Webhook endpoint is reachable and ready to receive events.',
+        });
+      } else {
+        setHealthCheck({
+          status: 'error',
+          message: `HTTP ${response.status}: ${response.statusText}`,
+          lastChecked: new Date(),
+        });
+        addDebugLog('Health Check', `Failed: HTTP ${response.status}`, 'error');
+        toast({
+          title: 'Connection issue',
+          description: 'Webhook endpoint returned an error. Check debug logs for details.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      setHealthCheck({
+        status: 'error',
+        message,
+        lastChecked: new Date(),
+      });
+      addDebugLog('Health Check', `Error: ${message}`, 'error');
+      toast({
+        title: 'Connection failed',
+        description: 'Could not reach webhook endpoint. Check your internet connection.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCheckingHealth(false);
     }
   };
 
@@ -157,6 +221,9 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
     // Force refresh
     onRefresh();
     addDebugLog('Refresh Triggered', 'Profile data will be reloaded', 'info');
+    
+    // Also run health check
+    await checkWebhookHealth();
   };
 
   const getStatusColor = (status: DebugLog['status']) => {
@@ -165,6 +232,15 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
       case 'error': return 'text-destructive';
       case 'warning': return 'text-warning';
       default: return 'text-muted-foreground';
+    }
+  };
+
+  const getHealthIcon = () => {
+    if (isCheckingHealth) return <Loader2 className="w-4 h-4 animate-spin" />;
+    switch (healthCheck.status) {
+      case 'ok': return <Wifi className="w-4 h-4 text-success" />;
+      case 'error': return <WifiOff className="w-4 h-4 text-destructive" />;
+      default: return <AlertTriangle className="w-4 h-4 text-warning" />;
     }
   };
 
@@ -219,8 +295,8 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono font-medium text-muted-foreground">Debug Info</span>
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={handleTestConnection}>
-                  <RefreshCw className="w-3 h-3 mr-1" />
+                <Button variant="ghost" size="sm" onClick={handleTestConnection} disabled={isCheckingHealth}>
+                  <RefreshCw className={`w-3 h-3 mr-1 ${isCheckingHealth ? 'animate-spin' : ''}`} />
                   Test
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setDebugLogs([])}>
@@ -254,6 +330,21 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
                   {isConnected ? 'CONNECTED' : hasPartialConnection ? 'PARTIAL' : 'NOT CONNECTED'}
                 </span>
               </div>
+              <div className="flex justify-between items-center pt-2 border-t border-border mt-2">
+                <span className="text-muted-foreground">Webhook Health:</span>
+                <div className="flex items-center gap-2">
+                  {getHealthIcon()}
+                  <span className={healthCheck.status === 'ok' ? 'text-success' : healthCheck.status === 'error' ? 'text-destructive' : 'text-warning'}>
+                    {healthCheck.status.toUpperCase()}
+                  </span>
+                </div>
+              </div>
+              {healthCheck.lastChecked && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Last Checked:</span>
+                  <span>{healthCheck.lastChecked.toLocaleTimeString()}</span>
+                </div>
+              )}
             </div>
 
             {debugLogs.length > 0 && (
@@ -276,23 +367,44 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
         )}
 
         {isConnected ? (
-          <div className="mt-4 pt-4 border-t flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Organisation ID: {profile?.gocardless_organisation_id?.substring(0, 12)}...
+          <div className="mt-4 pt-4 border-t space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Organisation ID: {profile?.gocardless_organisation_id?.substring(0, 12)}...
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDisconnectConfirm(true)}
+                disabled={isDisconnecting}
+              >
+                {isDisconnecting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Link2Off className="w-4 h-4 mr-2" />
+                    Disconnect
+                  </>
+                )}
+              </Button>
             </div>
+            
+            {/* Health Check Button */}
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              onClick={() => setShowDisconnectConfirm(true)}
-              disabled={isDisconnecting}
+              onClick={checkWebhookHealth}
+              disabled={isCheckingHealth}
+              className="w-full justify-start text-muted-foreground hover:text-foreground"
             >
-              {isDisconnecting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <Link2Off className="w-4 h-4 mr-2" />
-                  Disconnect
-                </>
+              {getHealthIcon()}
+              <span className="ml-2">
+                {isCheckingHealth ? 'Checking connection...' : 'Test Webhook Connection'}
+              </span>
+              {healthCheck.status === 'ok' && (
+                <Badge variant="secondary" className="ml-auto bg-success/10 text-success text-xs">
+                  Healthy
+                </Badge>
               )}
             </Button>
           </div>
