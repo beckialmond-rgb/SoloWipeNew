@@ -1,4 +1,4 @@
-import { Check, MapPin, SkipForward, Navigation, Phone, GripVertical, CreditCard, Send, Loader2 } from 'lucide-react';
+import { Check, MapPin, SkipForward, Navigation, Phone, GripVertical, CreditCard, Send, Loader2, Clock } from 'lucide-react';
 import { motion, useMotionValue, useTransform, PanInfo, Reorder, useDragControls } from 'framer-motion';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -212,12 +212,18 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false, prof
               <span className="text-sm text-muted-foreground">
                 {job.customer.name}
               </span>
-              {job.customer.gocardless_id && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                  <CreditCard className="w-3 h-3" />
-                  DD
+              {/* Mandate Status Badge */}
+              {job.customer.gocardless_mandate_status === 'pending' ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs font-medium">
+                  <Clock className="w-3 h-3" />
+                  DD Pending
                 </span>
-              )}
+              ) : job.customer.gocardless_id ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/10 text-success text-xs font-medium">
+                  <CreditCard className="w-3 h-3" />
+                  DD Active
+                </span>
+              ) : null}
             </div>
 
             {/* Quick action buttons */}
