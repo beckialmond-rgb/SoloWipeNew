@@ -176,16 +176,16 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false, prof
         onDragEnd={handleDragEnd}
         style={{ x }}
         className={cn(
-          "bg-card rounded-xl shadow-sm border overflow-hidden relative",
+          "bg-card rounded-xl shadow-sm border overflow-hidden relative swipe-card",
           isDragging && "cursor-grabbing",
           isNextUp ? "border-l-4 border-l-primary border-t border-r border-b border-border" : "border-border"
         )}
       >
 
-        <div className="flex items-stretch">
+        <div className="flex items-stretch flex-ios-fix">
           {/* Drag Handle */}
           <div
-            className="w-10 flex items-center justify-center cursor-grab active:cursor-grabbing touch-none bg-muted/30 hover:bg-muted/50 transition-colors border-r border-border"
+            className="w-10 flex items-center justify-center cursor-grab active:cursor-grabbing bg-muted/30 hover:bg-muted/50 transition-colors border-r border-border drag-handle"
             onPointerDown={(e) => {
               e.preventDefault();
               dragControls.start(e);

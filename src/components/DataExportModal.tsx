@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, Loader2, FileJson, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,8 @@ interface DataExportModalProps {
   onClose: () => void;
 }
 
-export function DataExportModal({ isOpen, onClose }: DataExportModalProps) {
+export const DataExportModal = React.forwardRef<HTMLDivElement, DataExportModalProps>(
+  ({ isOpen, onClose }, ref) => {
   const { user } = useAuth();
   const [isExporting, setIsExporting] = useState(false);
   const [exportComplete, setExportComplete] = useState(false);
@@ -88,6 +89,7 @@ export function DataExportModal({ isOpen, onClose }: DataExportModalProps) {
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          ref={ref}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -175,4 +177,8 @@ export function DataExportModal({ isOpen, onClose }: DataExportModalProps) {
       )}
     </AnimatePresence>
   );
-}
+});
+
+DataExportModal.displayName = 'DataExportModal';
+
+export default DataExportModal;
