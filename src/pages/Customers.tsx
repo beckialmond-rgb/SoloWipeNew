@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Search, Users, Plus, CreditCard } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Search, Users, Plus, CreditCard, Send, CheckSquare, Square, Loader2, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { CustomerCard } from '@/components/CustomerCard';
@@ -10,10 +10,13 @@ import { EditCustomerModal } from '@/components/EditCustomerModal';
 import { CustomerHistoryModal } from '@/components/CustomerHistoryModal';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
+import { Button } from '@/components/ui/button';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 type DDFilter = 'all' | 'with-dd' | 'without-dd' | 'pending';
 
@@ -26,6 +29,9 @@ const Customers = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isSendingBulkDD, setIsSendingBulkDD] = useState(false);
 
   const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
 
@@ -53,6 +59,79 @@ const Customers = () => {
     }
     return true;
   });
+
+  // Customers eligible for DD link (no mandate, has phone)
+  const customersEligibleForDD = filteredCustomers.filter(
+    c => !c.gocardless_id && c.gocardless_mandate_status !== 'pending' && c.mobile_phone
+  );
+
+  const toggleSelectCustomer = (customerId: string) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(customerId)) {
+        newSet.delete(customerId);
+      } else {
+        newSet.add(customerId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllEligible = () => {
+    setSelectedIds(new Set(customersEligibleForDD.map(c => c.id)));
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectMode(false);
+  };
+
+  const handleBulkSendDDLink = async () => {
+    const selectedCustomers = customersEligibleForDD.filter(c => selectedIds.has(c.id));
+    if (selectedCustomers.length === 0) {
+      toast.error('No customers selected');
+      return;
+    }
+
+    setIsSendingBulkDD(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const customer of selectedCustomers) {
+      try {
+        const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
+          body: { customerId: customer.id }
+        });
+
+        if (error) throw error;
+        if (!data?.authorisationUrl) throw new Error('No authorization URL returned');
+
+        const firstName = customer.name.split(' ')[0];
+        const message = encodeURIComponent(
+          `Hi ${firstName}, please set up your Direct Debit for ${businessName} using this secure link: ${data.authorisationUrl}`
+        );
+        const phone = customer.mobile_phone?.replace(/\s/g, '') || '';
+        
+        // Open SMS for each customer (will open multiple SMS apps)
+        window.open(`sms:${phone}?body=${message}`, '_blank');
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to generate DD link for ${customer.name}:`, error);
+        failCount++;
+      }
+    }
+
+    setIsSendingBulkDD(false);
+    clearSelection();
+    refetchAll();
+
+    if (successCount > 0) {
+      toast.success(`Opened SMS for ${successCount} customer${successCount !== 1 ? 's' : ''}`);
+    }
+    if (failCount > 0) {
+      toast.error(`Failed for ${failCount} customer${failCount !== 1 ? 's' : ''}`);
+    }
+  };
 
   const handleEditCustomer = (customer: Customer) => {
     if (!requirePremium('edit')) return;
@@ -218,22 +297,109 @@ const Customers = () => {
               </motion.div>
             )}
 
-            {/* Customer count */}
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-5">
-              <Users className="w-4 h-4" />
-              <span>{filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}</span>
+            {/* Customer count and bulk DD action */}
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Users className="w-4 h-4" />
+                <span>{filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}</span>
+              </div>
+              
+              {/* Bulk DD Link action - only show if GoCardless connected and eligible customers exist */}
+              {isGoCardlessConnected && customersEligibleForDD.length > 0 && !selectMode && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectMode(true)}
+                  className="text-primary border-primary/20 hover:bg-primary/10"
+                >
+                  <Send className="w-4 h-4 mr-1.5" />
+                  Bulk DD Link
+                </Button>
+              )}
             </div>
+
+            {/* Select mode header */}
+            <AnimatePresence>
+              {selectMode && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-4 p-3 bg-primary/10 rounded-xl border border-primary/20"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-medium text-foreground">
+                      {selectedIds.size} of {customersEligibleForDD.length} selected
+                    </span>
+                    <button
+                      onClick={clearSelection}
+                      className="p-1 hover:bg-muted rounded-full transition-colors"
+                    >
+                      <X className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={selectAllEligible}
+                      className="flex-1"
+                    >
+                      Select All ({customersEligibleForDD.length})
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleBulkSendDDLink}
+                      disabled={selectedIds.size === 0 || isSendingBulkDD}
+                      className="flex-1 bg-primary hover:bg-primary/90"
+                    >
+                      {isSendingBulkDD ? (
+                        <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4 mr-1.5" />
+                      )}
+                      Send DD Links
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Customer list */}
             <div className="space-y-4">
-              {filteredCustomers.map((customer, index) => (
-                <CustomerCard
-                  key={customer.id}
-                  customer={customer}
-                  onClick={() => setSelectedCustomer(customer)}
-                  index={index}
-                />
-              ))}
+              {filteredCustomers.map((customer, index) => {
+                const isEligible = customersEligibleForDD.some(c => c.id === customer.id);
+                const isSelected = selectedIds.has(customer.id);
+                
+                return (
+                  <div key={customer.id} className="flex items-center gap-3">
+                    {/* Checkbox in select mode */}
+                    {selectMode && (
+                      <button
+                        onClick={() => isEligible && toggleSelectCustomer(customer.id)}
+                        disabled={!isEligible}
+                        className={cn(
+                          "flex-shrink-0 transition-colors",
+                          !isEligible && "opacity-30 cursor-not-allowed"
+                        )}
+                      >
+                        {isSelected ? (
+                          <CheckSquare className="w-6 h-6 text-primary" />
+                        ) : (
+                          <Square className="w-6 h-6 text-muted-foreground" />
+                        )}
+                      </button>
+                    )}
+                    <div className="flex-1">
+                      <CustomerCard
+                        customer={customer}
+                        onClick={() => !selectMode && setSelectedCustomer(customer)}
+                        index={index}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Empty search state */}
