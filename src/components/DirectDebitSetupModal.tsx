@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, MessageSquare, ExternalLink, CheckCircle2, Settings } from 'lucide-react';
+import { Loader2, Copy, MessageSquare, ExternalLink, CheckCircle2, Settings, Bug, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Customer } from '@/types/database';
@@ -22,18 +22,44 @@ interface DirectDebitSetupModalProps {
   onSuccess: () => void;
 }
 
+interface DebugLog {
+  timestamp: string;
+  action: string;
+  details: string;
+  status: 'info' | 'success' | 'error';
+}
+
 export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: DirectDebitSetupModalProps) {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [authorisationUrl, setAuthorisationUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [requiresReconnect, setRequiresReconnect] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
+  const [billingRequestId, setBillingRequestId] = useState<string | null>(null);
+
+  const addDebugLog = (action: string, details: string, status: DebugLog['status'] = 'info') => {
+    const log: DebugLog = {
+      timestamp: new Date().toLocaleTimeString(),
+      action,
+      details,
+      status,
+    };
+    setDebugLogs(prev => [...prev, log]);
+    console.log(`[DD-SETUP-DEBUG] ${action}:`, details);
+  };
 
   const handleCreateMandate = async () => {
     setIsLoading(true);
+    setDebugLogs([]);
+    
     try {
       const exitUrl = `${window.location.origin}/customers`;
       const successUrl = `${window.location.origin}/customers?mandate=success&customer=${customer.id}`;
+
+      addDebugLog('Create Mandate', `Customer: ${customer.name} (${customer.id})`, 'info');
+      addDebugLog('URLs', `Exit: ${exitUrl}, Success: ${successUrl}`, 'info');
 
       const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
         body: {
@@ -44,10 +70,18 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        addDebugLog('Function Error', JSON.stringify(error), 'error');
+        throw error;
+      }
+
+      addDebugLog('Response', JSON.stringify(data), data?.authorisationUrl ? 'success' : 'error');
 
       if (data?.authorisationUrl) {
         setAuthorisationUrl(data.authorisationUrl);
+        setBillingRequestId(data.billingRequestId);
+        addDebugLog('Auth URL', data.authorisationUrl.substring(0, 60) + '...', 'success');
+        addDebugLog('Billing Request ID', data.billingRequestId || 'N/A', 'info');
         toast({
           title: 'Direct Debit setup ready',
           description: 'Share the link with your customer to set up Direct Debit.',
@@ -55,6 +89,7 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
       }
     } catch (error: unknown) {
       console.error('Failed to create mandate:', error);
+      addDebugLog('Exception', error instanceof Error ? error.message : 'Unknown error', 'error');
       
       // Check if the error indicates reconnection is required
       const errorData = error as { message?: string; context?: { body?: { requiresReconnect?: boolean; error?: string } } };
@@ -62,6 +97,7 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
       
       if (bodyData?.requiresReconnect) {
         setRequiresReconnect(true);
+        addDebugLog('Reconnect Required', 'GoCardless connection expired', 'error');
         toast({
           title: 'GoCardless connection expired',
           description: 'Please reconnect your GoCardless account in Settings.',
@@ -84,6 +120,7 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
     
     await navigator.clipboard.writeText(authorisationUrl);
     setCopied(true);
+    addDebugLog('Link Copied', 'Copied to clipboard', 'success');
     toast({
       title: 'Link copied',
       description: 'Direct Debit setup link copied to clipboard.',
@@ -97,17 +134,21 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
     const message = encodeURIComponent(
       `Hi ${customer.name.split(' ')[0]}, please set up your Direct Debit for window cleaning payments using this secure link: ${authorisationUrl}`
     );
+    addDebugLog('SMS Opened', `To: ${customer.mobile_phone}`, 'info');
     window.open(`sms:${customer.mobile_phone}?body=${message}`, '_blank');
   };
 
   const handleOpenLink = () => {
     if (!authorisationUrl) return;
+    addDebugLog('Link Opened', 'Opening in new tab', 'info');
     window.open(authorisationUrl, '_blank');
   };
 
   const handleClose = () => {
     setAuthorisationUrl(null);
     setCopied(false);
+    setDebugLogs([]);
+    setBillingRequestId(null);
     onClose();
     if (authorisationUrl) {
       onSuccess();
@@ -119,20 +160,85 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
     navigate('/settings');
   };
 
+  const getStatusColor = (status: DebugLog['status']) => {
+    switch (status) {
+      case 'success': return 'text-success';
+      case 'error': return 'text-destructive';
+      default: return 'text-muted-foreground';
+    }
+  };
+
   return (
     <Drawer open={isOpen} onOpenChange={handleClose}>
       <DrawerContent>
         <DrawerHeader className="text-left">
-          <DrawerTitle>Set Up Direct Debit</DrawerTitle>
-          <DrawerDescription>
-            {authorisationUrl 
-              ? `Share the link below with ${customer.name} to set up Direct Debit.`
-              : `Create a Direct Debit mandate for ${customer.name}.`
-            }
-          </DrawerDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DrawerTitle>Set Up Direct Debit</DrawerTitle>
+              <DrawerDescription>
+                {authorisationUrl 
+                  ? `Share the link below with ${customer.name} to set up Direct Debit.`
+                  : `Create a Direct Debit mandate for ${customer.name}.`
+                }
+              </DrawerDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowDebug(!showDebug)}
+              className={showDebug ? 'text-primary' : 'text-muted-foreground'}
+            >
+              <Bug className="w-4 h-4" />
+            </Button>
+          </div>
         </DrawerHeader>
 
         <div className="px-4 pb-4">
+          {/* Debug Panel */}
+          {showDebug && (
+            <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border text-xs font-mono">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-medium text-muted-foreground">Debug Info</span>
+                <Button variant="ghost" size="sm" onClick={() => setDebugLogs([])}>
+                  Clear
+                </Button>
+              </div>
+              
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Customer ID:</span>
+                  <span>{customer.id.substring(0, 8)}...</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Has GC ID:</span>
+                  <span className={customer.gocardless_id ? 'text-success' : 'text-muted-foreground'}>
+                    {customer.gocardless_id ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Mandate Status:</span>
+                  <span>{customer.gocardless_mandate_status || 'None'}</span>
+                </div>
+                {billingRequestId && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Billing Request:</span>
+                    <span>{billingRequestId.substring(0, 12)}...</span>
+                  </div>
+                )}
+              </div>
+
+              {debugLogs.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-border max-h-32 overflow-y-auto space-y-1">
+                  {debugLogs.map((log, i) => (
+                    <div key={i} className={getStatusColor(log.status)}>
+                      [{log.timestamp}] {log.action}: {log.details}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {requiresReconnect ? (
             <div className="space-y-4">
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-center gap-3">
