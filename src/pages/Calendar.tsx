@@ -163,9 +163,25 @@ const Calendar = () => {
               >
                 <ChevronLeft className="w-5 h-5" />
               </Button>
-              <h2 className="text-lg font-semibold text-foreground text-center">
-                {getHeaderText()}
-              </h2>
+              <div className="flex flex-col items-center gap-1">
+                <h2 className="text-lg font-semibold text-foreground text-center">
+                  {getHeaderText()}
+                </h2>
+                {!isToday(currentDate) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      lightTap();
+                      setCurrentDate(new Date());
+                      setSelectedDate(new Date());
+                    }}
+                    className="h-6 text-xs text-primary"
+                  >
+                    Today
+                  </Button>
+                )}
+              </div>
               <Button
                 variant="ghost"
                 size="icon"
