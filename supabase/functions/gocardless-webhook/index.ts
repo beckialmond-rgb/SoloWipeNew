@@ -52,26 +52,37 @@ serve(async (req) => {
   try {
     const webhookSecret = Deno.env.get('GOCARDLESS_WEBHOOK_SECRET');
     if (!webhookSecret) {
-      console.error('Webhook secret not configured');
+      console.error(`[WEBHOOK ${requestId}] ❌ Webhook secret not configured`);
       return new Response(JSON.stringify({ error: 'Webhook not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    console.log(`[WEBHOOK ${requestId}] ✓ Webhook secret configured (${webhookSecret.length} chars)`);
 
     const body = await req.text();
+    console.log(`[WEBHOOK ${requestId}] Request body length: ${body.length} chars`);
+    
     const signature = req.headers.get('webhook-signature');
+    console.log(`[WEBHOOK ${requestId}] Signature header: ${signature ? `present (${signature.length} chars)` : 'MISSING'}`);
 
     // Verify webhook signature
     if (signature) {
+      console.log(`[WEBHOOK ${requestId}] Verifying signature...`);
       const isValid = await verifyWebhookSignature(body, signature, webhookSecret);
+      console.log(`[WEBHOOK ${requestId}] Signature verification: ${isValid ? '✓ VALID' : '❌ INVALID'}`);
+      
       if (!isValid) {
-        console.error('Invalid webhook signature');
+        console.error(`[WEBHOOK ${requestId}] ❌ Invalid webhook signature`);
+        console.error(`[WEBHOOK ${requestId}] Expected signature format: HMAC-SHA256 hex`);
+        console.error(`[WEBHOOK ${requestId}] Received signature: ${signature.substring(0, 20)}...`);
         return new Response(JSON.stringify({ error: 'Invalid signature' }), {
           status: 401,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+    } else {
+      console.log(`[WEBHOOK ${requestId}] ⚠️ No signature provided - processing anyway for debugging`);
     }
 
     const payload = JSON.parse(body);
