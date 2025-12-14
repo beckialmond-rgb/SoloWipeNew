@@ -676,6 +676,8 @@ const Index = () => {
                     onSkip={handleSkipRequestById}
                     index={index}
                     isNextUp={index === 0}
+                    profile={profile}
+                    businessName={businessName}
                   />
                 ))}
               </AnimatePresence>

@@ -1,4 +1,4 @@
-import { Check, MapPin, SkipForward, Navigation, Phone, GripVertical, CreditCard } from 'lucide-react';
+import { Check, MapPin, SkipForward, Navigation, Phone, GripVertical, CreditCard, Send, Loader2 } from 'lucide-react';
 import { motion, useMotionValue, useTransform, PanInfo, Reorder, useDragControls } from 'framer-motion';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -7,23 +7,33 @@ import { CustomerNotesPreview } from './CustomerNotesPreview';
 import { Button } from './ui/button';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
 interface JobCardProps {
   job: JobWithCustomer;
   onComplete: (job: JobWithCustomer) => void;
   onSkip: (jobId: string) => void;
   index: number;
   isNextUp?: boolean;
+  profile?: { gocardless_organisation_id?: string | null } | null;
+  businessName?: string;
 }
 
 const SWIPE_THRESHOLD = 100;
 
-export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: JobCardProps) {
+export function JobCard({ job, onComplete, onSkip, index, isNextUp = false, profile, businessName }: JobCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
+  const [isSendingDDLink, setIsSendingDDLink] = useState(false);
   const x = useMotionValue(0);
   const dragControls = useDragControls();
   const { lightTap, success } = useHaptics();
   const { requirePremium } = useSoftPaywall();
+
+  const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
+  const hasActiveMandate = !!job.customer.gocardless_id;
+  const canSendDDLink = isGoCardlessConnected && !hasActiveMandate && !!job.customer.mobile_phone;
   
   // Background colors based on swipe direction
   const backgroundColor = useTransform(
@@ -70,6 +80,35 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
       window.open(`maps://maps.apple.com/?daddr=${encodedAddress}`, '_blank');
     } else {
       window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodedAddress}`, '_blank');
+    }
+  };
+
+  const sendDDLinkViaSMS = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!job.customer.mobile_phone) return;
+
+    setIsSendingDDLink(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
+        body: { customerId: job.customer.id }
+      });
+
+      if (error) throw error;
+      if (!data?.authorisationUrl) throw new Error('No authorization URL returned');
+
+      const firstName = job.customer.name.split(' ')[0];
+      const message = encodeURIComponent(
+        `Hi ${firstName}, please set up your Direct Debit for ${businessName || 'us'} using this secure link: ${data.authorisationUrl}`
+      );
+      const phone = job.customer.mobile_phone.replace(/\s/g, '');
+      window.open(`sms:${phone}?body=${message}`, '_blank');
+
+      toast.success('SMS opened with DD link');
+    } catch (error: any) {
+      console.error('Failed to send DD link:', error);
+      toast.error(error.message || 'Failed to generate DD link');
+    } finally {
+      setIsSendingDDLink(false);
     }
   };
 
@@ -202,6 +241,24 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
                 >
                   <Phone className="w-4 h-4" />
                   Call
+                </Button>
+              )}
+              
+              {/* Send DD Link button - for customers without active mandate */}
+              {canSendDDLink && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={sendDDLinkViaSMS}
+                  disabled={isSendingDDLink}
+                  className="gap-1.5 text-primary border-primary/20 hover:bg-primary/10 h-9"
+                >
+                  {isSendingDDLink ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  DD Link
                 </Button>
               )}
               
