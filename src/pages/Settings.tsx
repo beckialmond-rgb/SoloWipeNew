@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff, RefreshCw, CloudOff, Cloud } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff, RefreshCw, CloudOff, Cloud, FileJson, MessageCircle } from 'lucide-react';
 import { useOffline } from '@/contexts/OfflineContext';
 import { syncStatus } from '@/lib/offlineStorage';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -14,6 +14,8 @@ import { BusinessInsights } from '@/components/BusinessInsights';
 import { WelcomeTour, useWelcomeTour } from '@/components/WelcomeTour';
 import { SubscriptionSection } from '@/components/SubscriptionSection';
 import { GoCardlessSection } from '@/components/GoCardlessSection';
+import { HelpSection } from '@/components/HelpSection';
+import { DataExportModal } from '@/components/DataExportModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
@@ -43,6 +45,8 @@ const Settings = () => {
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isDataExportOpen, setIsDataExportOpen] = useState(false);
   const { showTour, completeTour, resetTour } = useWelcomeTour();
 
   // Load last synced timestamp
@@ -507,7 +511,7 @@ const Settings = () => {
             )}
           >
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <HelpCircle className="w-5 h-5 text-primary" />
+              <RotateCcw className="w-5 h-5 text-primary" />
             </div>
             
             <div className="flex-1 min-w-0">
@@ -517,6 +521,57 @@ const Settings = () => {
 
             <ChevronRight className="w-5 h-5 text-muted-foreground" />
           </motion.button>
+
+          {/* Help & Support */}
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.26 }}
+            onClick={() => setIsHelpOpen(true)}
+            className={cn(
+              "w-full bg-card rounded-xl border border-border p-4",
+              "flex items-center gap-4 text-left",
+              "hover:bg-muted/50 transition-colors",
+              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            )}
+          >
+            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+              <MessageCircle className="w-5 h-5 text-blue-500" />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-muted-foreground">Questions?</p>
+              <p className="font-medium text-foreground">Help & Support</p>
+            </div>
+
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </motion.button>
+
+          {/* Export My Data */}
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.27 }}
+            onClick={() => setIsDataExportOpen(true)}
+            className={cn(
+              "w-full bg-card rounded-xl border border-border p-4",
+              "flex items-center gap-4 text-left",
+              "hover:bg-muted/50 transition-colors",
+              "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+            )}
+          >
+            <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center">
+              <FileJson className="w-5 h-5 text-purple-500" />
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-muted-foreground">Your Data</p>
+              <p className="font-medium text-foreground">Export All Data</p>
+            </div>
+
+            <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          </motion.button>
+
 
           {/* Recently Deleted Section */}
           {recentlyArchivedCustomers.length > 0 && (
@@ -629,6 +684,12 @@ const Settings = () => {
 
       {/* Welcome Tour */}
       {showTour && <WelcomeTour onComplete={completeTour} />}
+
+      {/* Help Section */}
+      <HelpSection isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+
+      {/* Data Export Modal */}
+      <DataExportModal isOpen={isDataExportOpen} onClose={() => setIsDataExportOpen(false)} />
     </div>
   );
 };

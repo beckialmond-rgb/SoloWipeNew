@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,20 +16,25 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ReloadPrompt } from "@/components/ReloadPrompt";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { WhatsNewModal } from "@/components/WhatsNewModal";
+import { LoadingState } from "@/components/LoadingState";
 import { queryPersister, CACHE_TIME, STALE_TIME } from "@/lib/queryPersister";
+
+// Eagerly loaded pages (most frequently used)
 import Index from "./pages/Index";
-import Customers from "./pages/Customers";
-import Money from "./pages/Money";
-import Earnings from "./pages/Earnings";
-import Calendar from "./pages/Calendar";
-import Settings from "./pages/Settings";
-import Install from "./pages/Install";
 import Auth from "./pages/Auth";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Terms from "./pages/Terms";
-import Privacy from "./pages/Privacy";
-import NotFound from "./pages/NotFound";
+
+// Lazy loaded pages (less frequently used, heavier bundles)
+const Customers = lazy(() => import("./pages/Customers"));
+const Money = lazy(() => import("./pages/Money"));
+const Earnings = lazy(() => import("./pages/Earnings"));
+const Calendar = lazy(() => import("./pages/Calendar"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Install = lazy(() => import("./pages/Install"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -76,63 +82,65 @@ const App = () => (
                 <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                   <TrialGateModal />
                   <KeyboardShortcutsProvider>
-                    <Routes>
-                      <Route path="/auth" element={<Auth />} />
-                      <Route path="/forgot-password" element={<ForgotPassword />} />
-                      <Route path="/reset-password" element={<ResetPassword />} />
-                      <Route
-                        path="/"
-                        element={
-                          <ProtectedRoute>
-                            <Index />
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/customers"
-                        element={
-                          <ProtectedRoute>
-                            <Customers />
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/money"
-                        element={
-                          <ProtectedRoute>
-                            <Money />
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/earnings"
-                        element={
-                          <ProtectedRoute>
-                            <Earnings />
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/calendar"
-                        element={
-                          <ProtectedRoute>
-                            <Calendar />
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route
-                        path="/settings"
-                        element={
-                          <ProtectedRoute>
-                            <Settings />
-                          </ProtectedRoute>
-                        }
-                      />
-                      <Route path="/install" element={<Install />} />
-                      <Route path="/terms" element={<Terms />} />
-                      <Route path="/privacy" element={<Privacy />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
+                    <Suspense fallback={<LoadingState message="Loading..." />}>
+                      <Routes>
+                        <Route path="/auth" element={<Auth />} />
+                        <Route path="/forgot-password" element={<ForgotPassword />} />
+                        <Route path="/reset-password" element={<ResetPassword />} />
+                        <Route
+                          path="/"
+                          element={
+                            <ProtectedRoute>
+                              <Index />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/customers"
+                          element={
+                            <ProtectedRoute>
+                              <Customers />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/money"
+                          element={
+                            <ProtectedRoute>
+                              <Money />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/earnings"
+                          element={
+                            <ProtectedRoute>
+                              <Earnings />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/calendar"
+                          element={
+                            <ProtectedRoute>
+                              <Calendar />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route
+                          path="/settings"
+                          element={
+                            <ProtectedRoute>
+                              <Settings />
+                            </ProtectedRoute>
+                          }
+                        />
+                        <Route path="/install" element={<Install />} />
+                        <Route path="/terms" element={<Terms />} />
+                        <Route path="/privacy" element={<Privacy />} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </Suspense>
                   </KeyboardShortcutsProvider>
                 </BrowserRouter>
               </TooltipProvider>
