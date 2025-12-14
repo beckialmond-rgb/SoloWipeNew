@@ -86,11 +86,19 @@ serve(async (req) => {
       ? 'https://api.gocardless.com'
       : 'https://api-sandbox.gocardless.com';
 
+    console.log('[GC-COLLECT] ====================================');
+    console.log('[GC-COLLECT] PAYMENT COLLECTION STARTED');
+    console.log('[GC-COLLECT] ====================================');
     console.log('[GC-COLLECT] Environment:', environment);
-    console.log('[GC-COLLECT] Customer:', customer.name, 'Amount:', amount);
+    console.log('[GC-COLLECT] API URL:', apiUrl);
+    console.log('[GC-COLLECT] Customer:', customer.name);
+    console.log('[GC-COLLECT] Customer GC ID (Mandate):', customer.gocardless_id);
+    console.log('[GC-COLLECT] Amount:', amount, 'GBP');
+    console.log('[GC-COLLECT] Job ID:', jobId);
+    console.log('[GC-COLLECT] Token (masked):', accessToken ? `${accessToken.substring(0, 8)}...${accessToken.substring(accessToken.length - 4)}` : 'MISSING');
 
     // Validate token with a test API call
-    console.log('[GC-COLLECT] Validating access token...');
+    console.log('[GC-COLLECT] Step 1: Validating access token...');
     const testResponse = await fetch(`${apiUrl}/creditors`, {
       method: 'GET',
       headers: {
@@ -101,7 +109,9 @@ serve(async (req) => {
 
     if (!testResponse.ok) {
       const testError = await testResponse.text();
-      console.error('[GC-COLLECT] Token validation failed:', testResponse.status, testError);
+      console.error('[GC-COLLECT] ❌ Token validation FAILED');
+      console.error('[GC-COLLECT] Status:', testResponse.status);
+      console.error('[GC-COLLECT] Error:', testError);
       return new Response(JSON.stringify({ 
         error: 'GoCardless connection expired. Please reconnect in Settings.',
         requiresReconnect: true 
@@ -111,7 +121,9 @@ serve(async (req) => {
       });
     }
 
-    console.log('[GC-COLLECT] Token validated successfully');
+    const creditorData = await testResponse.json();
+    console.log('[GC-COLLECT] ✅ Token validated successfully');
+    console.log('[GC-COLLECT] Creditor:', creditorData?.creditors?.[0]?.name || 'Unknown');
 
     // Create payment
     const paymentResponse = await fetch(`${apiUrl}/payments`, {
@@ -137,10 +149,25 @@ serve(async (req) => {
       }),
     });
 
+    console.log('[GC-COLLECT] Step 2: Payment API Response Status:', paymentResponse.status);
+
     if (!paymentResponse.ok) {
       const errorText = await paymentResponse.text();
-      console.error('Failed to create payment:', errorText);
-      return new Response(JSON.stringify({ error: 'Failed to collect payment' }), {
+      console.error('[GC-COLLECT] ❌ Payment creation FAILED');
+      console.error('[GC-COLLECT] Status:', paymentResponse.status);
+      console.error('[GC-COLLECT] Error:', errorText);
+      
+      // Parse error for more details
+      try {
+        const errorJson = JSON.parse(errorText);
+        console.error('[GC-COLLECT] Error type:', errorJson?.error?.type);
+        console.error('[GC-COLLECT] Error message:', errorJson?.error?.message);
+        console.error('[GC-COLLECT] Error errors:', JSON.stringify(errorJson?.error?.errors));
+      } catch {
+        // Not JSON, already logged raw text
+      }
+      
+      return new Response(JSON.stringify({ error: 'Failed to collect payment', details: errorText }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -149,11 +176,17 @@ serve(async (req) => {
     const paymentData = await paymentResponse.json();
     const paymentId = paymentData.payments.id;
     const paymentStatus = paymentData.payments.status;
+    const chargeDate = paymentData.payments.charge_date;
 
-    console.log('Created payment:', paymentId, 'Status:', paymentStatus);
+    console.log('[GC-COLLECT] ✅ Payment created successfully');
+    console.log('[GC-COLLECT] Payment ID:', paymentId);
+    console.log('[GC-COLLECT] Status:', paymentStatus);
+    console.log('[GC-COLLECT] Charge Date:', chargeDate);
+    console.log('[GC-COLLECT] Amount:', paymentData.payments.amount, 'pence');
 
     // Update job with payment info
-    await adminClient
+    console.log('[GC-COLLECT] Step 3: Updating job record...');
+    const { error: updateError } = await adminClient
       .from('jobs')
       .update({
         gocardless_payment_id: paymentId,
@@ -163,10 +196,21 @@ serve(async (req) => {
       })
       .eq('id', jobId);
 
+    if (updateError) {
+      console.error('[GC-COLLECT] ⚠️ Job update failed:', updateError);
+    } else {
+      console.log('[GC-COLLECT] ✅ Job updated successfully');
+    }
+
+    console.log('[GC-COLLECT] ====================================');
+    console.log('[GC-COLLECT] PAYMENT COLLECTION COMPLETE');
+    console.log('[GC-COLLECT] ====================================');
+
     return new Response(JSON.stringify({ 
       success: true,
       paymentId,
       paymentStatus,
+      chargeDate,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

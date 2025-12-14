@@ -24,6 +24,7 @@ export interface Customer {
   frequency_weeks: number;
   status: 'active' | 'inactive';
   gocardless_id: string | null;
+  gocardless_mandate_status: string | null;
   notes: string | null;
   archived_at: string | null;
   latitude: number | null;
