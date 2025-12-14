@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, isTomorrow, isThisWeek } from 'date-fns';
-import { Calendar, MapPin, ChevronDown, ChevronUp, SkipForward, Send, Loader2 } from 'lucide-react';
+import { Calendar, MapPin, ChevronDown, ChevronUp, SkipForward, Send, Loader2, Clock, CreditCard } from 'lucide-react';
 import { useState } from 'react';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -196,9 +196,23 @@ function UpcomingJobCard({ job, onClick, onSkip, profile, businessName }: Upcomi
         )}
       >
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-foreground truncate">
-            {job.customer.name}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="font-medium text-foreground truncate">
+              {job.customer.name}
+            </p>
+            {/* Mandate Status Badge */}
+            {job.customer.gocardless_mandate_status === 'pending' ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-warning/10 text-warning text-[10px] font-medium flex-shrink-0">
+                <Clock className="w-2.5 h-2.5" />
+                Pending
+              </span>
+            ) : job.customer.gocardless_id ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 text-success text-[10px] font-medium flex-shrink-0">
+                <CreditCard className="w-2.5 h-2.5" />
+                DD
+              </span>
+            ) : null}
+          </div>
           <div className="flex items-center gap-1 mt-1">
             <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
             <p className="text-sm text-muted-foreground truncate">
