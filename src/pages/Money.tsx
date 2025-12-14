@@ -25,6 +25,7 @@ const Money = () => {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
   const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [paymentFilter, setPaymentFilter] = useState<'all' | 'gocardless' | 'cash' | 'transfer'>('all');
 
   // Calculate DD earnings summary
   const ddEarnings = useMemo(() => {
@@ -32,6 +33,20 @@ const Money = () => {
     const total = ddJobs.reduce((sum, job) => sum + (job.amount_collected || 0), 0);
     return { count: ddJobs.length, total };
   }, [paidThisWeek]);
+
+  // Filter paid jobs by payment method
+  const filteredPaidJobs = useMemo(() => {
+    if (paymentFilter === 'all') return paidThisWeek;
+    return paidThisWeek.filter(job => job.payment_method === paymentFilter);
+  }, [paidThisWeek, paymentFilter]);
+
+  // Get counts for each payment method
+  const paymentCounts = useMemo(() => ({
+    all: paidThisWeek.length,
+    gocardless: paidThisWeek.filter(j => j.payment_method === 'gocardless').length,
+    cash: paidThisWeek.filter(j => j.payment_method === 'cash').length,
+    transfer: paidThisWeek.filter(j => j.payment_method === 'transfer').length,
+  }), [paidThisWeek]);
 
   const handleMarkPaid = (job: JobWithCustomer) => {
     if (!requirePremium('mark-paid')) return;
@@ -256,43 +271,92 @@ const Money = () => {
                 description="Completed payments will appear here."
               />
             ) : (
-              paidThisWeek.map((job, index) => (
-                <motion.div
-                  key={job.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="bg-card rounded-xl border border-border p-4"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-foreground truncate text-base">
-                          {job.customer.name}
-                        </p>
-                        {job.payment_method === 'gocardless' && (
-                          <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium shrink-0">
-                            <CreditCard className="w-3 h-3" />
-                            DD
-                          </span>
-                        )}
+              <>
+                {/* Payment method filter */}
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  <Button
+                    variant={paymentFilter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPaymentFilter('all')}
+                    className="shrink-0"
+                  >
+                    All ({paymentCounts.all})
+                  </Button>
+                  {paymentCounts.gocardless > 0 && (
+                    <Button
+                      variant={paymentFilter === 'gocardless' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPaymentFilter('gocardless')}
+                      className="shrink-0 gap-1"
+                    >
+                      <CreditCard className="w-3 h-3" />
+                      DD ({paymentCounts.gocardless})
+                    </Button>
+                  )}
+                  {paymentCounts.cash > 0 && (
+                    <Button
+                      variant={paymentFilter === 'cash' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPaymentFilter('cash')}
+                      className="shrink-0"
+                    >
+                      Cash ({paymentCounts.cash})
+                    </Button>
+                  )}
+                  {paymentCounts.transfer > 0 && (
+                    <Button
+                      variant={paymentFilter === 'transfer' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setPaymentFilter('transfer')}
+                      className="shrink-0"
+                    >
+                      Transfer ({paymentCounts.transfer})
+                    </Button>
+                  )}
+                </div>
+
+                {filteredPaidJobs.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No payments match this filter.</p>
+                ) : (
+                  filteredPaidJobs.map((job, index) => (
+                    <motion.div
+                      key={job.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className="bg-card rounded-xl border border-border p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-foreground truncate text-base">
+                              {job.customer.name}
+                            </p>
+                            {job.payment_method === 'gocardless' && (
+                              <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium shrink-0">
+                                <CreditCard className="w-3 h-3" />
+                                DD
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate mt-1">
+                            {job.customer.address}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-2 capitalize">
+                            {job.payment_method === 'gocardless' ? 'Direct Debit' : job.payment_method} • {job.payment_date ? new Date(job.payment_date).toLocaleDateString() : ''}
+                          </p>
+                        </div>
+                        <div className="text-right ml-4">
+                          <p className="text-xl font-bold text-success">
+                            £{(job.amount_collected || 0).toFixed(2)}
+                          </p>
+                          <CheckCircle className="w-5 h-5 text-success ml-auto mt-2" />
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground truncate mt-1">
-                        {job.customer.address}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-2 capitalize">
-                        {job.payment_method === 'gocardless' ? 'Direct Debit' : job.payment_method} • {job.payment_date ? new Date(job.payment_date).toLocaleDateString() : ''}
-                      </p>
-                    </div>
-                    <div className="text-right ml-4">
-                      <p className="text-xl font-bold text-success">
-                        £{(job.amount_collected || 0).toFixed(2)}
-                      </p>
-                      <CheckCircle className="w-5 h-5 text-success ml-auto mt-2" />
-                    </div>
-                  </div>
-                </motion.div>
-              ))
+                    </motion.div>
+                  ))
+                )}
+              </>
             )}
           </TabsContent>
         </Tabs>
