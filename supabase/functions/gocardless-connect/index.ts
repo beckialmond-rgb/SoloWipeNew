@@ -39,7 +39,6 @@ serve(async (req) => {
     const clientId = Deno.env.get('GOCARDLESS_CLIENT_ID');
     const environment = Deno.env.get('GOCARDLESS_ENVIRONMENT') || 'sandbox';
     
-    // Enhanced logging for debugging redirect_uri mismatch
     console.log('=== GoCardless OAuth Debug ===');
     console.log('Client ID:', clientId);
     console.log('Environment:', environment);
@@ -52,10 +51,30 @@ serve(async (req) => {
       });
     }
 
-    // TEMPORARY: Hardcode redirect_uri for testing
-    // This ensures consistency regardless of client origin
-    const redirectUrl = 'https://d33180fa-9605-41f5-acd3-baa29a550bb7.lovableproject.com/settings?gocardless=callback';
-    console.log('Using hardcoded redirect_uri:', redirectUrl);
+    // Validate client redirect URL is provided
+    if (!clientRedirectUrl) {
+      return new Response(JSON.stringify({ error: 'Missing redirect URL' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate it's from a trusted Lovable domain
+    const trustedDomains = ['lovable.app', 'lovableproject.com', 'localhost'];
+    const urlOrigin = new URL(clientRedirectUrl).hostname;
+    const isTrusted = trustedDomains.some(domain => urlOrigin.endsWith(domain));
+
+    if (!isTrusted) {
+      console.log('Untrusted redirect URL:', clientRedirectUrl);
+      return new Response(JSON.stringify({ error: 'Invalid redirect URL' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Use dynamic redirect URL from client
+    const redirectUrl = clientRedirectUrl;
+    console.log('Using dynamic redirect_uri:', redirectUrl);
 
     // Build OAuth authorization URL
     const baseUrl = environment === 'live' 
