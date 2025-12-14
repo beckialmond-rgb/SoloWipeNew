@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Loader2, Copy, MessageSquare, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { Loader2, Copy, MessageSquare, ExternalLink, CheckCircle2, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Customer } from '@/types/database';
@@ -22,9 +23,11 @@ interface DirectDebitSetupModalProps {
 }
 
 export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: DirectDebitSetupModalProps) {
+  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [authorisationUrl, setAuthorisationUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [requiresReconnect, setRequiresReconnect] = useState(false);
 
   const handleCreateMandate = async () => {
     setIsLoading(true);
@@ -52,11 +55,25 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
       }
     } catch (error: unknown) {
       console.error('Failed to create mandate:', error);
-      toast({
-        title: 'Setup failed',
-        description: 'Failed to create Direct Debit setup. Please try again.',
-        variant: 'destructive',
-      });
+      
+      // Check if the error indicates reconnection is required
+      const errorData = error as { message?: string; context?: { body?: { requiresReconnect?: boolean; error?: string } } };
+      const bodyData = errorData?.context?.body;
+      
+      if (bodyData?.requiresReconnect) {
+        setRequiresReconnect(true);
+        toast({
+          title: 'GoCardless connection expired',
+          description: 'Please reconnect your GoCardless account in Settings.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Setup failed',
+          description: bodyData?.error || 'Failed to create Direct Debit setup. Please try again.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -97,6 +114,11 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
     }
   };
 
+  const handleGoToSettings = () => {
+    handleClose();
+    navigate('/settings');
+  };
+
   return (
     <Drawer open={isOpen} onOpenChange={handleClose}>
       <DrawerContent>
@@ -111,7 +133,25 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
         </DrawerHeader>
 
         <div className="px-4 pb-4">
-          {!authorisationUrl ? (
+          {requiresReconnect ? (
+            <div className="space-y-4">
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 flex items-center gap-3">
+                <Settings className="w-5 h-5 text-destructive shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-destructive">Connection expired</p>
+                  <p className="text-muted-foreground">Please reconnect GoCardless in Settings.</p>
+                </div>
+              </div>
+
+              <Button
+                onClick={handleGoToSettings}
+                className="w-full min-h-[60px]"
+              >
+                <Settings className="w-5 h-5 mr-2" />
+                Go to Settings
+              </Button>
+            </div>
+          ) : !authorisationUrl ? (
             <div className="space-y-4">
               <div className="bg-muted/50 rounded-lg p-4 space-y-2">
                 <p className="font-medium">{customer.name}</p>
