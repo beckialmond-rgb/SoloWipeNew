@@ -73,6 +73,33 @@ serve(async (req) => {
       ? 'https://api.gocardless.com'
       : 'https://api-sandbox.gocardless.com';
 
+    console.log('[GC-MANDATE] Environment:', environment);
+    console.log('[GC-MANDATE] Token (first 4 chars):', accessToken.substring(0, 4));
+
+    // Step 0: Validate token with a test API call
+    console.log('[GC-MANDATE] Validating access token...');
+    const testResponse = await fetch(`${apiUrl}/creditors`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'GoCardless-Version': '2015-07-06',
+      },
+    });
+
+    if (!testResponse.ok) {
+      const testError = await testResponse.text();
+      console.error('[GC-MANDATE] Token validation failed:', testResponse.status, testError);
+      return new Response(JSON.stringify({ 
+        error: 'GoCardless connection expired. Please reconnect in Settings.',
+        requiresReconnect: true 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('[GC-MANDATE] Token validated successfully');
+
     // Step 1: Create a billing request
     const billingRequestResponse = await fetch(`${apiUrl}/billing_requests`, {
       method: 'POST',
