@@ -316,6 +316,7 @@ const Calendar = () => {
           onOpenChange={setQuickScheduleOpen}
           selectedDate={selectedDate}
           customers={activeCustomers}
+          bookedCustomerIds={selectedDateJobs.map(job => job.customer_id)}
         />
       )}
 

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { format } from 'date-fns';
-import { Search, CalendarPlus, User } from 'lucide-react';
+import { Search, CalendarPlus, User, CalendarCheck } from 'lucide-react';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -22,13 +22,15 @@ interface QuickScheduleModalProps {
   onOpenChange: (open: boolean) => void;
   selectedDate: Date;
   customers: Customer[];
+  bookedCustomerIds: string[];
 }
 
 export const QuickScheduleModal = ({
   open,
   onOpenChange,
   selectedDate,
-  customers
+  customers,
+  bookedCustomerIds
 }: QuickScheduleModalProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -36,12 +38,21 @@ export const QuickScheduleModal = ({
   const [isScheduling, setIsScheduling] = useState(false);
 
   const filteredCustomers = useMemo(() => {
-    if (!searchQuery.trim()) return customers;
-    const query = searchQuery.toLowerCase();
-    return customers.filter(
-      c => c.name.toLowerCase().includes(query) || c.address.toLowerCase().includes(query)
-    );
-  }, [customers, searchQuery]);
+    const filtered = !searchQuery.trim() 
+      ? customers 
+      : customers.filter(
+          c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+               c.address.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    
+    // Sort: available customers first, then booked
+    return filtered.sort((a, b) => {
+      const aBooked = bookedCustomerIds.includes(a.id);
+      const bBooked = bookedCustomerIds.includes(b.id);
+      if (aBooked === bBooked) return 0;
+      return aBooked ? 1 : -1;
+    });
+  }, [customers, searchQuery, bookedCustomerIds]);
 
   const handleSchedule = async (customer: Customer) => {
     if (!user || isScheduling) return;
@@ -101,24 +112,40 @@ export const QuickScheduleModal = ({
                 <p>No customers found</p>
               </div>
             ) : (
-              filteredCustomers.map(customer => (
-                <Button
-                  key={customer.id}
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start h-auto py-3 px-4",
-                    isScheduling && "opacity-50 pointer-events-none"
-                  )}
-                  onClick={() => handleSchedule(customer)}
-                  disabled={isScheduling}
-                >
-                  <div className="flex-1 text-left">
-                    <p className="font-medium text-foreground">{customer.name}</p>
-                    <p className="text-sm text-muted-foreground truncate">{customer.address}</p>
-                  </div>
-                  <span className="text-primary font-semibold">£{customer.price}</span>
-                </Button>
-              ))
+              filteredCustomers.map(customer => {
+                const isBooked = bookedCustomerIds.includes(customer.id);
+                
+                return (
+                  <Button
+                    key={customer.id}
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start h-auto py-3 px-4",
+                      isScheduling && "opacity-50 pointer-events-none",
+                      isBooked && "opacity-60 bg-muted/50"
+                    )}
+                    onClick={() => handleSchedule(customer)}
+                    disabled={isScheduling || isBooked}
+                  >
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-foreground">{customer.name}</p>
+                        {isBooked && (
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            <CalendarCheck className="w-3 h-3" />
+                            Booked
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-muted-foreground truncate">{customer.address}</p>
+                    </div>
+                    <span className={cn(
+                      "font-semibold",
+                      isBooked ? "text-muted-foreground" : "text-primary"
+                    )}>£{customer.price}</span>
+                  </Button>
+                );
+              })
             )}
           </div>
         </div>
