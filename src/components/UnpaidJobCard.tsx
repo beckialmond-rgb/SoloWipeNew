@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { MapPin, Phone, PoundSterling, CreditCard } from 'lucide-react';
+import { MapPin, Phone, MessageSquare, PoundSterling, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { JobWithCustomer } from '@/types/database';
 import { format } from 'date-fns';
@@ -7,16 +7,26 @@ import { format } from 'date-fns';
 interface UnpaidJobCardProps {
   job: JobWithCustomer;
   index: number;
+  businessName?: string;
   onMarkPaid: () => void;
 }
 
-export function UnpaidJobCard({ job, index, onMarkPaid }: UnpaidJobCardProps) {
+export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner', onMarkPaid }: UnpaidJobCardProps) {
+  const firstName = job.customer.name.split(' ')[0];
+  const completedDate = job.completed_at ? format(new Date(job.completed_at), 'd MMM') : 'recently';
+  const amount = (job.amount_collected || 0).toFixed(2);
+  
   const handleSendReminder = () => {
     const message = encodeURIComponent(
-      `Hi ${job.customer.name}, just a friendly reminder that your last window clean is still outstanding. £${(job.amount_collected || 0).toFixed(2)} is due. Thanks!`
+      `Hi ${firstName}, ${businessName} here 👋\n\nJust a friendly reminder about your window clean from ${completedDate}.\n\nAmount due: £${amount}\n\nThanks so much!`
     );
     const phone = job.customer.mobile_phone?.replace(/\s/g, '') || '';
     window.open(`sms:${phone}?body=${message}`, '_self');
+  };
+
+  const handleCall = () => {
+    const phone = job.customer.mobile_phone?.replace(/\s/g, '') || '';
+    window.open(`tel:${phone}`, '_self');
   };
 
   return (
@@ -56,17 +66,26 @@ export function UnpaidJobCard({ job, index, onMarkPaid }: UnpaidJobCardProps) {
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           {job.customer.mobile_phone && (
-            <Button
-              variant="outline"
-              size="lg"
-              className="flex-1"
-              onClick={handleSendReminder}
-            >
-              <Phone className="w-4 h-4 mr-2" />
-              Send Reminder
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="lg"
+                className="flex-1"
+                onClick={handleSendReminder}
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                Remind
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={handleCall}
+              >
+                <Phone className="w-4 h-4" />
+              </Button>
+            </>
           )}
           <Button
             variant="success"
