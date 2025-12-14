@@ -86,6 +86,33 @@ serve(async (req) => {
       ? 'https://api.gocardless.com'
       : 'https://api-sandbox.gocardless.com';
 
+    console.log('[GC-COLLECT] Environment:', environment);
+    console.log('[GC-COLLECT] Customer:', customer.name, 'Amount:', amount);
+
+    // Validate token with a test API call
+    console.log('[GC-COLLECT] Validating access token...');
+    const testResponse = await fetch(`${apiUrl}/creditors`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'GoCardless-Version': '2015-07-06',
+      },
+    });
+
+    if (!testResponse.ok) {
+      const testError = await testResponse.text();
+      console.error('[GC-COLLECT] Token validation failed:', testResponse.status, testError);
+      return new Response(JSON.stringify({ 
+        error: 'GoCardless connection expired. Please reconnect in Settings.',
+        requiresReconnect: true 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('[GC-COLLECT] Token validated successfully');
+
     // Create payment
     const paymentResponse = await fetch(`${apiUrl}/payments`, {
       method: 'POST',
