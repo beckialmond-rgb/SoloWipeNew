@@ -41,12 +41,18 @@ export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCa
 
     setIsUploading(true);
     try {
+      // Get current user ID for folder structure
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       // Convert base64 to blob
       const response = await fetch(capturedImage);
       const blob = await response.blob();
       
-      // Generate unique filename
-      const filename = `${jobId || 'temp'}-${Date.now()}.jpg`;
+      // Generate unique filename with user ID folder structure for RLS
+      const filename = `${user.id}/${jobId || 'temp'}-${Date.now()}.jpg`;
       
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
@@ -58,12 +64,14 @@ export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCa
 
       if (error) throw error;
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
+      // Create signed URL since bucket is now private
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from('job-photos')
-        .getPublicUrl(data.path);
+        .createSignedUrl(data.path, 60 * 60 * 24 * 365); // 1 year expiry
 
-      onCapture(publicUrl);
+      if (signedUrlError) throw signedUrlError;
+
+      onCapture(signedUrlData.signedUrl);
       handleClose();
     } catch (error) {
       console.error('Error uploading photo:', error);

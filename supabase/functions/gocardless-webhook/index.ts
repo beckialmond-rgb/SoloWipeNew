@@ -66,38 +66,28 @@ serve(async (req) => {
     const signature = req.headers.get('webhook-signature');
     console.log(`[WEBHOOK ${requestId}] Signature header: ${signature ? `present (${signature.length} chars)` : 'MISSING'}`);
 
-    // Check environment - only allow missing signature in sandbox/development
-    const environment = Deno.env.get('GOCARDLESS_ENVIRONMENT') || 'sandbox';
-    const isProduction = environment === 'live';
+    // ALWAYS require valid signature in all environments for security
+    if (!signature) {
+      console.error(`[WEBHOOK ${requestId}] ❌ Missing webhook signature - REJECTING`);
+      return new Response(JSON.stringify({ error: 'Missing webhook signature' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    // Verify webhook signature - REQUIRED in production
-    if (signature) {
-      console.log(`[WEBHOOK ${requestId}] Verifying signature...`);
-      const isValid = await verifyWebhookSignature(body, signature, webhookSecret);
-      console.log(`[WEBHOOK ${requestId}] Signature verification: ${isValid ? '✓ VALID' : '❌ INVALID'}`);
-      
-      if (!isValid) {
-        console.error(`[WEBHOOK ${requestId}] ❌ Invalid webhook signature`);
-        console.error(`[WEBHOOK ${requestId}] Expected signature format: HMAC-SHA256 hex`);
-        console.error(`[WEBHOOK ${requestId}] Received signature: ${signature.substring(0, 20)}...`);
-        return new Response(JSON.stringify({ error: 'Invalid signature' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-    } else {
-      // No signature provided
-      if (isProduction) {
-        // In production, ALWAYS require valid signature
-        console.error(`[WEBHOOK ${requestId}] ❌ Missing signature in production - REJECTING`);
-        return new Response(JSON.stringify({ error: 'Missing webhook signature' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      } else {
-        // In sandbox/development, log warning but allow processing
-        console.log(`[WEBHOOK ${requestId}] ⚠️ SANDBOX MODE: No signature provided - processing for debugging`);
-      }
+    // Verify webhook signature
+    console.log(`[WEBHOOK ${requestId}] Verifying signature...`);
+    const isValid = await verifyWebhookSignature(body, signature, webhookSecret);
+    console.log(`[WEBHOOK ${requestId}] Signature verification: ${isValid ? '✓ VALID' : '❌ INVALID'}`);
+    
+    if (!isValid) {
+      console.error(`[WEBHOOK ${requestId}] ❌ Invalid webhook signature`);
+      console.error(`[WEBHOOK ${requestId}] Expected signature format: HMAC-SHA256 hex`);
+      console.error(`[WEBHOOK ${requestId}] Received signature: ${signature.substring(0, 20)}...`);
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const payload = JSON.parse(body);

@@ -6,6 +6,49 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Validate redirect URL against trusted domains with proper matching
+function isValidRedirectUrl(urlString: string, environment: string): { valid: boolean; error?: string } {
+  // Check max length
+  if (urlString.length > 500) {
+    return { valid: false, error: 'URL too long' };
+  }
+
+  try {
+    const url = new URL(urlString);
+    
+    // Require HTTPS in production
+    if (environment === 'live' && url.protocol !== 'https:') {
+      return { valid: false, error: 'HTTPS required in production' };
+    }
+
+    // Allow HTTP only for localhost in development
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+      return { valid: false, error: 'Invalid protocol' };
+    }
+
+    const hostname = url.hostname;
+    
+    // Trusted domains with exact matching or subdomain support
+    const trustedDomains = ['lovable.app', 'lovableproject.com'];
+    
+    // Check for exact match or subdomain match (e.g., *.lovable.app)
+    const isTrusted = trustedDomains.some(domain => 
+      hostname === domain || hostname.endsWith('.' + domain)
+    );
+
+    // Also allow localhost for development
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+
+    if (!isTrusted && !isLocalhost) {
+      return { valid: false, error: 'Untrusted domain' };
+    }
+
+    return { valid: true };
+  } catch {
+    return { valid: false, error: 'Invalid URL format' };
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -59,14 +102,11 @@ serve(async (req) => {
       });
     }
 
-    // Validate it's from a trusted Lovable domain
-    const trustedDomains = ['lovable.app', 'lovableproject.com', 'localhost'];
-    const urlOrigin = new URL(clientRedirectUrl).hostname;
-    const isTrusted = trustedDomains.some(domain => urlOrigin.endsWith(domain));
-
-    if (!isTrusted) {
-      console.log('Untrusted redirect URL:', clientRedirectUrl);
-      return new Response(JSON.stringify({ error: 'Invalid redirect URL' }), {
+    // Validate redirect URL with proper domain matching
+    const validation = isValidRedirectUrl(clientRedirectUrl, environment);
+    if (!validation.valid) {
+      console.log('Invalid redirect URL:', clientRedirectUrl, 'Reason:', validation.error);
+      return new Response(JSON.stringify({ error: `Invalid redirect URL: ${validation.error}` }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
