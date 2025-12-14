@@ -27,7 +27,9 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
 
-  const isConnected = !!profile?.gocardless_organisation_id;
+  // Check both organisation ID and access token - if token is missing, connection is incomplete
+  const isConnected = !!profile?.gocardless_organisation_id && !!profile?.gocardless_access_token_encrypted;
+  const hasPartialConnection = !!profile?.gocardless_organisation_id && !profile?.gocardless_access_token_encrypted;
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -100,6 +102,8 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
               <p className="text-sm text-muted-foreground">
                 {isConnected 
                   ? 'Connected - collect payments automatically'
+                  : hasPartialConnection
+                  ? 'Connection incomplete - please reconnect'
                   : 'Connect to collect Direct Debit payments'}
               </p>
             </div>
@@ -108,6 +112,10 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
           {isConnected ? (
             <Badge variant="secondary" className="bg-success/10 text-success">
               Connected
+            </Badge>
+          ) : hasPartialConnection ? (
+            <Badge variant="secondary" className="bg-warning/10 text-warning">
+              Reconnect Required
             </Badge>
           ) : null}
         </div>
@@ -131,6 +139,25 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
                   Disconnect
                 </>
               )}
+            </Button>
+          </div>
+        ) : hasPartialConnection ? (
+          <div className="mt-4 space-y-3">
+            <div className="text-sm text-warning">
+              Your GoCardless connection is incomplete. Please disconnect and reconnect to fix this.
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => setShowDisconnectConfirm(true)}
+              disabled={isDisconnecting}
+              className="w-full"
+            >
+              {isDisconnecting ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Link2Off className="w-4 h-4 mr-2" />
+              )}
+              Disconnect & Retry
             </Button>
           </div>
         ) : (

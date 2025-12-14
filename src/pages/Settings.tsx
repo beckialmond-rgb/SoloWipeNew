@@ -88,18 +88,26 @@ const Settings = () => {
       const handleCallback = async () => {
         const redirectUrl = localStorage.getItem('gocardless_redirect_url');
         
+        console.log('[Settings] Starting GoCardless callback');
+        console.log('[Settings] Code:', code?.substring(0, 10) + '...');
+        console.log('[Settings] RedirectUrl:', redirectUrl);
+        
         try {
           const { data, error } = await supabase.functions.invoke('gocardless-callback', {
             body: { code, redirectUrl },
           });
 
+          console.log('[Settings] Callback response:', { data, error });
+
           if (error) throw error;
 
+          console.log('[Settings] Success! Refreshing data...');
           toast({
             title: "GoCardless connected!",
             description: "You can now set up Direct Debits for your customers.",
           });
-          refetchAll();
+          await refetchAll();
+          console.log('[Settings] Data refreshed');
         } catch (error) {
           console.error('GoCardless callback error:', error);
           toast({
