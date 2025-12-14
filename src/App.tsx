@@ -14,6 +14,7 @@ import { OfflineProvider } from "@/contexts/OfflineContext";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ReloadPrompt } from "@/components/ReloadPrompt";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { WhatsNewModal } from "@/components/WhatsNewModal";
 import { queryPersister, CACHE_TIME, STALE_TIME } from "@/lib/queryPersister";
 import Index from "./pages/Index";
 import Customers from "./pages/Customers";
@@ -67,10 +68,11 @@ const App = () => (
           <SoftPaywallProvider>
             <OfflineProvider>
               <TooltipProvider>
-                <OfflineIndicator />
-                <ReloadPrompt />
-                <Toaster />
-                <Sonner />
+              <OfflineIndicator />
+              <ReloadPrompt />
+              <WhatsNewModal />
+              <Toaster />
+              <Sonner />
                 <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                   <TrialGateModal />
                   <KeyboardShortcutsProvider>

@@ -592,9 +592,14 @@ const Settings = () => {
         </motion.div>
 
         {/* App Version */}
-        <p className="text-center text-xs text-muted-foreground mt-12">
-          SoloWipe v1.2.0 • Build {__BUILD_DATE__}
-        </p>
+        <div className="text-center mt-12 space-y-1">
+          <p className="text-xs text-muted-foreground">
+            SoloWipe v1.3.0
+          </p>
+          <p className="text-xs text-muted-foreground/60">
+            Build {__BUILD_DATE__}
+          </p>
+        </div>
       </main>
 
       <BottomNav />
