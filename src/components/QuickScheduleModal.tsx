@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useHaptics } from '@/hooks/useHaptics';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
@@ -33,6 +34,7 @@ export const QuickScheduleModal = ({
   bookedCustomerIds
 }: QuickScheduleModalProps) => {
   const { user } = useAuth();
+  const { success } = useHaptics();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [isScheduling, setIsScheduling] = useState(false);
@@ -68,6 +70,7 @@ export const QuickScheduleModal = ({
 
       if (error) throw error;
 
+      success();
       toast.success(`Scheduled ${customer.name} for ${format(selectedDate, 'EEE, d MMM')}`);
       
       await queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
