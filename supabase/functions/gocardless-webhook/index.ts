@@ -30,8 +30,23 @@ async function verifyWebhookSignature(body: string, signature: string, secret: s
 }
 
 serve(async (req) => {
+  const requestId = crypto.randomUUID().slice(0, 8);
+  console.log(`[WEBHOOK ${requestId}] Received ${req.method} request from ${req.headers.get('user-agent')}`);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Health check endpoint
+  if (req.method === 'GET') {
+    console.log(`[WEBHOOK ${requestId}] Health check requested`);
+    return new Response(JSON.stringify({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      message: 'GoCardless webhook endpoint is reachable'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 
   try {
@@ -61,6 +76,8 @@ serve(async (req) => {
 
     const payload = JSON.parse(body);
     const events = payload.events || [];
+    
+    console.log(`[WEBHOOK ${requestId}] Parsed payload with ${events.length} events`);
 
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -70,7 +87,7 @@ serve(async (req) => {
     for (const event of events) {
       const { resource_type, action, links } = event;
 
-      console.log('Processing webhook event:', resource_type, action);
+      console.log(`[WEBHOOK ${requestId}] Processing event: ${resource_type}.${action}`, JSON.stringify(links));
 
       switch (resource_type) {
         case 'mandates':
