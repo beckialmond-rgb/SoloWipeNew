@@ -66,7 +66,11 @@ serve(async (req) => {
     const signature = req.headers.get('webhook-signature');
     console.log(`[WEBHOOK ${requestId}] Signature header: ${signature ? `present (${signature.length} chars)` : 'MISSING'}`);
 
-    // Verify webhook signature
+    // Check environment - only allow missing signature in sandbox/development
+    const environment = Deno.env.get('GOCARDLESS_ENVIRONMENT') || 'sandbox';
+    const isProduction = environment === 'live';
+
+    // Verify webhook signature - REQUIRED in production
     if (signature) {
       console.log(`[WEBHOOK ${requestId}] Verifying signature...`);
       const isValid = await verifyWebhookSignature(body, signature, webhookSecret);
@@ -82,7 +86,18 @@ serve(async (req) => {
         });
       }
     } else {
-      console.log(`[WEBHOOK ${requestId}] ⚠️ No signature provided - processing anyway for debugging`);
+      // No signature provided
+      if (isProduction) {
+        // In production, ALWAYS require valid signature
+        console.error(`[WEBHOOK ${requestId}] ❌ Missing signature in production - REJECTING`);
+        return new Response(JSON.stringify({ error: 'Missing webhook signature' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } else {
+        // In sandbox/development, log warning but allow processing
+        console.log(`[WEBHOOK ${requestId}] ⚠️ SANDBOX MODE: No signature provided - processing for debugging`);
+      }
     }
 
     const payload = JSON.parse(body);
