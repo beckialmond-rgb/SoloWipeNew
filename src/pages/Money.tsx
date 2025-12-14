@@ -266,14 +266,22 @@ const Money = () => {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground truncate text-base">
-                        {job.customer.name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-foreground truncate text-base">
+                          {job.customer.name}
+                        </p>
+                        {job.payment_method === 'gocardless' && (
+                          <span className="inline-flex items-center gap-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium shrink-0">
+                            <CreditCard className="w-3 h-3" />
+                            DD
+                          </span>
+                        )}
+                      </div>
                       <p className="text-sm text-muted-foreground truncate mt-1">
                         {job.customer.address}
                       </p>
                       <p className="text-xs text-muted-foreground mt-2 capitalize">
-                        {job.payment_method} • {job.payment_date ? new Date(job.payment_date).toLocaleDateString() : ''}
+                        {job.payment_method === 'gocardless' ? 'Direct Debit' : job.payment_method} • {job.payment_date ? new Date(job.payment_date).toLocaleDateString() : ''}
                       </p>
                     </div>
                     <div className="text-right ml-4">
