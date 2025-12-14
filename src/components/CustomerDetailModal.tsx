@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MessageSquare, MapPin, Phone, Repeat, Pencil, Trash2, FileText, History, CreditCard, CheckCircle2 } from 'lucide-react';
+import { X, MessageSquare, MapPin, Phone, Repeat, Pencil, Trash2, FileText, History, CreditCard, CheckCircle2, Loader2, Send } from 'lucide-react';
 import { Customer, Profile } from '@/types/database';
 import { Button } from '@/components/ui/button';
 import { DirectDebitSetupModal } from '@/components/DirectDebitSetupModal';
@@ -16,6 +16,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface CustomerDetailModalProps {
   customer: Customer | null;
@@ -32,6 +34,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [showDirectDebitSetup, setShowDirectDebitSetup] = useState(false);
+  const [isSendingDDLink, setIsSendingDDLink] = useState(false);
 
   const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
   const hasActiveMandate = !!customer?.gocardless_id;
@@ -54,6 +57,40 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
       setShowArchiveConfirm(false);
     } finally {
       setIsArchiving(false);
+    }
+  };
+
+  const sendDDLinkViaSMS = async () => {
+    if (!customer?.mobile_phone) {
+      toast.error('Customer has no phone number');
+      return;
+    }
+
+    setIsSendingDDLink(true);
+    try {
+      // Create mandate and get authorization URL
+      const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
+        body: { customerId: customer.id }
+      });
+
+      if (error) throw error;
+      if (!data?.authorisationUrl) throw new Error('No authorization URL returned');
+
+      // Open SMS with DD link
+      const firstName = customer.name.split(' ')[0];
+      const message = encodeURIComponent(
+        `Hi ${firstName}, please set up your Direct Debit for ${businessName} using this secure link: ${data.authorisationUrl}`
+      );
+      const phone = customer.mobile_phone.replace(/\s/g, '');
+      window.open(`sms:${phone}?body=${message}`, '_blank');
+
+      toast.success('SMS opened with DD link');
+      onRefresh?.();
+    } catch (error: any) {
+      console.error('Failed to send DD link:', error);
+      toast.error(error.message || 'Failed to generate DD link');
+    } finally {
+      setIsSendingDDLink(false);
     }
   };
 
@@ -151,7 +188,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
               {/* Direct Debit Status/Setup */}
               {isGoCardlessConnected && (
                 hasActiveMandate ? (
-                  <div className="flex items-center gap-3 p-4 bg-success/10 rounded-xl border border-success/20">
+                  <div className="flex items-center gap-3 p-4 bg-success/10 rounded-xl border border-success/20 mb-4">
                     <CheckCircle2 className="w-5 h-5 text-success mt-0.5" />
                     <div>
                       <p className="text-sm text-muted-foreground">Direct Debit</p>
@@ -159,19 +196,41 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                     </div>
                   </div>
                 ) : (
-                  <Button
-                    onClick={() => setShowDirectDebitSetup(true)}
-                    variant="outline"
-                    className={cn(
-                      "w-full fat-button rounded-xl",
-                      "border-primary text-primary",
-                      "hover:bg-primary/10",
-                      "font-semibold text-base"
+                  <div className="space-y-3 mb-4">
+                    <Button
+                      onClick={() => setShowDirectDebitSetup(true)}
+                      variant="outline"
+                      className={cn(
+                        "w-full fat-button rounded-xl",
+                        "border-primary text-primary",
+                        "hover:bg-primary/10",
+                        "font-semibold text-base"
+                      )}
+                    >
+                      <CreditCard className="w-5 h-5 mr-2" />
+                      Set Up Direct Debit
+                    </Button>
+                    
+                    {/* Send DD Link via SMS - one-tap action */}
+                    {customer?.mobile_phone && (
+                      <Button
+                        onClick={sendDDLinkViaSMS}
+                        disabled={isSendingDDLink}
+                        className={cn(
+                          "w-full fat-button rounded-xl",
+                          "bg-primary hover:bg-primary/90 text-primary-foreground",
+                          "font-semibold text-base"
+                        )}
+                      >
+                        {isSendingDDLink ? (
+                          <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        ) : (
+                          <Send className="w-5 h-5 mr-2" />
+                        )}
+                        {isSendingDDLink ? 'Generating Link...' : 'Send DD Link via SMS'}
+                      </Button>
                     )}
-                  >
-                    <CreditCard className="w-5 h-5 mr-2" />
-                    Set Up Direct Debit
-                  </Button>
+                  </div>
                 )
               )}
 
