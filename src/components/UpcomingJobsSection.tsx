@@ -1,14 +1,18 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, isTomorrow, isThisWeek } from 'date-fns';
-import { Calendar, MapPin, ChevronDown, ChevronUp, SkipForward } from 'lucide-react';
+import { Calendar, MapPin, ChevronDown, ChevronUp, SkipForward, Send, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface UpcomingJobsSectionProps {
   jobs: JobWithCustomer[];
   onJobClick?: (job: JobWithCustomer) => void;
   onSkip?: (job: JobWithCustomer) => void;
+  profile?: { gocardless_organisation_id?: string | null } | null;
+  businessName?: string;
 }
 
 interface GroupedJobs {
@@ -17,7 +21,7 @@ interface GroupedJobs {
   later: JobWithCustomer[];
 }
 
-export function UpcomingJobsSection({ jobs, onJobClick, onSkip }: UpcomingJobsSectionProps) {
+export function UpcomingJobsSection({ jobs, onJobClick, onSkip, profile, businessName }: UpcomingJobsSectionProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Group jobs by date category
@@ -78,17 +82,17 @@ export function UpcomingJobsSection({ jobs, onJobClick, onSkip }: UpcomingJobsSe
           >
             {/* Tomorrow */}
             {groupedJobs.tomorrow.length > 0 && (
-              <JobGroup title="Tomorrow" jobs={groupedJobs.tomorrow} onJobClick={onJobClick} onSkip={onSkip} />
+              <JobGroup title="Tomorrow" jobs={groupedJobs.tomorrow} onJobClick={onJobClick} onSkip={onSkip} profile={profile} businessName={businessName} />
             )}
 
             {/* This Week */}
             {groupedJobs.thisWeek.length > 0 && (
-              <JobGroup title="This Week" jobs={groupedJobs.thisWeek} onJobClick={onJobClick} onSkip={onSkip} />
+              <JobGroup title="This Week" jobs={groupedJobs.thisWeek} onJobClick={onJobClick} onSkip={onSkip} profile={profile} businessName={businessName} />
             )}
 
             {/* Later */}
             {groupedJobs.later.length > 0 && (
-              <JobGroup title="Later" jobs={groupedJobs.later} onJobClick={onJobClick} onSkip={onSkip} />
+              <JobGroup title="Later" jobs={groupedJobs.later} onJobClick={onJobClick} onSkip={onSkip} profile={profile} businessName={businessName} />
             )}
           </motion.div>
         )}
@@ -102,15 +106,17 @@ interface JobGroupProps {
   jobs: JobWithCustomer[];
   onJobClick?: (job: JobWithCustomer) => void;
   onSkip?: (job: JobWithCustomer) => void;
+  profile?: { gocardless_organisation_id?: string | null } | null;
+  businessName?: string;
 }
 
-function JobGroup({ title, jobs, onJobClick, onSkip }: JobGroupProps) {
+function JobGroup({ title, jobs, onJobClick, onSkip, profile, businessName }: JobGroupProps) {
   return (
     <div>
       <h3 className="text-sm font-medium text-muted-foreground mb-2">{title}</h3>
       <div className="space-y-2">
         {jobs.map((job) => (
-          <UpcomingJobCard key={job.id} job={job} onClick={onJobClick} onSkip={onSkip} />
+          <UpcomingJobCard key={job.id} job={job} onClick={onJobClick} onSkip={onSkip} profile={profile} businessName={businessName} />
         ))}
       </div>
     </div>
@@ -121,9 +127,17 @@ interface UpcomingJobCardProps {
   job: JobWithCustomer;
   onClick?: (job: JobWithCustomer) => void;
   onSkip?: (job: JobWithCustomer) => void;
+  profile?: { gocardless_organisation_id?: string | null } | null;
+  businessName?: string;
 }
 
-function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
+function UpcomingJobCard({ job, onClick, onSkip, profile, businessName }: UpcomingJobCardProps) {
+  const [isSendingDDLink, setIsSendingDDLink] = useState(false);
+  
+  const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
+  const hasActiveMandate = !!job.customer.gocardless_id;
+  const canSendDDLink = isGoCardlessConnected && !hasActiveMandate && !!job.customer.mobile_phone;
+
   const jobDate = new Date(job.scheduled_date);
   const formattedDate = isTomorrow(jobDate)
     ? 'Tomorrow'
@@ -132,6 +146,35 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
   const handleSkip = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSkip?.(job);
+  };
+
+  const sendDDLinkViaSMS = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!job.customer.mobile_phone) return;
+
+    setIsSendingDDLink(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
+        body: { customerId: job.customer.id }
+      });
+
+      if (error) throw error;
+      if (!data?.authorisationUrl) throw new Error('No authorization URL returned');
+
+      const firstName = job.customer.name.split(' ')[0];
+      const message = encodeURIComponent(
+        `Hi ${firstName}, please set up your Direct Debit for ${businessName || 'us'} using this secure link: ${data.authorisationUrl}`
+      );
+      const phone = job.customer.mobile_phone.replace(/\s/g, '');
+      window.open(`sms:${phone}?body=${message}`, '_blank');
+
+      toast.success('SMS opened with DD link');
+    } catch (error: any) {
+      console.error('Failed to send DD link:', error);
+      toast.error(error.message || 'Failed to generate DD link');
+    } finally {
+      setIsSendingDDLink(false);
+    }
   };
 
   return (
@@ -173,6 +216,27 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
           </p>
         </div>
       </button>
+
+      {/* Send DD Link Button */}
+      {canSendDDLink && (
+        <button
+          onClick={sendDDLinkViaSMS}
+          disabled={isSendingDDLink}
+          className={cn(
+            "w-12 flex items-center justify-center",
+            "bg-primary/10 hover:bg-primary/20 transition-colors border-l border-border/50",
+            "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+            "disabled:opacity-50"
+          )}
+          aria-label={`Send DD link to ${job.customer.name}`}
+        >
+          {isSendingDDLink ? (
+            <Loader2 className="w-4 h-4 text-primary animate-spin" />
+          ) : (
+            <Send className="w-4 h-4 text-primary" />
+          )}
+        </button>
+      )}
 
       {/* Skip Button */}
       <button
