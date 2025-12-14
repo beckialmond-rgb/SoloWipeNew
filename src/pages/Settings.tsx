@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff, RefreshCw, CloudOff, Cloud } from 'lucide-react';
 import { useOffline } from '@/contexts/OfflineContext';
@@ -70,12 +70,21 @@ const Settings = () => {
     }
   }, [searchParams, toast, checkSubscription, setSearchParams]);
 
+  // Ref to prevent double-execution of GoCardless callback
+  const processingCallbackRef = useRef(false);
+
   // Handle GoCardless OAuth callback
   useEffect(() => {
     const gocardless = searchParams.get('gocardless');
     const code = searchParams.get('code');
     
-    if (gocardless === 'callback' && code) {
+    // Guard against multiple executions
+    if (gocardless === 'callback' && code && !processingCallbackRef.current) {
+      processingCallbackRef.current = true;
+      
+      // Clear URL params immediately to prevent re-triggers
+      setSearchParams({});
+      
       const handleCallback = async () => {
         const redirectUrl = localStorage.getItem('gocardless_redirect_url');
         
@@ -101,7 +110,7 @@ const Settings = () => {
         } finally {
           localStorage.removeItem('gocardless_state');
           localStorage.removeItem('gocardless_redirect_url');
-          setSearchParams({});
+          processingCallbackRef.current = false;
         }
       };
       
