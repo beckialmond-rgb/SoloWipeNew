@@ -64,15 +64,18 @@ serve(async (req) => {
       customerId = customers.data[0].id;
       logStep("Existing customer found", { customerId });
       
-      // Check if already subscribed
+      // Check if already subscribed (active or trialing)
       const subscriptions = await stripe.subscriptions.list({
         customer: customerId,
-        status: "active",
-        limit: 1,
+        limit: 10,
       });
       
-      if (subscriptions.data.length > 0) {
-        logStep("User already has active subscription");
+      const hasActiveSub = subscriptions.data.some(
+        (sub: { status: string }) => sub.status === 'active' || sub.status === 'trialing'
+      );
+      
+      if (hasActiveSub) {
+        logStep("User already has active or trialing subscription");
         return new Response(JSON.stringify({ 
           error: "You already have an active subscription. Use the customer portal to manage it." 
         }), {
