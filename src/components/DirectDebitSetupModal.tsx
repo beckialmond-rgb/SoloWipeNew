@@ -55,8 +55,8 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
     setDebugLogs([]);
     
     try {
-    // Always redirect customers to production domain, not preview domains
-    const PRODUCTION_DOMAIN = 'https://solowipe.co.uk';
+    // Use configured production domain, fallback to current origin for development
+    const PRODUCTION_DOMAIN = import.meta.env.VITE_PRODUCTION_DOMAIN || window.location.origin;
     const exitUrl = `${PRODUCTION_DOMAIN}/customers`;
     const successUrl = `${PRODUCTION_DOMAIN}/customers?mandate=success&customer=${customer.id}`;
 
