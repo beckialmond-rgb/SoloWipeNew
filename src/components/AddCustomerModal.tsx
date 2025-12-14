@@ -70,15 +70,18 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
           <DrawerTitle>Add Customer</DrawerTitle>
         </DrawerHeader>
 
-        <form onSubmit={handleSubmit} className="px-6 pb-8 overflow-y-auto">
+        <form onSubmit={handleSubmit} autoComplete="off" className="px-6 pb-8 overflow-y-auto">
           <div className="space-y-4">
             {/* Name */}
             <div>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <label htmlFor="add-cust-name" className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                 <User className="w-4 h-4" />
                 Name *
               </label>
               <input
+                id="add-cust-name"
+                name="customer_name"
+                autoComplete="off"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -95,11 +98,14 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
 
             {/* Address */}
             <div>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <label htmlFor="add-cust-address" className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                 <MapPin className="w-4 h-4" />
                 Address *
               </label>
               <input
+                id="add-cust-address"
+                name="customer_address"
+                autoComplete="off"
                 type="text"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
@@ -116,11 +122,14 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
 
             {/* Mobile Phone */}
             <div>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <label htmlFor="add-cust-phone" className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                 <Phone className="w-4 h-4" />
                 Mobile Phone
               </label>
               <input
+                id="add-cust-phone"
+                name="customer_phone"
+                autoComplete="off"
                 type="tel"
                 value={mobilePhone}
                 onChange={(e) => setMobilePhone(e.target.value)}
@@ -137,11 +146,14 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
             {/* Price and Frequency Row */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                <label htmlFor="add-cust-price" className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                   <PoundSterling className="w-4 h-4" />
                   Price *
                 </label>
                 <input
+                  id="add-cust-price"
+                  name="customer_price"
+                  autoComplete="off"
                   type="number"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
@@ -158,11 +170,13 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
               </div>
 
               <div>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                <label htmlFor="add-cust-freq" className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                   <Repeat className="w-4 h-4" />
                   Frequency
                 </label>
                 <select
+                  id="add-cust-freq"
+                  name="customer_frequency"
                   value={frequencyWeeks}
                   onChange={(e) => setFrequencyWeeks(e.target.value)}
                   className={cn(
@@ -182,11 +196,13 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
 
             {/* First Clean Date */}
             <div>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <label htmlFor="add-cust-date" className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                 <Calendar className="w-4 h-4" />
                 First Clean Date *
               </label>
               <input
+                id="add-cust-date"
+                name="customer_date"
                 type="date"
                 value={firstCleanDate}
                 onChange={(e) => setFirstCleanDate(e.target.value)}
@@ -202,11 +218,14 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
 
             {/* Notes */}
             <div>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <label htmlFor="add-cust-notes" className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
                 <FileText className="w-4 h-4" />
                 Notes
               </label>
               <textarea
+                id="add-cust-notes"
+                name="customer_notes"
+                autoComplete="off"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Gate code, pet warnings, special instructions..."

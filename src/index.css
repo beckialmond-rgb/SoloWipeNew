@@ -160,9 +160,34 @@
 }
 
 /* PWA standalone mode adjustments */
-@media (display-mode: standalone) {
+@media all and (display-mode: standalone) {
   body {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
+}
+
+/* iOS-specific touch handling */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS drag handle styling */
+.drag-handle {
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* iOS swipe card styling */
+.swipe-card {
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Ensure consistent flexbox on iOS */
+.flex-ios-fix {
+  display: -webkit-flex;
+  display: flex;
 }
