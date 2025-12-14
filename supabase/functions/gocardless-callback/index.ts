@@ -6,6 +6,51 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Encryption key derived from a secret - in production this should use Supabase Vault
+async function getEncryptionKey(): Promise<CryptoKey> {
+  const secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'fallback-secret-key';
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret.slice(0, 32).padEnd(32, '0')),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+  
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode('gocardless-token-salt'),
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptToken(token: string): Promise<string> {
+  const key = await getEncryptionKey();
+  const encoder = new TextEncoder();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encoder.encode(token)
+  );
+  
+  // Combine IV and encrypted data, then base64 encode
+  const combined = new Uint8Array(iv.length + new Uint8Array(encrypted).length);
+  combined.set(iv);
+  combined.set(new Uint8Array(encrypted), iv.length);
+  
+  return btoa(String.fromCharCode(...combined));
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -69,11 +114,21 @@ serve(async (req) => {
       });
     }
 
-    const { code, redirectUrl } = await req.json();
+    const body = await req.json();
+    const { code, redirectUrl } = body;
     
-    if (!code) {
-      console.error('[GC-CALLBACK] No authorization code provided');
-      return new Response(JSON.stringify({ error: 'No authorization code provided' }), {
+    // Input validation
+    if (!code || typeof code !== 'string' || code.length > 500) {
+      console.error('[GC-CALLBACK] Invalid authorization code');
+      return new Response(JSON.stringify({ error: 'Invalid authorization code' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (redirectUrl && (typeof redirectUrl !== 'string' || redirectUrl.length > 500)) {
+      console.error('[GC-CALLBACK] Invalid redirect URL');
+      return new Response(JSON.stringify({ error: 'Invalid redirect URL' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -165,9 +220,9 @@ serve(async (req) => {
       });
     }
 
-    // Simple encryption (base64 encoding with prefix) - in production use proper encryption
-    const encryptedToken = btoa(`gc_token_${accessToken}`);
-    console.log('[GC-CALLBACK] Token encrypted, length:', encryptedToken.length);
+    // Encrypt token using AES-GCM
+    const encryptedToken = await encryptToken(accessToken);
+    console.log('[GC-CALLBACK] Token encrypted with AES-GCM, length:', encryptedToken.length);
 
     // Store credentials in user's profile using service role client with retry logic
     console.log('[GC-CALLBACK] Updating profile for user:', user.id);

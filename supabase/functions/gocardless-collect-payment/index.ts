@@ -6,9 +6,87 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function decryptToken(encrypted: string): string {
-  const decoded = atob(encrypted);
-  return decoded.replace('gc_token_', '');
+// Encryption key derived from a secret - matches gocardless-callback
+async function getEncryptionKey(): Promise<CryptoKey> {
+  const secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'fallback-secret-key';
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret.slice(0, 32).padEnd(32, '0')),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+  
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode('gocardless-token-salt'),
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decryptToken(encrypted: string): Promise<string> {
+  try {
+    const key = await getEncryptionKey();
+    const decoder = new TextDecoder();
+    
+    // Decode base64
+    const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+    
+    // Extract IV (first 12 bytes) and encrypted data
+    const iv = combined.slice(0, 12);
+    const encryptedData = combined.slice(12);
+    
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encryptedData
+    );
+    
+    return decoder.decode(decrypted);
+  } catch (error) {
+    // Fallback for legacy Base64 encoded tokens (migration support)
+    console.log('[GC-COLLECT] Attempting legacy token decryption');
+    try {
+      const decoded = atob(encrypted);
+      if (decoded.startsWith('gc_token_')) {
+        return decoded.replace('gc_token_', '');
+      }
+    } catch {
+      // Not a legacy token either
+    }
+    throw new Error('Failed to decrypt token');
+  }
+}
+
+// Input validation helpers
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+function isValidAmount(amount: unknown): amount is number {
+  return typeof amount === 'number' && 
+         !isNaN(amount) && 
+         isFinite(amount) && 
+         amount > 0 && 
+         amount <= 100000; // Max £100,000 per payment
+}
+
+function sanitizeDescription(description: unknown): string {
+  if (typeof description !== 'string') return '';
+  // Remove any potentially harmful characters, limit length
+  return description
+    .replace(/[<>\"'&]/g, '')
+    .slice(0, 200)
+    .trim();
 }
 
 serve(async (req) => {
@@ -39,14 +117,32 @@ serve(async (req) => {
       });
     }
 
-    const { jobId, customerId, amount, description } = await req.json();
+    const body = await req.json();
+    const { jobId, customerId, amount, description } = body;
 
-    if (!jobId || !customerId || !amount) {
-      return new Response(JSON.stringify({ error: 'Job ID, customer ID and amount are required' }), {
+    // Validate inputs
+    if (!jobId || !isValidUUID(jobId)) {
+      return new Response(JSON.stringify({ error: 'Invalid job ID format' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    if (!customerId || !isValidUUID(customerId)) {
+      return new Response(JSON.stringify({ error: 'Invalid customer ID format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!isValidAmount(amount)) {
+      return new Response(JSON.stringify({ error: 'Invalid amount. Must be between £0.01 and £100,000' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const sanitizedDescription = sanitizeDescription(description);
 
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -80,7 +176,7 @@ serve(async (req) => {
       });
     }
 
-    const accessToken = decryptToken(profile.gocardless_access_token_encrypted);
+    const accessToken = await decryptToken(profile.gocardless_access_token_encrypted);
     const environment = Deno.env.get('GOCARDLESS_ENVIRONMENT') || 'sandbox';
     const apiUrl = environment === 'live'
       ? 'https://api.gocardless.com'
@@ -125,7 +221,9 @@ serve(async (req) => {
     console.log('[GC-COLLECT] ✅ Token validated successfully');
     console.log('[GC-COLLECT] Creditor:', creditorData?.creditors?.[0]?.name || 'Unknown');
 
-    // Create payment
+    // Create payment with sanitized description
+    const paymentDescription = sanitizedDescription || `Window cleaning - ${customer.name.slice(0, 50)}`;
+    
     const paymentResponse = await fetch(`${apiUrl}/payments`, {
       method: 'POST',
       headers: {
@@ -137,7 +235,7 @@ serve(async (req) => {
         payments: {
           amount: Math.round(amount * 100), // Convert to pence
           currency: 'GBP',
-          description: description || `Window cleaning - ${customer.name}`,
+          description: paymentDescription,
           links: {
             mandate: customer.gocardless_id,
           },
@@ -167,7 +265,7 @@ serve(async (req) => {
         // Not JSON, already logged raw text
       }
       
-      return new Response(JSON.stringify({ error: 'Failed to collect payment', details: errorText }), {
+      return new Response(JSON.stringify({ error: 'Failed to collect payment' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
