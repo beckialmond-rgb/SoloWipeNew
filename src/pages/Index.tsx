@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { format, differenceInDays } from 'date-fns';
 import { AnimatePresence, motion, Reorder } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -45,6 +46,7 @@ import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 const Index = () => {
+  const navigate = useNavigate();
   const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading, markJobPaid, profile } = useSupabaseData();
   const { user } = useAuth();
   const { subscribed, status } = useSubscription();
@@ -492,15 +494,27 @@ const Index = () => {
                 className="mb-4"
               >
                 {profile?.gocardless_access_token_encrypted ? (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-lg text-sm">
-                    <CreditCard className="w-4 h-4 text-success" />
-                    <span className="text-success font-medium">Direct Debit active</span>
-                  </div>
+                  <button
+                    onClick={() => navigate('/settings')}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-lg text-sm hover:bg-success/20 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-success" />
+                      <span className="text-success font-medium">Direct Debit active</span>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-success -rotate-90" />
+                  </button>
                 ) : (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-warning/10 border border-warning/20 rounded-lg text-sm">
-                    <AlertTriangle className="w-4 h-4 text-warning" />
-                    <span className="text-warning font-medium">Direct Debit needs reconnecting</span>
-                  </div>
+                  <button
+                    onClick={() => navigate('/settings')}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-warning/10 border border-warning/20 rounded-lg text-sm hover:bg-warning/20 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-warning" />
+                      <span className="text-warning font-medium">Direct Debit needs reconnecting</span>
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-warning -rotate-90" />
+                  </button>
                 )}
               </motion.div>
             )}
