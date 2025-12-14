@@ -285,6 +285,24 @@ const Calendar = () => {
         )}
       </main>
 
+      {/* Floating Action Button */}
+      {selectedDate && (
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          className="fixed bottom-24 right-4 z-40"
+        >
+          <Button
+            size="icon"
+            onClick={() => setQuickScheduleOpen(true)}
+            className="h-14 w-14 rounded-full shadow-lg"
+          >
+            <Plus className="w-6 h-6" />
+          </Button>
+        </motion.div>
+      )}
+
       <RescheduleJobModal
         job={selectedJob}
         open={rescheduleModalOpen}
