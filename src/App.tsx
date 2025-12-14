@@ -13,6 +13,7 @@ import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvide
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ReloadPrompt } from "@/components/ReloadPrompt";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryPersister, CACHE_TIME, STALE_TIME } from "@/lib/queryPersister";
 import Index from "./pages/Index";
 import Customers from "./pages/Customers";
@@ -47,96 +48,98 @@ const queryClient = new QueryClient({
 });
 
 const App = () => (
-  <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-    <PersistQueryClientProvider
-      client={queryClient}
-      persistOptions={{
-        persister: queryPersister,
-        maxAge: CACHE_TIME,
-        dehydrateOptions: {
-          shouldDehydrateQuery: (query) => {
-            // Persist all successful queries
-            return query.state.status === 'success';
+  <ErrorBoundary>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <PersistQueryClientProvider
+        client={queryClient}
+        persistOptions={{
+          persister: queryPersister,
+          maxAge: CACHE_TIME,
+          dehydrateOptions: {
+            shouldDehydrateQuery: (query) => {
+              // Persist all successful queries
+              return query.state.status === 'success';
+            },
           },
-        },
-      }}
-    >
-      <AuthProvider>
-        <SoftPaywallProvider>
-          <OfflineProvider>
-            <TooltipProvider>
-              <OfflineIndicator />
-              <ReloadPrompt />
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <TrialGateModal />
-                <KeyboardShortcutsProvider>
-                  <Routes>
-                    <Route path="/auth" element={<Auth />} />
-                    <Route path="/forgot-password" element={<ForgotPassword />} />
-                    <Route path="/reset-password" element={<ResetPassword />} />
-                    <Route
-                      path="/"
-                      element={
-                        <ProtectedRoute>
-                          <Index />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="/customers"
-                      element={
-                        <ProtectedRoute>
-                          <Customers />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="/money"
-                      element={
-                        <ProtectedRoute>
-                          <Money />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="/earnings"
-                      element={
-                        <ProtectedRoute>
-                          <Earnings />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="/calendar"
-                      element={
-                        <ProtectedRoute>
-                          <Calendar />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route
-                      path="/settings"
-                      element={
-                        <ProtectedRoute>
-                          <Settings />
-                        </ProtectedRoute>
-                      }
-                    />
-                    <Route path="/install" element={<Install />} />
-                    <Route path="/terms" element={<Terms />} />
-                    <Route path="/privacy" element={<Privacy />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </KeyboardShortcutsProvider>
-              </BrowserRouter>
-            </TooltipProvider>
-          </OfflineProvider>
-        </SoftPaywallProvider>
-      </AuthProvider>
-    </PersistQueryClientProvider>
-  </ThemeProvider>
+        }}
+      >
+        <AuthProvider>
+          <SoftPaywallProvider>
+            <OfflineProvider>
+              <TooltipProvider>
+                <OfflineIndicator />
+                <ReloadPrompt />
+                <Toaster />
+                <Sonner />
+                <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+                  <TrialGateModal />
+                  <KeyboardShortcutsProvider>
+                    <Routes>
+                      <Route path="/auth" element={<Auth />} />
+                      <Route path="/forgot-password" element={<ForgotPassword />} />
+                      <Route path="/reset-password" element={<ResetPassword />} />
+                      <Route
+                        path="/"
+                        element={
+                          <ProtectedRoute>
+                            <Index />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/customers"
+                        element={
+                          <ProtectedRoute>
+                            <Customers />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/money"
+                        element={
+                          <ProtectedRoute>
+                            <Money />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/earnings"
+                        element={
+                          <ProtectedRoute>
+                            <Earnings />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/calendar"
+                        element={
+                          <ProtectedRoute>
+                            <Calendar />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route
+                        path="/settings"
+                        element={
+                          <ProtectedRoute>
+                            <Settings />
+                          </ProtectedRoute>
+                        }
+                      />
+                      <Route path="/install" element={<Install />} />
+                      <Route path="/terms" element={<Terms />} />
+                      <Route path="/privacy" element={<Privacy />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </KeyboardShortcutsProvider>
+                </BrowserRouter>
+              </TooltipProvider>
+            </OfflineProvider>
+          </SoftPaywallProvider>
+        </AuthProvider>
+      </PersistQueryClientProvider>
+    </ThemeProvider>
+  </ErrorBoundary>
 );
 
 export default App;
