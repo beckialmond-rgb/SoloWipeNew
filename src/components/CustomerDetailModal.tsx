@@ -68,15 +68,17 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
 
     setIsSendingDDLink(true);
     try {
-      // Create mandate and get authorization URL
       const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
-        body: { customerId: customer.id }
+        body: { 
+          customerId: customer.id,
+          customerName: customer.name,
+          exitUrl: window.location.origin
+        }
       });
 
       if (error) throw error;
       if (!data?.authorisationUrl) throw new Error('No authorization URL returned');
 
-      // Open SMS with DD link
       const firstName = customer.name.split(' ')[0];
       const message = encodeURIComponent(
         `Hi ${firstName}, please set up your Direct Debit for ${businessName} using this secure link: ${data.authorisationUrl}`

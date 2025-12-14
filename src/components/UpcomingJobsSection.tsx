@@ -155,7 +155,11 @@ function UpcomingJobCard({ job, onClick, onSkip, profile, businessName }: Upcomi
     setIsSendingDDLink(true);
     try {
       const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
-        body: { customerId: job.customer.id }
+        body: { 
+          customerId: job.customer.id,
+          customerName: job.customer.name,
+          exitUrl: window.location.origin
+        }
       });
 
       if (error) throw error;
@@ -200,17 +204,11 @@ function UpcomingJobCard({ job, onClick, onSkip, profile, businessName }: Upcomi
             <p className="font-medium text-foreground truncate">
               {job.customer.name}
             </p>
-            {/* Mandate Status Badge */}
+            {/* Mandate Status Indicator */}
             {job.customer.gocardless_mandate_status === 'pending' ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-warning/10 text-warning text-[10px] font-medium flex-shrink-0">
-                <Clock className="w-2.5 h-2.5" />
-                Pending
-              </span>
+              <span title="DD Pending"><Clock className="w-3.5 h-3.5 text-warning flex-shrink-0" /></span>
             ) : job.customer.gocardless_id ? (
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 text-success text-[10px] font-medium flex-shrink-0">
-                <CreditCard className="w-2.5 h-2.5" />
-                DD
-              </span>
+              <span title="DD Active"><CreditCard className="w-3.5 h-3.5 text-success flex-shrink-0" /></span>
             ) : null}
           </div>
           <div className="flex items-center gap-1 mt-1">
