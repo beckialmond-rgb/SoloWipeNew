@@ -103,25 +103,35 @@ serve(async (req) => {
 async function handleMandateEvent(adminClient: any, event: any) {
   const { action, links } = event;
   const mandateId = links?.mandate;
+  const billingRequestId = links?.billing_request;
 
   if (!mandateId) {
     console.log('No mandate ID in event');
     return;
   }
 
-  console.log('Handling mandate event:', action, mandateId);
+  console.log('Handling mandate event:', action, mandateId, 'billingRequest:', billingRequestId);
 
   switch (action) {
     case 'created':
     case 'active':
-      // Find customer by metadata in billing request or update by mandate ID
-      await adminClient
-        .from('customers')
-        .update({
-          gocardless_id: mandateId,
-          gocardless_mandate_status: 'active',
-        })
-        .eq('gocardless_mandate_status', 'pending');
+      // Match customer by billing_request_id stored during mandate creation
+      if (billingRequestId) {
+        const { data, error } = await adminClient
+          .from('customers')
+          .update({
+            gocardless_id: mandateId,
+            gocardless_mandate_status: 'active',
+          })
+          .eq('gocardless_id', `br_${billingRequestId}`)
+          .select('id');
+        
+        if (data?.length) {
+          console.log('Updated customer via billing request match:', data[0].id);
+        } else {
+          console.log('No customer found with billing request:', billingRequestId, error);
+        }
+      }
       break;
 
     case 'cancelled':
