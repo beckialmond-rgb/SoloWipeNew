@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, Clock, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, Clock, Plus, Grid3X3, List } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingState } from '@/components/LoadingState';
@@ -13,10 +13,13 @@ import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
+type ViewMode = 'month' | 'week';
+
 const Calendar = () => {
   const { pendingJobs, upcomingJobs, completedToday, customers, rescheduleJob, isLoading } = useSupabaseData();
   const { lightTap } = useHaptics();
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [quickScheduleOpen, setQuickScheduleOpen] = useState(false);
@@ -48,10 +51,15 @@ const Calendar = () => {
   // Get jobs for selected date
   const selectedDateJobs = selectedDate ? getJobsForDate(selectedDate) : [];
 
-  // Calendar grid days
-  const monthStart = startOfMonth(currentMonth);
-  const monthEnd = endOfMonth(currentMonth);
+  // Calendar grid days - month view
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+  // Calendar grid days - week view
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 0 });
+  const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   // Get the day of week for the first day (0 = Sunday, 1 = Monday, etc.)
   const startDayOfWeek = monthStart.getDay();
@@ -59,13 +67,21 @@ const Calendar = () => {
   // Create empty slots for days before the month starts
   const emptySlots = Array(startDayOfWeek).fill(null);
 
-  const handlePrevMonth = () => {
-    setCurrentMonth(subMonths(currentMonth, 1));
+  const handlePrev = () => {
+    if (viewMode === 'month') {
+      setCurrentDate(subMonths(currentDate, 1));
+    } else {
+      setCurrentDate(subWeeks(currentDate, 1));
+    }
     setSelectedDate(null);
   };
 
-  const handleNextMonth = () => {
-    setCurrentMonth(addMonths(currentMonth, 1));
+  const handleNext = () => {
+    if (viewMode === 'month') {
+      setCurrentDate(addMonths(currentDate, 1));
+    } else {
+      setCurrentDate(addWeeks(currentDate, 1));
+    }
     setSelectedDate(null);
   };
 
@@ -85,7 +101,22 @@ const Calendar = () => {
     setSelectedJob(null);
   };
 
+  const toggleViewMode = () => {
+    lightTap();
+    setViewMode(prev => prev === 'month' ? 'week' : 'month');
+    setSelectedDate(null);
+  };
+
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  const getHeaderText = () => {
+    if (viewMode === 'month') {
+      return format(currentDate, 'MMMM yyyy');
+    }
+    const weekStartFormatted = format(weekStart, 'd MMM');
+    const weekEndFormatted = format(weekEnd, 'd MMM yyyy');
+    return `${weekStartFormatted} - ${weekEndFormatted}`;
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -102,25 +133,43 @@ const Calendar = () => {
                 <CalendarDays className="w-6 h-6 text-primary" />
                 <h1 className="text-2xl font-bold text-foreground">Calendar</h1>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleViewMode}
+                className="gap-2"
+              >
+                {viewMode === 'month' ? (
+                  <>
+                    <List className="w-4 h-4" />
+                    Week
+                  </>
+                ) : (
+                  <>
+                    <Grid3X3 className="w-4 h-4" />
+                    Month
+                  </>
+                )}
+              </Button>
             </div>
 
-            {/* Month Navigation */}
+            {/* Navigation */}
             <div className="flex items-center justify-between mb-4">
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handlePrevMonth}
+                onClick={handlePrev}
                 className="h-10 w-10"
               >
                 <ChevronLeft className="w-5 h-5" />
               </Button>
-              <h2 className="text-lg font-semibold text-foreground">
-                {format(currentMonth, 'MMMM yyyy')}
+              <h2 className="text-lg font-semibold text-foreground text-center">
+                {getHeaderText()}
               </h2>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={handleNextMonth}
+                onClick={handleNext}
                 className="h-10 w-10"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -140,54 +189,117 @@ const Calendar = () => {
 
               {/* Calendar days */}
               <div className="grid grid-cols-7 gap-1">
-                {/* Empty slots */}
-                {emptySlots.map((_, index) => (
-                  <div key={`empty-${index}`} className="aspect-square" />
-                ))}
+                {viewMode === 'month' && (
+                  <>
+                    {/* Empty slots for month view */}
+                    {emptySlots.map((_, index) => (
+                      <div key={`empty-${index}`} className="aspect-square" />
+                    ))}
 
-                {/* Days of the month */}
-                {daysInMonth.map(day => {
-                  const dayJobs = getJobsForDate(day);
-                  const hasPending = dayJobs.some(j => j.status === 'pending');
-                  const hasCompleted = dayJobs.some(j => j.status === 'completed');
-                  const isSelected = selectedDate && isSameDay(day, selectedDate);
-                  const isDayToday = isToday(day);
+                    {/* Days of the month */}
+                    {daysInMonth.map(day => {
+                      const dayJobs = getJobsForDate(day);
+                      const hasPending = dayJobs.some(j => j.status === 'pending');
+                      const hasCompleted = dayJobs.some(j => j.status === 'completed');
+                      const isSelected = selectedDate && isSameDay(day, selectedDate);
+                      const isDayToday = isToday(day);
 
-                  return (
-                    <motion.button
-                      key={day.toISOString()}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => handleDateClick(day)}
-                      className={cn(
-                        "aspect-square flex flex-col items-center justify-center rounded-lg relative transition-all",
-                        isSelected && "bg-primary text-primary-foreground",
-                        !isSelected && isDayToday && "bg-primary/10 text-primary font-bold",
-                        !isSelected && !isDayToday && "hover:bg-muted",
-                        !isSameMonth(day, currentMonth) && "text-muted-foreground/50"
-                      )}
-                    >
-                      <span className="text-sm">{format(day, 'd')}</span>
-                      
-                      {/* Job indicators */}
-                      {dayJobs.length > 0 && (
-                        <div className="flex gap-0.5 mt-0.5">
-                          {hasPending && (
-                            <span className={cn(
-                              "w-1.5 h-1.5 rounded-full",
-                              isSelected ? "bg-primary-foreground" : "bg-primary"
-                            )} />
+                      return (
+                        <motion.button
+                          key={day.toISOString()}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleDateClick(day)}
+                          className={cn(
+                            "aspect-square flex flex-col items-center justify-center rounded-lg relative transition-all",
+                            isSelected && "bg-primary text-primary-foreground",
+                            !isSelected && isDayToday && "bg-primary/10 text-primary font-bold",
+                            !isSelected && !isDayToday && "hover:bg-muted",
+                            !isSameMonth(day, currentDate) && "text-muted-foreground/50"
                           )}
-                          {hasCompleted && (
-                            <span className={cn(
-                              "w-1.5 h-1.5 rounded-full",
-                              isSelected ? "bg-primary-foreground/70" : "bg-green-500"
-                            )} />
+                        >
+                          <span className="text-sm">{format(day, 'd')}</span>
+                          
+                          {/* Job indicators */}
+                          {dayJobs.length > 0 && (
+                            <div className="flex gap-0.5 mt-0.5">
+                              {hasPending && (
+                                <span className={cn(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  isSelected ? "bg-primary-foreground" : "bg-primary"
+                                )} />
+                              )}
+                              {hasCompleted && (
+                                <span className={cn(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  isSelected ? "bg-primary-foreground/70" : "bg-green-500"
+                                )} />
+                              )}
+                            </div>
                           )}
-                        </div>
-                      )}
-                    </motion.button>
-                  );
-                })}
+                        </motion.button>
+                      );
+                    })}
+                  </>
+                )}
+
+                {viewMode === 'week' && (
+                  <>
+                    {/* Week view - larger day cells */}
+                    {daysInWeek.map(day => {
+                      const dayJobs = getJobsForDate(day);
+                      const hasPending = dayJobs.some(j => j.status === 'pending');
+                      const hasCompleted = dayJobs.some(j => j.status === 'completed');
+                      const isSelected = selectedDate && isSameDay(day, selectedDate);
+                      const isDayToday = isToday(day);
+                      const jobCount = dayJobs.length;
+
+                      return (
+                        <motion.button
+                          key={day.toISOString()}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleDateClick(day)}
+                          className={cn(
+                            "min-h-[80px] flex flex-col items-center justify-start pt-2 rounded-lg relative transition-all",
+                            isSelected && "bg-primary text-primary-foreground",
+                            !isSelected && isDayToday && "bg-primary/10 text-primary font-bold",
+                            !isSelected && !isDayToday && "hover:bg-muted"
+                          )}
+                        >
+                          <span className="text-xs text-muted-foreground mb-1">
+                            {format(day, 'EEE')}
+                          </span>
+                          <span className="text-lg font-semibold">{format(day, 'd')}</span>
+                          
+                          {/* Job count badge */}
+                          {jobCount > 0 && (
+                            <div className="mt-1 flex flex-col items-center gap-0.5">
+                              <span className={cn(
+                                "text-xs font-medium",
+                                isSelected ? "text-primary-foreground" : "text-foreground"
+                              )}>
+                                {jobCount} job{jobCount !== 1 ? 's' : ''}
+                              </span>
+                              <div className="flex gap-0.5">
+                                {hasPending && (
+                                  <span className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    isSelected ? "bg-primary-foreground" : "bg-primary"
+                                  )} />
+                                )}
+                                {hasCompleted && (
+                                  <span className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    isSelected ? "bg-primary-foreground/70" : "bg-green-500"
+                                  )} />
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </>
+                )}
               </div>
 
               {/* Legend */}
