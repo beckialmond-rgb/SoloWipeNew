@@ -29,23 +29,29 @@ const Customers = () => {
 
   const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
 
-  const filteredCustomers = customers.filter(customer => {
-    // Text search filter
-    const matchesSearch = 
-      customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.address.toLowerCase().includes(searchQuery.toLowerCase());
-    
+  // Calculate counts for each filter (before applying DD filter, but after search)
+  const searchFilteredCustomers = customers.filter(customer =>
+    customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    customer.address.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const ddCounts = {
+    all: searchFilteredCustomers.length,
+    withDD: searchFilteredCustomers.filter(c => !!c.gocardless_id).length,
+    withoutDD: searchFilteredCustomers.filter(c => !c.gocardless_id && c.gocardless_mandate_status !== 'pending').length,
+    pending: searchFilteredCustomers.filter(c => c.gocardless_mandate_status === 'pending').length,
+  };
+
+  const filteredCustomers = searchFilteredCustomers.filter(customer => {
     // DD filter
-    let matchesDD = true;
     if (ddFilter === 'with-dd') {
-      matchesDD = !!customer.gocardless_id;
+      return !!customer.gocardless_id;
     } else if (ddFilter === 'without-dd') {
-      matchesDD = !customer.gocardless_id && customer.gocardless_mandate_status !== 'pending';
+      return !customer.gocardless_id && customer.gocardless_mandate_status !== 'pending';
     } else if (ddFilter === 'pending') {
-      matchesDD = customer.gocardless_mandate_status === 'pending';
+      return customer.gocardless_mandate_status === 'pending';
     }
-    
-    return matchesSearch && matchesDD;
+    return true;
   });
 
   const handleEditCustomer = (customer: Customer) => {
@@ -141,13 +147,19 @@ const Customers = () => {
                 <button
                   onClick={() => setDDFilter('all')}
                   className={cn(
-                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5",
                     ddFilter === 'all'
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground hover:bg-muted/80"
                   )}
                 >
                   All
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded-full text-[10px] font-bold min-w-[20px] text-center",
+                    ddFilter === 'all' ? "bg-primary-foreground/20" : "bg-background"
+                  )}>
+                    {ddCounts.all}
+                  </span>
                 </button>
                 <button
                   onClick={() => setDDFilter('with-dd')}
@@ -159,30 +171,50 @@ const Customers = () => {
                   )}
                 >
                   <CreditCard className="w-3.5 h-3.5" />
-                  With DD
+                  DD
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded-full text-[10px] font-bold min-w-[20px] text-center",
+                    ddFilter === 'with-dd' ? "bg-success-foreground/20" : "bg-background"
+                  )}>
+                    {ddCounts.withDD}
+                  </span>
                 </button>
                 <button
                   onClick={() => setDDFilter('without-dd')}
                   className={cn(
-                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5",
                     ddFilter === 'without-dd'
                       ? "bg-muted-foreground text-background"
                       : "bg-muted text-muted-foreground hover:bg-muted/80"
                   )}
                 >
                   No DD
+                  <span className={cn(
+                    "px-1.5 py-0.5 rounded-full text-[10px] font-bold min-w-[20px] text-center",
+                    ddFilter === 'without-dd' ? "bg-background/20" : "bg-background"
+                  )}>
+                    {ddCounts.withoutDD}
+                  </span>
                 </button>
-                <button
-                  onClick={() => setDDFilter('pending')}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
-                    ddFilter === 'pending'
-                      ? "bg-warning text-warning-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  )}
-                >
-                  Pending
-                </button>
+                {ddCounts.pending > 0 && (
+                  <button
+                    onClick={() => setDDFilter('pending')}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5",
+                      ddFilter === 'pending'
+                        ? "bg-warning text-warning-foreground"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    )}
+                  >
+                    Pending
+                    <span className={cn(
+                      "px-1.5 py-0.5 rounded-full text-[10px] font-bold min-w-[20px] text-center",
+                      ddFilter === 'pending' ? "bg-warning-foreground/20" : "bg-background"
+                    )}>
+                      {ddCounts.pending}
+                    </span>
+                  </button>
+                )}
               </motion.div>
             )}
 
