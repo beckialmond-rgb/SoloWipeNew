@@ -29,7 +29,7 @@ function isValidRedirectUrl(urlString: string, environment: string): { valid: bo
     const hostname = url.hostname;
     
     // Trusted domains with exact matching or subdomain support
-    const trustedDomains = ['lovable.app', 'lovableproject.com'];
+    const trustedDomains = ['lovable.app', 'lovableproject.com', 'solowipe.co.uk'];
     
     // Check for exact match or subdomain match (e.g., *.lovable.app)
     const isTrusted = trustedDomains.some(domain => 
