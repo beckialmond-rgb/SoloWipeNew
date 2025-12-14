@@ -45,7 +45,11 @@ export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner'
     setIsSendingDDLink(true);
     try {
       const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
-        body: { customerId: job.customer.id }
+        body: { 
+          customerId: job.customer.id,
+          customerName: job.customer.name,
+          exitUrl: window.location.origin
+        }
       });
 
       if (error) throw error;
@@ -80,17 +84,11 @@ export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner'
               <p className="font-semibold text-foreground truncate text-lg">
                 {job.customer.name}
               </p>
-              {/* Mandate Status Badge */}
+              {/* Mandate Status Indicator */}
               {job.customer.gocardless_mandate_status === 'pending' ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs font-medium">
-                  <Clock className="w-3 h-3" />
-                  DD Pending
-                </span>
+                <span title="DD Pending"><Clock className="w-4 h-4 text-warning" /></span>
               ) : job.customer.gocardless_id ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/10 text-success text-xs font-medium">
-                  <CreditCard className="w-3 h-3" />
-                  DD Active
-                </span>
+                <span title="DD Active"><CreditCard className="w-4 h-4 text-success" /></span>
               ) : null}
             </div>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
