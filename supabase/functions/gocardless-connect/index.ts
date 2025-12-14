@@ -34,10 +34,16 @@ serve(async (req) => {
       });
     }
 
-    const { redirectUrl } = await req.json();
+    const { redirectUrl: clientRedirectUrl } = await req.json();
     
     const clientId = Deno.env.get('GOCARDLESS_CLIENT_ID');
     const environment = Deno.env.get('GOCARDLESS_ENVIRONMENT') || 'sandbox';
+    
+    // Enhanced logging for debugging redirect_uri mismatch
+    console.log('=== GoCardless OAuth Debug ===');
+    console.log('Client ID:', clientId);
+    console.log('Environment:', environment);
+    console.log('Redirect URL from client:', clientRedirectUrl);
     
     if (!clientId) {
       return new Response(JSON.stringify({ error: 'GoCardless not configured' }), {
@@ -46,10 +52,17 @@ serve(async (req) => {
       });
     }
 
+    // TEMPORARY: Hardcode redirect_uri for testing
+    // This ensures consistency regardless of client origin
+    const redirectUrl = 'https://d33180fa-9605-41f5-acd3-baa29a550bb7.lovableproject.com/settings?gocardless=callback';
+    console.log('Using hardcoded redirect_uri:', redirectUrl);
+
     // Build OAuth authorization URL
     const baseUrl = environment === 'live' 
       ? 'https://connect.gocardless.com'
       : 'https://connect-sandbox.gocardless.com';
+    
+    console.log('OAuth base URL:', baseUrl);
     
     const state = btoa(JSON.stringify({ userId: user.id, timestamp: Date.now() }));
     
@@ -61,7 +74,8 @@ serve(async (req) => {
     authUrl.searchParams.set('state', state);
     authUrl.searchParams.set('initial_view', 'login');
 
-    console.log('Generated GoCardless OAuth URL for user:', user.id);
+    console.log('Full OAuth URL:', authUrl.toString());
+    console.log('=== End Debug ===');
 
     return new Response(JSON.stringify({ url: authUrl.toString(), state }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
