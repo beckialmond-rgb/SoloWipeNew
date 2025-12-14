@@ -6,9 +6,92 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function decryptToken(encrypted: string): string {
-  const decoded = atob(encrypted);
-  return decoded.replace('gc_token_', '');
+// Encryption key derived from a secret - matches gocardless-callback
+async function getEncryptionKey(): Promise<CryptoKey> {
+  const secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'fallback-secret-key';
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret.slice(0, 32).padEnd(32, '0')),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+  
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode('gocardless-token-salt'),
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decryptToken(encrypted: string): Promise<string> {
+  try {
+    const key = await getEncryptionKey();
+    const decoder = new TextDecoder();
+    
+    // Decode base64
+    const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+    
+    // Extract IV (first 12 bytes) and encrypted data
+    const iv = combined.slice(0, 12);
+    const encryptedData = combined.slice(12);
+    
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encryptedData
+    );
+    
+    return decoder.decode(decrypted);
+  } catch (error) {
+    // Fallback for legacy Base64 encoded tokens (migration support)
+    console.log('[GC-MANDATE] Attempting legacy token decryption');
+    try {
+      const decoded = atob(encrypted);
+      if (decoded.startsWith('gc_token_')) {
+        return decoded.replace('gc_token_', '');
+      }
+    } catch {
+      // Not a legacy token either
+    }
+    throw new Error('Failed to decrypt token');
+  }
+}
+
+// Input validation helpers
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+function isValidEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email) && email.length <= 254;
+}
+
+function sanitizeString(str: unknown, maxLength: number = 100): string {
+  if (typeof str !== 'string') return '';
+  return str
+    .replace(/[<>\"'&]/g, '')
+    .slice(0, maxLength)
+    .trim();
+}
+
+function isValidUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return ['http:', 'https:'].includes(parsed.protocol);
+  } catch {
+    return false;
+  }
 }
 
 serve(async (req) => {
@@ -39,10 +122,44 @@ serve(async (req) => {
       });
     }
 
-    const { customerId, customerName, customerEmail, exitUrl, successUrl } = await req.json();
+    const body = await req.json();
+    const { customerId, customerName, customerEmail, exitUrl, successUrl } = body;
 
-    if (!customerId || !customerName) {
-      return new Response(JSON.stringify({ error: 'Customer ID and name are required' }), {
+    // Validate inputs
+    if (!customerId || !isValidUUID(customerId)) {
+      return new Response(JSON.stringify({ error: 'Invalid customer ID format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const sanitizedName = sanitizeString(customerName, 100);
+    if (!sanitizedName || sanitizedName.length < 1) {
+      return new Response(JSON.stringify({ error: 'Customer name is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Email is optional but validate if provided
+    const sanitizedEmail = customerEmail ? sanitizeString(customerEmail, 254) : undefined;
+    if (sanitizedEmail && !isValidEmail(sanitizedEmail)) {
+      return new Response(JSON.stringify({ error: 'Invalid email format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validate URLs
+    if (exitUrl && !isValidUrl(exitUrl)) {
+      return new Response(JSON.stringify({ error: 'Invalid exit URL' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (successUrl && !isValidUrl(successUrl)) {
+      return new Response(JSON.stringify({ error: 'Invalid success URL' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -67,7 +184,7 @@ serve(async (req) => {
       });
     }
 
-    const accessToken = decryptToken(profile.gocardless_access_token_encrypted);
+    const accessToken = await decryptToken(profile.gocardless_access_token_encrypted);
     const environment = Deno.env.get('GOCARDLESS_ENVIRONMENT') || 'sandbox';
     const apiUrl = environment === 'live'
       ? 'https://api.gocardless.com'
@@ -135,7 +252,12 @@ serve(async (req) => {
 
     console.log('Created billing request:', billingRequestId);
 
-    // Step 2: Create a billing request flow
+    // Step 2: Create a billing request flow with sanitized customer details
+    // Split name safely
+    const nameParts = sanitizedName.split(' ');
+    const givenName = nameParts[0] || sanitizedName;
+    const familyName = nameParts.slice(1).join(' ') || sanitizedName;
+
     const flowResponse = await fetch(`${apiUrl}/billing_request_flows`, {
       method: 'POST',
       headers: {
@@ -151,9 +273,9 @@ serve(async (req) => {
             billing_request: billingRequestId,
           },
           prefilled_customer: {
-            given_name: customerName.split(' ')[0],
-            family_name: customerName.split(' ').slice(1).join(' ') || customerName,
-            email: customerEmail || undefined,
+            given_name: givenName,
+            family_name: familyName,
+            email: sanitizedEmail || undefined,
           },
           lock_customer_details: false,
           lock_bank_account: false,
