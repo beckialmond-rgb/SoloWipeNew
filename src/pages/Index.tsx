@@ -496,64 +496,81 @@ const Index = () => {
             )}
 
             {/* GoCardless Status Indicator */}
-            {profile?.gocardless_organisation_id ? (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4"
-              >
-                {profile?.gocardless_access_token_encrypted ? (
-                  <button
-                    onClick={() => navigate('/settings')}
-                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-lg text-sm hover:bg-success/20 transition-colors"
+            {(() => {
+              const ddCustomerCount = customers.filter(c => c.gocardless_id && c.status === 'active').length;
+              
+              if (profile?.gocardless_organisation_id) {
+                return (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4"
                   >
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-success" />
-                      <span className="text-success font-medium">Direct Debit active</span>
+                    {profile?.gocardless_access_token_encrypted ? (
+                      <button
+                        onClick={() => navigate('/settings')}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-lg text-sm hover:bg-success/20 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-success" />
+                          <span className="text-success font-medium">
+                            Direct Debit active
+                            {ddCustomerCount > 0 && (
+                              <span className="text-success/70 font-normal"> • {ddCustomerCount} customer{ddCustomerCount !== 1 ? 's' : ''}</span>
+                            )}
+                          </span>
+                        </div>
+                        <ChevronDown className="w-4 h-4 text-success -rotate-90" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => navigate('/settings')}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-warning/10 border border-warning/20 rounded-lg text-sm hover:bg-warning/20 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-warning" />
+                          <span className="text-warning font-medium">Direct Debit needs reconnecting</span>
+                        </div>
+                        <ChevronDown className="w-4 h-4 text-warning -rotate-90" />
+                      </button>
+                    )}
+                  </motion.div>
+                );
+              }
+              
+              if (customers.length >= 3 && !ddPromptDismissed) {
+                return (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="mb-4"
+                  >
+                    <div className="relative">
+                      <button
+                        onClick={() => navigate('/settings')}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 pr-10 bg-primary/10 border border-primary/20 rounded-lg text-sm hover:bg-primary/20 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-primary" />
+                          <span className="text-primary font-medium">Set up Direct Debit to get paid automatically</span>
+                        </div>
+                        <ChevronDown className="w-4 h-4 text-primary -rotate-90" />
+                      </button>
+                      <button
+                        onClick={handleDismissDdPrompt}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-primary/20 transition-colors"
+                        aria-label="Dismiss"
+                      >
+                        <X className="w-4 h-4 text-primary/60" />
+                      </button>
                     </div>
-                    <ChevronDown className="w-4 h-4 text-success -rotate-90" />
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => navigate('/settings')}
-                    className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-warning/10 border border-warning/20 rounded-lg text-sm hover:bg-warning/20 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-warning" />
-                      <span className="text-warning font-medium">Direct Debit needs reconnecting</span>
-                    </div>
-                    <ChevronDown className="w-4 h-4 text-warning -rotate-90" />
-                  </button>
-                )}
-              </motion.div>
-            ) : customers.length >= 3 && !ddPromptDismissed && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="mb-4"
-              >
-                <div className="relative">
-                  <button
-                    onClick={() => navigate('/settings')}
-                    className="w-full flex items-center justify-between gap-2 px-3 py-2 pr-10 bg-primary/10 border border-primary/20 rounded-lg text-sm hover:bg-primary/20 transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-primary" />
-                      <span className="text-primary font-medium">Set up Direct Debit to get paid automatically</span>
-                    </div>
-                    <ChevronDown className="w-4 h-4 text-primary -rotate-90" />
-                  </button>
-                  <button
-                    onClick={handleDismissDdPrompt}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-primary/20 transition-colors"
-                    aria-label="Dismiss"
-                  >
-                    <X className="w-4 h-4 text-primary/60" />
-                  </button>
-                </div>
-              </motion.div>
-            )}
+                  </motion.div>
+                );
+              }
+              
+              return null;
+            })()}
 
             {/* Today's Stats Summary */}
             <motion.div
