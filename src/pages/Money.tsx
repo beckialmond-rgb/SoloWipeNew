@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, CheckCircle, Clock, CheckSquare, Square, CreditCard } from 'lucide-react';
+import { Wallet, CheckCircle, Clock, CheckSquare, Square, CreditCard, MessageSquare } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingState } from '@/components/LoadingState';
@@ -15,9 +15,10 @@ import { Button } from '@/components/ui/button';
 import { ToastAction } from '@/components/ui/toast';
 import { JobWithCustomer } from '@/types/database';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
+import { format } from 'date-fns';
 
 const Money = () => {
-  const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, batchMarkPaid, undoMarkPaid, isLoading } = useSupabaseData();
+  const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, batchMarkPaid, undoMarkPaid, isLoading, profile } = useSupabaseData();
   const { toast, dismiss } = useToast();
   const { requirePremium } = useSoftPaywall();
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
@@ -116,6 +117,35 @@ const Money = () => {
   };
 
   const selectedJobsForBatch = unpaidJobs.filter(j => selectedJobIds.has(j.id));
+  const businessName = profile?.business_name || 'Your window cleaner';
+
+  // Get jobs with phone numbers for bulk reminder
+  const jobsWithPhones = unpaidJobs.filter(j => j.customer.mobile_phone);
+
+  const handleBulkReminder = () => {
+    if (jobsWithPhones.length === 0) return;
+    
+    // Build SMS message with all customers
+    const customerMessages = jobsWithPhones.map(job => {
+      const firstName = job.customer.name.split(' ')[0];
+      const completedDate = job.completed_at ? format(new Date(job.completed_at), 'd MMM') : 'recently';
+      const amount = (job.amount_collected || 0).toFixed(2);
+      return `${firstName}: £${amount} (${completedDate})`;
+    }).join('\n');
+    
+    const message = encodeURIComponent(
+      `Hi, ${businessName} here 👋\n\nFriendly reminder about outstanding payments:\n\n${customerMessages}\n\nThanks so much!`
+    );
+    
+    // Open SMS with first customer's number (bulk SMS not universally supported)
+    const phone = jobsWithPhones[0].customer.mobile_phone?.replace(/\s/g, '') || '';
+    window.open(`sms:${phone}?body=${message}`, '_self');
+    
+    toast({
+      title: 'Reminder ready',
+      description: `Message prepared for ${jobsWithPhones.length} customer${jobsWithPhones.length !== 1 ? 's' : ''}`,
+    });
+  };
 
   if (isLoading) {
     return <LoadingState />;
@@ -194,7 +224,7 @@ const Money = () => {
             ) : (
               <>
                 {/* Batch selection controls */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <Button
                     variant="outline"
                     size="default"
@@ -213,8 +243,19 @@ const Money = () => {
                       </>
                     )}
                   </Button>
+                  {!selectMode && jobsWithPhones.length > 1 && (
+                    <Button
+                      variant="outline"
+                      size="default"
+                      onClick={handleBulkReminder}
+                      className="gap-2"
+                    >
+                      <MessageSquare className="w-4 h-4" />
+                      Remind All ({jobsWithPhones.length})
+                    </Button>
+                  )}
                   {selectMode && (
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                       <Button
                         variant="ghost"
                         size="default"
@@ -253,6 +294,7 @@ const Money = () => {
                         <UnpaidJobCard
                           job={job}
                           index={index}
+                          businessName={businessName}
                           onMarkPaid={() => !selectMode && handleMarkPaid(job)}
                         />
                       </div>
