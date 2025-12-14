@@ -55,8 +55,10 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
     setDebugLogs([]);
     
     try {
-      const exitUrl = `${window.location.origin}/customers`;
-      const successUrl = `${window.location.origin}/customers?mandate=success&customer=${customer.id}`;
+    // Always redirect customers to production domain, not preview domains
+    const PRODUCTION_DOMAIN = 'https://solowipe.co.uk';
+    const exitUrl = `${PRODUCTION_DOMAIN}/customers`;
+    const successUrl = `${PRODUCTION_DOMAIN}/customers?mandate=success&customer=${customer.id}`;
 
       addDebugLog('Create Mandate', `Customer: ${customer.name} (${customer.id})`, 'info');
       addDebugLog('URLs', `Exit: ${exitUrl}, Success: ${successUrl}`, 'info');
