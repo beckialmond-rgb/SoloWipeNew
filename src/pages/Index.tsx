@@ -741,7 +741,7 @@ const Index = () => {
             )}
 
             {/* Upcoming Jobs Section */}
-            <UpcomingJobsSection jobs={upcomingJobs} onJobClick={handleJobClick} onSkip={handleSkipRequest} />
+            <UpcomingJobsSection jobs={upcomingJobs} onJobClick={handleJobClick} onSkip={handleSkipRequest} profile={profile} businessName={businessName} />
           </>
         )}
       </main>
