@@ -675,6 +675,20 @@ export function useSupabaseData() {
     }) => {
       if (!user) throw new Error('Not authenticated');
 
+      // Validate that the user's profile exists before attempting to add a customer
+      const { data: profileCheck, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError || !profileCheck) {
+        // Profile doesn't exist - session is stale, sign out
+        console.warn('Profile not found for user, signing out');
+        await supabase.auth.signOut();
+        throw new Error('Your session has expired. Please sign in again.');
+      }
+
       const { data: newCustomer, error: customerError } = await supabase
         .from('customers')
         .insert({
@@ -690,7 +704,14 @@ export function useSupabaseData() {
         .select()
         .single();
 
-      if (customerError) throw customerError;
+      if (customerError) {
+        // Check for foreign key constraint error specifically
+        if (customerError.message?.includes('foreign key constraint')) {
+          await supabase.auth.signOut();
+          throw new Error('Your session has expired. Please sign in again.');
+        }
+        throw customerError;
+      }
 
       const { error: jobError } = await supabase
         .from('jobs')
