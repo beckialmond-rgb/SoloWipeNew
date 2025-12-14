@@ -55,10 +55,11 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
     setDebugLogs([]);
     
     try {
-    // Use configured production domain, fallback to current origin for development
-    const PRODUCTION_DOMAIN = import.meta.env.VITE_PRODUCTION_DOMAIN || window.location.origin;
-    const exitUrl = `${PRODUCTION_DOMAIN}/customers`;
-    const successUrl = `${PRODUCTION_DOMAIN}/customers?mandate=success&customer=${customer.id}`;
+    // Use production domain for customer redirects, detect based on current origin
+    const isProduction = window.location.hostname === 'solowipe.co.uk' || window.location.hostname === 'www.solowipe.co.uk';
+    const REDIRECT_DOMAIN = isProduction ? 'https://solowipe.co.uk' : window.location.origin;
+    const exitUrl = `${REDIRECT_DOMAIN}/customers`;
+    const successUrl = `${REDIRECT_DOMAIN}/customers?mandate=success&customer=${customer.id}`;
 
       addDebugLog('Create Mandate', `Customer: ${customer.name} (${customer.id})`, 'info');
       addDebugLog('URLs', `Exit: ${exitUrl}, Success: ${successUrl}`, 'info');
