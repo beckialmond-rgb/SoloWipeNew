@@ -1,22 +1,34 @@
 import { useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday, parseISO } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, Clock, Plus } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingState } from '@/components/LoadingState';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
+import { QuickScheduleModal } from '@/components/QuickScheduleModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 
 const Calendar = () => {
-  const { pendingJobs, upcomingJobs, completedToday, rescheduleJob, isLoading } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, completedToday, customers, rescheduleJob, isLoading } = useSupabaseData();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [quickScheduleOpen, setQuickScheduleOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
+
+  // Active customers for quick schedule
+  const activeCustomers = useMemo(() => {
+    return customers.filter(c => c.status === 'active').map(c => ({
+      id: c.id,
+      name: c.name,
+      address: c.address,
+      price: Number(c.price)
+    }));
+  }, [customers]);
 
   // Combine all jobs for the calendar view
   const allJobs = useMemo(() => {
@@ -205,7 +217,14 @@ const Calendar = () => {
                   {selectedDateJobs.length === 0 ? (
                     <div className="bg-muted/50 rounded-xl p-6 text-center">
                       <CalendarDays className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-muted-foreground">No jobs scheduled</p>
+                      <p className="text-muted-foreground mb-4">No jobs scheduled</p>
+                      <Button
+                        onClick={() => setQuickScheduleOpen(true)}
+                        className="gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Quick Schedule
+                      </Button>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -272,6 +291,15 @@ const Calendar = () => {
         onOpenChange={setRescheduleModalOpen}
         onReschedule={handleReschedule}
       />
+
+      {selectedDate && (
+        <QuickScheduleModal
+          open={quickScheduleOpen}
+          onOpenChange={setQuickScheduleOpen}
+          selectedDate={selectedDate}
+          customers={activeCustomers}
+        />
+      )}
 
       <BottomNav />
     </div>
