@@ -90,7 +90,11 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false, prof
     setIsSendingDDLink(true);
     try {
       const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
-        body: { customerId: job.customer.id }
+        body: { 
+          customerId: job.customer.id,
+          customerName: job.customer.name,
+          exitUrl: window.location.origin
+        }
       });
 
       if (error) throw error;
@@ -172,18 +176,11 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false, prof
         onDragEnd={handleDragEnd}
         style={{ x }}
         className={cn(
-          "bg-card rounded-xl shadow-sm border border-border overflow-hidden relative",
+          "bg-card rounded-xl shadow-sm border overflow-hidden relative",
           isDragging && "cursor-grabbing",
-          isNextUp && "border-2 border-primary shadow-md"
+          isNextUp ? "border-l-4 border-l-primary border-t border-r border-b border-border" : "border-border"
         )}
       >
-        {/* Next Up Badge - Inside the card */}
-        {isNextUp && (
-          <div className="bg-primary/10 px-4 py-1.5 flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-semibold text-primary uppercase tracking-wide">Next Up</span>
-          </div>
-        )}
 
         <div className="flex items-stretch">
           {/* Drag Handle */}
@@ -212,17 +209,11 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false, prof
               <span className="text-sm text-muted-foreground">
                 {job.customer.name}
               </span>
-              {/* Mandate Status Badge */}
+              {/* Mandate Status Indicator */}
               {job.customer.gocardless_mandate_status === 'pending' ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs font-medium">
-                  <Clock className="w-3 h-3" />
-                  DD Pending
-                </span>
+                <span title="DD Pending"><Clock className="w-4 h-4 text-warning" /></span>
               ) : job.customer.gocardless_id ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/10 text-success text-xs font-medium">
-                  <CreditCard className="w-3 h-3" />
-                  DD Active
-                </span>
+                <span title="DD Active"><CreditCard className="w-4 h-4 text-success" /></span>
               ) : null}
             </div>
 

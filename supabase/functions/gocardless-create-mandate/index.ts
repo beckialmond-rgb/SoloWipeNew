@@ -177,10 +177,13 @@ serve(async (req) => {
 
     console.log('Created billing request flow for customer:', customerId);
 
-    // Update customer with pending mandate status
+    // Update customer with pending mandate status and billing request ID for webhook matching
     await adminClient
       .from('customers')
-      .update({ gocardless_mandate_status: 'pending' })
+      .update({ 
+        gocardless_mandate_status: 'pending',
+        gocardless_id: `br_${billingRequestId}` // Temporarily store billing request ID for webhook matching
+      })
       .eq('id', customerId);
 
     return new Response(JSON.stringify({ 
