@@ -292,6 +292,21 @@ export function useSupabaseData() {
       completingJobIds.add(jobId);
 
       try {
+        // Validate session before critical operation
+        if (user) {
+          const { data: profileCheck, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (profileError || !profileCheck) {
+            console.warn('Profile not found for user, signing out');
+            await supabase.auth.signOut();
+            throw new Error('Your session has expired. Please sign in again.');
+          }
+        }
+
         const job = pendingJobs.find(j => j.id === jobId);
         if (!job) throw new Error('Job not found');
 
@@ -495,6 +510,21 @@ export function useSupabaseData() {
       payingJobIds.add(jobId);
 
       try {
+        // Validate session before critical operation
+        if (user) {
+          const { data: profileCheck, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (profileError || !profileCheck) {
+            console.warn('Profile not found for user, signing out');
+            await supabase.auth.signOut();
+            throw new Error('Your session has expired. Please sign in again.');
+          }
+        }
+
         const now = new Date().toISOString();
 
         // If offline, queue the mutation
