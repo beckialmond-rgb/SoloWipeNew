@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Users, Plus } from 'lucide-react';
+import { Search, Users, Plus, CreditCard } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -15,20 +15,38 @@ import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 
+type DDFilter = 'all' | 'with-dd' | 'without-dd' | 'pending';
+
 const Customers = () => {
   const { customers, businessName, profile, isLoading, addCustomer, updateCustomer, archiveCustomer, refetchAll } = useSupabaseData();
   const { requirePremium } = useSoftPaywall();
   const [searchQuery, setSearchQuery] = useState('');
+  const [ddFilter, setDDFilter] = useState<DDFilter>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
 
-  const filteredCustomers = customers.filter(
-    customer =>
+  const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
+
+  const filteredCustomers = customers.filter(customer => {
+    // Text search filter
+    const matchesSearch = 
       customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customer.address.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      customer.address.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // DD filter
+    let matchesDD = true;
+    if (ddFilter === 'with-dd') {
+      matchesDD = !!customer.gocardless_id;
+    } else if (ddFilter === 'without-dd') {
+      matchesDD = !customer.gocardless_id && customer.gocardless_mandate_status !== 'pending';
+    } else if (ddFilter === 'pending') {
+      matchesDD = customer.gocardless_mandate_status === 'pending';
+    }
+    
+    return matchesSearch && matchesDD;
+  });
 
   const handleEditCustomer = (customer: Customer) => {
     if (!requirePremium('edit')) return;
@@ -111,6 +129,62 @@ const Customers = () => {
                 />
               </div>
             </motion.div>
+
+            {/* DD Filter - only show if GoCardless connected */}
+            {isGoCardlessConnected && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+                className="flex gap-2 mb-4 overflow-x-auto pb-1"
+              >
+                <button
+                  onClick={() => setDDFilter('all')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                    ddFilter === 'all'
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setDDFilter('with-dd')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5",
+                    ddFilter === 'with-dd'
+                      ? "bg-success text-success-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  With DD
+                </button>
+                <button
+                  onClick={() => setDDFilter('without-dd')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                    ddFilter === 'without-dd'
+                      ? "bg-muted-foreground text-background"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  No DD
+                </button>
+                <button
+                  onClick={() => setDDFilter('pending')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors",
+                    ddFilter === 'pending'
+                      ? "bg-warning text-warning-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                >
+                  Pending
+                </button>
+              </motion.div>
+            )}
 
             {/* Customer count */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-5">
