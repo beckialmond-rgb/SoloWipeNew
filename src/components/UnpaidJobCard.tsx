@@ -1,17 +1,27 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Phone, MessageSquare, PoundSterling, CreditCard, Clock } from 'lucide-react';
+import { MapPin, Phone, MessageSquare, PoundSterling, CreditCard, Clock, Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { JobWithCustomer } from '@/types/database';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface UnpaidJobCardProps {
   job: JobWithCustomer;
   index: number;
   businessName?: string;
   onMarkPaid: () => void;
+  profile?: { gocardless_organisation_id?: string | null } | null;
 }
 
-export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner', onMarkPaid }: UnpaidJobCardProps) {
+export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner', onMarkPaid, profile }: UnpaidJobCardProps) {
+  const [isSendingDDLink, setIsSendingDDLink] = useState(false);
+  
+  const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
+  const hasActiveMandate = !!job.customer.gocardless_id;
+  const canSendDDLink = isGoCardlessConnected && !hasActiveMandate && !!job.customer.mobile_phone;
+  
   const firstName = job.customer.name.split(' ')[0];
   const completedDate = job.completed_at ? format(new Date(job.completed_at), 'd MMM') : 'recently';
   const amount = (job.amount_collected || 0).toFixed(2);
@@ -27,6 +37,33 @@ export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner'
   const handleCall = () => {
     const phone = job.customer.mobile_phone?.replace(/\s/g, '') || '';
     window.open(`tel:${phone}`, '_self');
+  };
+
+  const sendDDLinkViaSMS = async () => {
+    if (!job.customer.mobile_phone) return;
+
+    setIsSendingDDLink(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
+        body: { customerId: job.customer.id }
+      });
+
+      if (error) throw error;
+      if (!data?.authorisationUrl) throw new Error('No authorization URL returned');
+
+      const message = encodeURIComponent(
+        `Hi ${firstName}, please set up your Direct Debit for ${businessName} using this secure link: ${data.authorisationUrl}`
+      );
+      const phone = job.customer.mobile_phone.replace(/\s/g, '');
+      window.open(`sms:${phone}?body=${message}`, '_blank');
+
+      toast.success('SMS opened with DD link');
+    } catch (error: any) {
+      console.error('Failed to send DD link:', error);
+      toast.error(error.message || 'Failed to generate DD link');
+    } finally {
+      setIsSendingDDLink(false);
+    }
   };
 
   return (
@@ -72,13 +109,13 @@ export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner'
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {job.customer.mobile_phone && (
             <>
               <Button
                 variant="outline"
                 size="lg"
-                className="flex-1"
+                className="flex-1 min-w-[100px]"
                 onClick={handleSendReminder}
               >
                 <MessageSquare className="w-4 h-4 mr-2" />
@@ -93,10 +130,26 @@ export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner'
               </Button>
             </>
           )}
+          {/* DD Link button for customers without mandate */}
+          {canSendDDLink && (
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={sendDDLinkViaSMS}
+              disabled={isSendingDDLink}
+              className="text-primary border-primary/20 hover:bg-primary/10"
+            >
+              {isSendingDDLink ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+            </Button>
+          )}
           <Button
             variant="success"
             size="lg"
-            className="flex-1"
+            className="flex-1 min-w-[100px]"
             onClick={onMarkPaid}
           >
             Mark Paid
