@@ -368,9 +368,10 @@ export function useSupabaseData() {
         if (updateError) throw updateError;
 
         // If customer has Direct Debit, collect payment automatically
+        let ddRequiresReconnect = false;
         if (isGoCardless && job.customer.gocardless_id) {
           try {
-            const { error: collectError } = await supabase.functions.invoke('gocardless-collect-payment', {
+            const { data: collectData, error: collectError } = await supabase.functions.invoke('gocardless-collect-payment', {
               body: {
                 jobId,
                 customerId: job.customer_id,
@@ -381,6 +382,12 @@ export function useSupabaseData() {
             
             if (collectError) {
               console.error('Failed to collect Direct Debit payment:', collectError);
+              // Check if reconnection is required
+              const errorBody = collectError as { context?: { body?: { requiresReconnect?: boolean } } };
+              if (errorBody?.context?.body?.requiresReconnect) {
+                ddRequiresReconnect = true;
+                console.warn('[DD] GoCardless connection expired - requires reconnect');
+              }
               // Don't fail the job completion, just log the error
               // The job is still marked as paid since DD will process async
             }
@@ -408,6 +415,7 @@ export function useSupabaseData() {
           nextDate: format(nextDate, 'dd MMM yyyy'),
           customerName: job.customer.name,
           isDirectDebit: isGoCardless,
+          ddRequiresReconnect,
         };
       } finally {
         completingJobIds.delete(jobId);
@@ -463,6 +471,15 @@ export function useSupabaseData() {
         queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
         queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
         queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
+      }
+      
+      // Show warning if DD payment collection failed due to expired connection
+      if (data?.ddRequiresReconnect) {
+        toast({
+          title: "Direct Debit collection failed",
+          description: "Your GoCardless connection has expired. Please reconnect in Settings to collect payments automatically.",
+          variant: "destructive",
+        });
       }
     },
   });
