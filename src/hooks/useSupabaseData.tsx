@@ -1215,9 +1215,12 @@ export function useSupabaseData() {
 
   const refetchAll = async () => {
     await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['profile'] }),
+      queryClient.invalidateQueries({ queryKey: ['customers'] }),
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] }),
       queryClient.invalidateQueries({ queryKey: ['completedToday'] }),
       queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] }),
+      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] }),
     ]);
   };
 
