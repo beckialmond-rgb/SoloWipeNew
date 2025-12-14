@@ -81,14 +81,28 @@ export const QuickScheduleModal = ({
                c.address.toLowerCase().includes(searchQuery.toLowerCase())
         );
     
-    // Sort: available customers first, then booked
+    // Priority order: overdue > on schedule > early > new > booked
+    const statusPriority: Record<string, number> = {
+      'overdue': 0,
+      'ontime': 1,
+      'early': 2,
+      'new': 3,
+      'unknown': 4
+    };
+    
     return filtered.sort((a, b) => {
       const aBooked = bookedCustomerIds.includes(a.id);
       const bBooked = bookedCustomerIds.includes(b.id);
-      if (aBooked === bBooked) return 0;
-      return aBooked ? 1 : -1;
+      
+      // Booked customers always go last
+      if (aBooked !== bBooked) return aBooked ? 1 : -1;
+      
+      // Sort by schedule status priority
+      const aStatus = getScheduleStatus(a).status;
+      const bStatus = getScheduleStatus(b).status;
+      return (statusPriority[aStatus] ?? 5) - (statusPriority[bStatus] ?? 5);
     });
-  }, [customers, searchQuery, bookedCustomerIds]);
+  }, [customers, searchQuery, bookedCustomerIds, selectedDate]);
 
   const handleSchedule = async (customer: Customer) => {
     if (!user || isScheduling) return;
