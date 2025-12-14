@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { MapPin, Phone, MessageSquare, PoundSterling, CreditCard } from 'lucide-react';
+import { MapPin, Phone, MessageSquare, PoundSterling, CreditCard, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { JobWithCustomer } from '@/types/database';
 import { format } from 'date-fns';
@@ -43,12 +43,18 @@ export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner'
               <p className="font-semibold text-foreground truncate text-lg">
                 {job.customer.name}
               </p>
-              {job.customer.gocardless_id && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-medium">
-                  <CreditCard className="w-3 h-3" />
-                  DD
+              {/* Mandate Status Badge */}
+              {job.customer.gocardless_mandate_status === 'pending' ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 text-warning text-xs font-medium">
+                  <Clock className="w-3 h-3" />
+                  DD Pending
                 </span>
-              )}
+              ) : job.customer.gocardless_id ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/10 text-success text-xs font-medium">
+                  <CreditCard className="w-3 h-3" />
+                  DD Active
+                </span>
+              ) : null}
             </div>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
               <MapPin className="w-4 h-4 flex-shrink-0" />
