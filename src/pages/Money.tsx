@@ -296,6 +296,7 @@ const Money = () => {
                           index={index}
                           businessName={businessName}
                           onMarkPaid={() => !selectMode && handleMarkPaid(job)}
+                          profile={profile}
                         />
                       </div>
                     </div>
