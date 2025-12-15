@@ -156,7 +156,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
           <div className="flex-1 min-w-0 p-4 flex flex-col justify-center">
             <div className="flex items-start gap-2 mb-1">
               <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <h3 className="font-semibold text-foreground text-base leading-tight truncate">
+              <h3 className="font-semibold text-foreground text-base leading-tight truncate min-w-0">
                 {job.customer.address}
               </h3>
             </div>
