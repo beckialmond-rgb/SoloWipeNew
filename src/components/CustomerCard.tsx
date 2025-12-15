@@ -44,9 +44,9 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-1.5 mt-1.5 text-sm text-muted-foreground">
+        <div className="flex items-center gap-1.5 mt-1.5 text-sm text-muted-foreground min-w-0">
           <MapPin className="w-4 h-4 flex-shrink-0" />
-          <span className="truncate">{customer.address}</span>
+          <span className="truncate min-w-0">{customer.address}</span>
         </div>
       </div>
       
