@@ -34,7 +34,7 @@ export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner'
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
-      className="bg-card rounded-xl shadow-sm border border-border overflow-hidden"
+      className="bg-card rounded-xl shadow-sm border border-border overflow-hidden min-h-[120px]"
     >
       <div className="p-4">
         <div className="flex items-start justify-between mb-4">
