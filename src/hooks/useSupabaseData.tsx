@@ -622,6 +622,21 @@ export function useSupabaseData() {
       batchPaymentInProgress.current = true;
 
       try {
+        // Validate session before critical operation
+        if (user) {
+          const { data: profileCheck, error: profileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (profileError || !profileCheck) {
+            console.warn('Profile not found for user, signing out');
+            await supabase.auth.signOut();
+            throw new Error('Your session has expired. Please sign in again.');
+          }
+        }
+
         const now = new Date().toISOString();
 
         if (!isOnline) {
