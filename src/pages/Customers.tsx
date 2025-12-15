@@ -390,7 +390,7 @@ const Customers = () => {
                         )}
                       </button>
                     )}
-                    <div className="flex-1">
+                    <div className="flex-1 flex-shrink-0">
                       <CustomerCard
                         customer={customer}
                         onClick={() => !selectMode && setSelectedCustomer(customer)}
