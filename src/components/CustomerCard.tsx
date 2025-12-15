@@ -21,7 +21,7 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
       "flex items-center gap-4 text-left touch-lg",
       "hover:bg-muted/50 transition-colors",
       "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-      "h-[80px] overflow-hidden"
+      "h-[72px] sm:h-[80px] md:h-[88px] overflow-hidden"
     )}
     >
       <div className="flex-1 min-w-0">
