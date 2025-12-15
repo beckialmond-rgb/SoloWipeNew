@@ -372,7 +372,7 @@ const Customers = () => {
                 const isSelected = selectedIds.has(customer.id);
                 
                 return (
-                  <div key={customer.id} className="flex items-center gap-3">
+                  <div key={customer.id} className="flex items-center gap-3 h-[72px] overflow-hidden">
                     {/* Checkbox in select mode */}
                     {selectMode && (
                       <button
@@ -390,7 +390,7 @@ const Customers = () => {
                         )}
                       </button>
                     )}
-                    <div className="flex-1 flex-shrink-0">
+                    <div className="flex-1 h-full min-w-0 overflow-hidden">
                       <CustomerCard
                         customer={customer}
                         onClick={() => !selectMode && setSelectedCustomer(customer)}
