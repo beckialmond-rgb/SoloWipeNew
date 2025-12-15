@@ -7,6 +7,23 @@ import { toast } from '@/hooks/use-toast';
 import { mutationQueue, localData } from '@/lib/offlineStorage';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 
+// Helper function to validate session before critical operations
+async function validateSession(userId: string | undefined): Promise<void> {
+  if (!userId) return;
+  
+  const { data: profileCheck, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (profileError || !profileCheck) {
+    console.warn('Profile not found for user, signing out');
+    await supabase.auth.signOut();
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+}
+
 export function useSupabaseData() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -293,19 +310,7 @@ export function useSupabaseData() {
 
       try {
         // Validate session before critical operation
-        if (user) {
-          const { data: profileCheck, error: profileError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (profileError || !profileCheck) {
-            console.warn('Profile not found for user, signing out');
-            await supabase.auth.signOut();
-            throw new Error('Your session has expired. Please sign in again.');
-          }
-        }
+        await validateSession(user?.id);
 
         const job = pendingJobs.find(j => j.id === jobId);
         if (!job) throw new Error('Job not found');
@@ -511,19 +516,7 @@ export function useSupabaseData() {
 
       try {
         // Validate session before critical operation
-        if (user) {
-          const { data: profileCheck, error: profileError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (profileError || !profileCheck) {
-            console.warn('Profile not found for user, signing out');
-            await supabase.auth.signOut();
-            throw new Error('Your session has expired. Please sign in again.');
-          }
-        }
+        await validateSession(user?.id);
 
         const now = new Date().toISOString();
 
@@ -623,19 +616,7 @@ export function useSupabaseData() {
 
       try {
         // Validate session before critical operation
-        if (user) {
-          const { data: profileCheck, error: profileError } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (profileError || !profileCheck) {
-            console.warn('Profile not found for user, signing out');
-            await supabase.auth.signOut();
-            throw new Error('Your session has expired. Please sign in again.');
-          }
-        }
+        await validateSession(user?.id);
 
         const now = new Date().toISOString();
 
@@ -720,19 +701,8 @@ export function useSupabaseData() {
     }) => {
       if (!user) throw new Error('Not authenticated');
 
-      // Validate that the user's profile exists before attempting to add a customer
-      const { data: profileCheck, error: profileError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .single();
-
-      if (profileError || !profileCheck) {
-        // Profile doesn't exist - session is stale, sign out
-        console.warn('Profile not found for user, signing out');
-        await supabase.auth.signOut();
-        throw new Error('Your session has expired. Please sign in again.');
-      }
+      // Validate session before critical operation
+      await validateSession(user.id);
 
       const { data: newCustomer, error: customerError } = await supabase
         .from('customers')
@@ -802,19 +772,7 @@ export function useSupabaseData() {
       };
     }) => {
       // Validate session before critical operation
-      if (user) {
-        const { data: profileCheck, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (profileError || !profileCheck) {
-          console.warn('Profile not found for user, signing out');
-          await supabase.auth.signOut();
-          throw new Error('Your session has expired. Please sign in again.');
-        }
-      }
+      await validateSession(user?.id);
 
       const { error } = await supabase
         .from('customers')
@@ -843,19 +801,7 @@ export function useSupabaseData() {
   const archiveCustomerMutation = useMutation({
     mutationFn: async (id: string) => {
       // Validate session before critical operation
-      if (user) {
-        const { data: profileCheck, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (profileError || !profileCheck) {
-          console.warn('Profile not found for user, signing out');
-          await supabase.auth.signOut();
-          throw new Error('Your session has expired. Please sign in again.');
-        }
-      }
+      await validateSession(user?.id);
 
       const now = new Date().toISOString();
       
@@ -899,19 +845,7 @@ export function useSupabaseData() {
   const unarchiveCustomerMutation = useMutation({
     mutationFn: async (id: string) => {
       // Validate session before critical operation
-      if (user) {
-        const { data: profileCheck, error: profileError } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('id', user.id)
-          .maybeSingle();
-
-        if (profileError || !profileCheck) {
-          console.warn('Profile not found for user, signing out');
-          await supabase.auth.signOut();
-          throw new Error('Your session has expired. Please sign in again.');
-        }
-      }
+      await validateSession(user?.id);
 
       const { error: customerError } = await supabase
         .from('customers')
