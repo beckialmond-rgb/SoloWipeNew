@@ -4,7 +4,7 @@ import { X, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { businessNameSchema, validateForm, sanitizeString } from '@/lib/validations';
-import { useToast } from '@/hooks/use-toast';
+import { FormField, getInputClassName } from '@/components/ui/form-field';
 
 interface EditBusinessNameModalProps {
   isOpen: boolean;
@@ -16,11 +16,12 @@ interface EditBusinessNameModalProps {
 export function EditBusinessNameModal({ isOpen, currentName, onClose, onSubmit }: EditBusinessNameModalProps) {
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+  const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
     if (isOpen) {
       setName(currentName);
+      setError(undefined);
     }
   }, [isOpen, currentName]);
 
@@ -33,15 +34,11 @@ export function EditBusinessNameModal({ isOpen, currentName, onClose, onSubmit }
     });
 
     if (!validation.success) {
-      const firstError = Object.values(validation.errors)[0];
-      toast({
-        title: 'Validation Error',
-        description: firstError,
-        variant: 'destructive',
-      });
+      setError(validation.errors.name);
       return;
     }
 
+    setError(undefined);
     setIsSubmitting(true);
     try {
       await onSubmit(validation.data.name);
@@ -87,26 +84,24 @@ export function EditBusinessNameModal({ isOpen, currentName, onClose, onSubmit }
           <form onSubmit={handleSubmit} className="px-6 pb-8 pt-2">
             <h2 className="text-2xl font-bold text-foreground mb-6">Edit Business Name</h2>
 
-            <div>
-              <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                <Building className="w-4 h-4" />
-                Business Name
-              </label>
+            <FormField
+              label="Business Name"
+              icon={<Building className="w-4 h-4" />}
+              required
+              error={error}
+            >
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (error) setError(undefined);
+                }}
                 placeholder="My Window Cleaning"
-                required
                 autoFocus
-                className={cn(
-                  "w-full h-14 px-4 rounded-xl",
-                  "bg-muted border-0",
-                  "text-foreground placeholder:text-muted-foreground",
-                  "focus:outline-none focus:ring-2 focus:ring-primary"
-                )}
+                className={getInputClassName(!!error)}
               />
-            </div>
+            </FormField>
 
             {/* Submit Button */}
             <Button

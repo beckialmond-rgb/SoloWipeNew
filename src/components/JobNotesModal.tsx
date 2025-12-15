@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { jobNotesSchema, validateForm, sanitizeString } from '@/lib/validations';
-import { useToast } from '@/hooks/use-toast';
+import { FormField } from '@/components/ui/form-field';
 
 interface JobNotesModalProps {
   job: JobWithCustomer | null;
@@ -17,11 +17,12 @@ interface JobNotesModalProps {
 export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalProps) {
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const { toast } = useToast();
+  const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
     if (job) {
       setNotes(job.notes || '');
+      setError(undefined);
     }
   }, [job]);
 
@@ -34,15 +35,11 @@ export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalPro
     });
 
     if (!validation.success) {
-      const firstError = Object.values(validation.errors)[0];
-      toast({
-        title: 'Validation Error',
-        description: firstError,
-        variant: 'destructive',
-      });
+      setError(validation.errors.notes);
       return;
     }
 
+    setError(undefined);
     setIsSaving(true);
     try {
       await onSave(job.id, validation.data.notes || null);
@@ -94,19 +91,32 @@ export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalPro
               {job.customer.name} • {job.customer.address}
             </p>
 
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Add notes about this visit... (e.g., couldn't access back windows, dog was loose)"
-              rows={4}
-              autoFocus
-              className={cn(
-                "w-full px-4 py-3 rounded-xl resize-none",
-                "bg-muted border-0",
-                "text-foreground placeholder:text-muted-foreground",
-                "focus:outline-none focus:ring-2 focus:ring-primary"
-              )}
-            />
+            <FormField
+              label="Notes"
+              icon={<StickyNote className="w-4 h-4" />}
+              error={error}
+            >
+              <textarea
+                value={notes}
+                onChange={(e) => {
+                  setNotes(e.target.value);
+                  if (error) setError(undefined);
+                }}
+                placeholder="Add notes about this visit... (e.g., couldn't access back windows, dog was loose)"
+                rows={4}
+                autoFocus
+                className={cn(
+                  "w-full px-4 py-3 rounded-xl resize-none",
+                  "bg-muted border-2",
+                  "text-foreground placeholder:text-muted-foreground",
+                  "focus:outline-none focus:ring-2 focus:ring-primary",
+                  "transition-colors",
+                  error 
+                    ? "border-destructive focus:ring-destructive" 
+                    : "border-transparent"
+                )}
+              />
+            </FormField>
 
             <div className="flex gap-3 mt-4">
               <Button
