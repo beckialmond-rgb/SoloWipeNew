@@ -1170,6 +1170,9 @@ export function useSupabaseData() {
   // Update job notes mutation with OFFLINE SUPPORT
   const updateJobNotesMutation = useMutation({
     mutationFn: async ({ jobId, notes }: { jobId: string; notes: string | null }) => {
+      // Validate session before critical operation
+      await validateSession(user?.id);
+
       if (!isOnline) {
         await mutationQueue.add({
           type: 'updateJobNotes',
