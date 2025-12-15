@@ -154,7 +154,7 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <p className="font-medium text-foreground truncate">
+            <p className="font-medium text-foreground truncate max-w-[60%]">
               {job.customer.name}
             </p>
             {/* Mandate Status Indicator */}
@@ -186,7 +186,7 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
       <button
         onClick={handleSkip}
         className={cn(
-          "w-16 h-14 flex items-center justify-center",
+          "w-16 self-stretch min-h-[56px] flex items-center justify-center",
           "bg-muted hover:bg-muted/80 transition-colors border-l border-border",
           "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
         )}
