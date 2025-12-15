@@ -1096,6 +1096,9 @@ export function useSupabaseData() {
   // Undo complete job mutation
   const undoCompleteJobMutation = useMutation({
     mutationFn: async ({ jobId, newJobId }: { jobId: string; newJobId: string }) => {
+      // Validate session before critical operation
+      await validateSession(user?.id);
+
       const { error: deleteError } = await supabase
         .from('jobs')
         .delete()
@@ -1139,6 +1142,9 @@ export function useSupabaseData() {
   // Undo mark paid mutation
   const undoMarkPaidMutation = useMutation({
     mutationFn: async (jobId: string) => {
+      // Validate session before critical operation
+      await validateSession(user?.id);
+
       const { error } = await supabase
         .from('jobs')
         .update({
