@@ -224,6 +224,15 @@ serve(async (req) => {
     // Create payment with sanitized description
     const paymentDescription = sanitizedDescription || `Window cleaning - ${customer.name.slice(0, 50)}`;
     
+    // Calculate amounts
+    const amountInPence = Math.round(amount * 100);
+    
+    // Calculate app fee: (amount in pence × 0.75%) + 20p, rounded to nearest integer
+    const appFee = Math.round((amountInPence * 0.0075) + 20);
+    
+    console.log('[GC-COLLECT] Amount in pence:', amountInPence);
+    console.log('[GC-COLLECT] App fee (pence):', appFee);
+    
     const paymentResponse = await fetch(`${apiUrl}/payments`, {
       method: 'POST',
       headers: {
@@ -233,9 +242,10 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         payments: {
-          amount: Math.round(amount * 100), // Convert to pence
+          amount: amountInPence,
           currency: 'GBP',
           description: paymentDescription,
+          app_fee: appFee,
           links: {
             mandate: customer.gocardless_id,
           },
@@ -281,6 +291,7 @@ serve(async (req) => {
     console.log('[GC-COLLECT] Status:', paymentStatus);
     console.log('[GC-COLLECT] Charge Date:', chargeDate);
     console.log('[GC-COLLECT] Amount:', paymentData.payments.amount, 'pence');
+    console.log('[GC-COLLECT] App Fee:', appFee, 'pence');
 
     // Update job with payment info
     console.log('[GC-COLLECT] Step 3: Updating job record...');
