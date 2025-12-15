@@ -942,6 +942,9 @@ export function useSupabaseData() {
   // Reschedule job mutation with OFFLINE SUPPORT
   const rescheduleJobMutation = useMutation({
     mutationFn: async ({ jobId, newDate }: { jobId: string; newDate: string }) => {
+      // Validate session before critical operation
+      await validateSession(user?.id);
+
       if (!isOnline) {
         await mutationQueue.add({
           type: 'rescheduleJob',
@@ -1005,6 +1008,9 @@ export function useSupabaseData() {
   // Skip job mutation with OFFLINE SUPPORT
   const skipJobMutation = useMutation({
     mutationFn: async (jobId: string) => {
+      // Validate session before critical operation
+      await validateSession(user?.id);
+
       const job = pendingJobs.find(j => j.id === jobId) || upcomingJobs.find(j => j.id === jobId);
       if (!job) throw new Error('Job not found');
 
