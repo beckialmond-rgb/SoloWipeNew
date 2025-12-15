@@ -134,7 +134,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
         onDragEnd={handleDragEnd}
         style={{ x }}
         className={cn(
-          "bg-card rounded-xl shadow-sm border overflow-hidden relative swipe-card",
+          "bg-card rounded-xl shadow-sm border overflow-hidden relative swipe-card min-h-[140px]",
           isDragging && "cursor-grabbing",
           isNextUp ? "border-l-4 border-l-primary border-t border-r border-b border-border" : "border-border"
         )}
@@ -212,7 +212,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
               whileTap={{ scale: 0.95 }}
               onClick={handleSkip}
               className={cn(
-                "w-16 h-14 flex items-center justify-center",
+                "w-16 flex-1 flex items-center justify-center min-h-[52px]",
                 "bg-muted/50 hover:bg-muted transition-colors border-b border-border",
                 "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-muted"
               )}
@@ -226,7 +226,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
               whileTap={{ scale: 0.95 }}
               onClick={handleComplete}
               className={cn(
-                "w-16 h-14 flex items-center justify-center",
+                "w-16 flex-1 flex items-center justify-center min-h-[52px]",
                 "bg-success hover:bg-success/90 transition-colors",
                 "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-success"
               )}
