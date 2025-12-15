@@ -6,7 +6,7 @@ import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingState } from '@/components/LoadingState';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
-import { QuickScheduleModal } from '@/components/QuickScheduleModal';
+import { CalendarAddCustomerModal } from '@/components/CalendarAddCustomerModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useHaptics } from '@/hooks/useHaptics';
 import { JobWithCustomer } from '@/types/database';
@@ -16,33 +16,14 @@ import { Button } from '@/components/ui/button';
 type ViewMode = 'month' | 'week';
 
 const Calendar = () => {
-  const { pendingJobs, upcomingJobs, completedToday, customers, rescheduleJob, isLoading } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, completedToday, addCustomer, rescheduleJob, isLoading } = useSupabaseData();
   const { lightTap } = useHaptics();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
-  const [quickScheduleOpen, setQuickScheduleOpen] = useState(false);
+  const [addCustomerOpen, setAddCustomerOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
-
-  // Active customers for quick schedule with frequency and last clean info
-  const activeCustomers = useMemo(() => {
-    return customers.filter(c => c.status === 'active').map(c => {
-      // Find the most recent completed job for this customer
-      const customerCompletedJobs = [...pendingJobs, ...upcomingJobs, ...completedToday]
-        .filter(j => j.customer_id === c.id && j.status === 'completed' && j.completed_at)
-        .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime());
-      
-      return {
-        id: c.id,
-        name: c.name,
-        address: c.address,
-        price: Number(c.price),
-        frequency_weeks: c.frequency_weeks,
-        last_completed_date: customerCompletedJobs[0]?.completed_at || null
-      };
-    });
-  }, [customers, pendingJobs, upcomingJobs, completedToday]);
 
   // Combine all jobs for the calendar view
   const allJobs = useMemo(() => {
@@ -380,11 +361,11 @@ const Calendar = () => {
                       <CalendarDays className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                       <p className="text-muted-foreground mb-4">No jobs scheduled</p>
                       <Button
-                        onClick={() => setQuickScheduleOpen(true)}
+                        onClick={() => setAddCustomerOpen(true)}
                         className="gap-2"
                       >
                         <Plus className="w-4 h-4" />
-                        Quick Schedule
+                        Add Customer
                       </Button>
                     </div>
                   ) : (
@@ -458,7 +439,7 @@ const Calendar = () => {
             size="icon"
             onClick={() => {
               lightTap();
-              setQuickScheduleOpen(true);
+              setAddCustomerOpen(true);
             }}
             className="h-14 w-14 rounded-full shadow-lg"
           >
@@ -475,12 +456,11 @@ const Calendar = () => {
       />
 
       {selectedDate && (
-        <QuickScheduleModal
-          open={quickScheduleOpen}
-          onOpenChange={setQuickScheduleOpen}
+        <CalendarAddCustomerModal
+          open={addCustomerOpen}
+          onOpenChange={setAddCustomerOpen}
           selectedDate={selectedDate}
-          customers={activeCustomers}
-          bookedCustomerIds={selectedDateJobs.map(job => job.customer_id)}
+          onSubmit={addCustomer}
         />
       )}
 
