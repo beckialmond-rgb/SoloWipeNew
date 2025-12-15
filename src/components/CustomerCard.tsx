@@ -25,7 +25,7 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
       "overflow-hidden flex-shrink-0 box-border"
     )}
     >
-      <div className="flex-1 min-w-0 overflow-hidden">
+      <div className="flex-1 min-w-0 overflow-hidden max-w-[calc(100%-100px)]">
         <div className="flex items-center gap-2 min-w-0">
           <h3 className="font-semibold text-foreground truncate text-base max-w-[70%]">
             {customer.name}
@@ -46,13 +46,13 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground min-w-0 overflow-hidden">
+        <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground min-w-0 overflow-hidden max-w-full">
           <MapPin className="w-4 h-4 flex-shrink-0" />
           <span className="truncate min-w-0 whitespace-nowrap">{customer.address}</span>
         </div>
       </div>
       
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-shrink-0">
         <span className="font-bold text-foreground text-lg">
           £{customer.price}
         </span>
