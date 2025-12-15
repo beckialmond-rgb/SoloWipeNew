@@ -140,19 +140,20 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       className={cn(
-        "flex items-stretch rounded-xl bg-card shadow-sm min-h-[72px]",
-        "border border-border overflow-hidden"
+        "flex items-stretch rounded-xl bg-card shadow-sm",
+        "h-[72px] max-h-[72px] sm:h-[80px] sm:max-h-[80px]",
+        "border border-border overflow-hidden flex-shrink-0"
       )}
     >
       <button
         onClick={() => onClick?.(job)}
         className={cn(
           "flex-1 flex items-center justify-between text-left p-4",
-          "hover:bg-muted transition-colors",
+          "hover:bg-muted transition-colors overflow-hidden",
           "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
         )}
       >
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex items-center gap-2 min-w-0">
             <p className="font-medium text-foreground truncate max-w-[60%]">
               {job.customer.name}
@@ -164,9 +165,9 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
               <span title="DD Active"><CreditCard className="w-4 h-4 text-success flex-shrink-0" /></span>
             ) : null}
           </div>
-          <div className="flex items-center gap-1 mt-1 min-w-0">
+          <div className="flex items-center gap-1 mt-1 min-w-0 overflow-hidden">
             <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-            <p className="text-sm text-muted-foreground truncate min-w-0">
+            <p className="text-sm text-muted-foreground truncate min-w-0 whitespace-nowrap">
               {job.customer.address}
             </p>
           </div>
