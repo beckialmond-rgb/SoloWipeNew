@@ -4,6 +4,8 @@ import { X, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { googleReviewLinkSchema, validateForm } from '@/lib/validations';
+import { useToast } from '@/hooks/use-toast';
 
 interface EditGoogleReviewLinkModalProps {
   isOpen: boolean;
@@ -20,6 +22,7 @@ export function EditGoogleReviewLinkModal({
 }: EditGoogleReviewLinkModalProps) {
   const [link, setLink] = useState(currentLink || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen) {
@@ -29,9 +32,28 @@ export function EditGoogleReviewLinkModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Only validate if a link is provided
+    const trimmedLink = link.trim();
+    if (trimmedLink) {
+      const validation = validateForm(googleReviewLinkSchema, {
+        link: trimmedLink,
+      });
+
+      if (!validation.success) {
+        const firstError = Object.values(validation.errors)[0];
+        toast({
+          title: 'Validation Error',
+          description: firstError,
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
-      await onSubmit(link.trim() || null);
+      await onSubmit(trimmedLink || null);
       onClose();
     } finally {
       setIsSubmitting(false);

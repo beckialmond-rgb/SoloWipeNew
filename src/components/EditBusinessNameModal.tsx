@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Building } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { businessNameSchema, validateForm, sanitizeString } from '@/lib/validations';
+import { useToast } from '@/hooks/use-toast';
 
 interface EditBusinessNameModalProps {
   isOpen: boolean;
@@ -14,6 +16,7 @@ interface EditBusinessNameModalProps {
 export function EditBusinessNameModal({ isOpen, currentName, onClose, onSubmit }: EditBusinessNameModalProps) {
   const [name, setName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen) {
@@ -23,11 +26,25 @@ export function EditBusinessNameModal({ isOpen, currentName, onClose, onSubmit }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+
+    // Validate with Zod
+    const validation = validateForm(businessNameSchema, {
+      name: sanitizeString(name),
+    });
+
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors)[0];
+      toast({
+        title: 'Validation Error',
+        description: firstError,
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      await onSubmit(name.trim());
+      await onSubmit(validation.data.name);
       onClose();
     } finally {
       setIsSubmitting(false);
