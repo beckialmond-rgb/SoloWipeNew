@@ -557,9 +557,11 @@ export function useSupabaseData() {
     onMutate: async ({ jobId, method }) => {
       await queryClient.cancelQueries({ queryKey: ['unpaidJobs'] });
       await queryClient.cancelQueries({ queryKey: ['paidThisWeek'] });
+      await queryClient.cancelQueries({ queryKey: ['completedToday'] });
 
       const previousUnpaid = queryClient.getQueryData(['unpaidJobs', user?.id]);
       const previousPaid = queryClient.getQueryData(['paidThisWeek', user?.id]);
+      const previousCompletedToday = queryClient.getQueryData(['completedToday', user?.id]);
 
       const job = unpaidJobs.find(j => j.id === jobId);
       if (job) {
@@ -578,9 +580,14 @@ export function useSupabaseData() {
         queryClient.setQueryData(['paidThisWeek', user?.id], (old: JobWithCustomer[] | undefined) =>
           [paidJob, ...(old || [])]
         );
+
+        // Update completedToday cache to reflect paid status immediately
+        queryClient.setQueryData(['completedToday', user?.id], (old: JobWithCustomer[] | undefined) =>
+          (old || []).map(j => j.id === jobId ? paidJob : j)
+        );
       }
 
-      return { previousUnpaid, previousPaid };
+      return { previousUnpaid, previousPaid, previousCompletedToday };
     },
     onError: (err, variables, context) => {
       if (context?.previousUnpaid) {
@@ -588,6 +595,9 @@ export function useSupabaseData() {
       }
       if (context?.previousPaid) {
         queryClient.setQueryData(['paidThisWeek', user?.id], context.previousPaid);
+      }
+      if (context?.previousCompletedToday) {
+        queryClient.setQueryData(['completedToday', user?.id], context.previousCompletedToday);
       }
       toast({
         title: 'Error',
@@ -600,6 +610,7 @@ export function useSupabaseData() {
         queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
         queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
         queryClient.invalidateQueries({ queryKey: ['weeklyEarnings'] });
+        queryClient.invalidateQueries({ queryKey: ['completedToday'] });
       }
     },
   });
