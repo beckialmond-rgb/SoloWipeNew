@@ -156,7 +156,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
           <div className="flex-1 p-4 flex flex-col justify-center">
             <div className="flex items-start gap-2 mb-1">
               <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <h3 className="font-semibold text-foreground text-base leading-tight">
+              <h3 className="font-semibold text-foreground text-base leading-tight truncate">
                 {job.customer.address}
               </h3>
             </div>
@@ -164,7 +164,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
               <span className="text-xl font-bold text-foreground">
                 £{job.customer.price}
               </span>
-              <span className="text-sm text-muted-foreground">
+              <span className="text-sm text-muted-foreground truncate max-w-[120px]">
                 {job.customer.name}
               </span>
               {/* Mandate Status Indicator */}
