@@ -140,7 +140,7 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       className={cn(
-        "flex items-stretch rounded-xl bg-card shadow-sm",
+        "flex items-stretch rounded-xl bg-card shadow-sm min-h-[72px]",
         "border border-border overflow-hidden"
       )}
     >
@@ -186,13 +186,13 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
       <button
         onClick={handleSkip}
         className={cn(
-          "w-14 flex items-center justify-center",
+          "w-16 flex items-center justify-center min-h-[52px]",
           "bg-muted hover:bg-muted/80 transition-colors border-l border-border",
           "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
         )}
         aria-label={`Skip ${job.customer.name}`}
       >
-        <SkipForward className="w-4 h-4 text-muted-foreground" />
+        <SkipForward className="w-5 h-5 text-muted-foreground" />
       </button>
     </motion.div>
   );
