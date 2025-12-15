@@ -6,6 +6,7 @@ import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { customerSchema, validateForm, sanitizeString } from '@/lib/validations';
 import { useToast } from '@/hooks/use-toast';
+import { FormField, getInputClassName } from '@/components/ui/form-field';
 
 interface EditCustomerModalProps {
   customer: Customer | null;
@@ -124,132 +125,123 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
 
             <div className="space-y-4">
               {/* Name */}
-              <div>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                  <User className="w-4 h-4" />
-                  Name *
-                </label>
+              <FormField 
+                label="Name" 
+                icon={<User className="w-4 h-4" />} 
+                required 
+                error={errors.name}
+              >
                 <input
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    if (errors.name) setErrors(prev => ({ ...prev, name: undefined }));
+                  }}
                   placeholder="John Smith"
-                  required
-                  className={cn(
-                    "w-full h-14 px-4 rounded-xl",
-                    "bg-muted border-0",
-                    "text-foreground placeholder:text-muted-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-primary"
-                  )}
+                  className={getInputClassName(!!errors.name)}
                 />
-              </div>
+              </FormField>
 
               {/* Address */}
-              <div>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                  <MapPin className="w-4 h-4" />
-                  Address *
-                </label>
+              <FormField 
+                label="Address" 
+                icon={<MapPin className="w-4 h-4" />} 
+                required 
+                error={errors.address}
+              >
                 <input
                   type="text"
                   value={address}
-                  onChange={(e) => setAddress(e.target.value)}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    if (errors.address) setErrors(prev => ({ ...prev, address: undefined }));
+                  }}
                   placeholder="123 Main Street"
-                  required
-                  className={cn(
-                    "w-full h-14 px-4 rounded-xl",
-                    "bg-muted border-0",
-                    "text-foreground placeholder:text-muted-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-primary"
-                  )}
+                  className={getInputClassName(!!errors.address)}
                 />
-              </div>
+              </FormField>
 
               {/* Mobile Phone */}
-              <div>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                  <Phone className="w-4 h-4" />
-                  Mobile Phone
-                </label>
+              <FormField 
+                label="Mobile Phone" 
+                icon={<Phone className="w-4 h-4" />}
+                error={errors.mobile_phone}
+              >
                 <input
                   type="tel"
                   value={mobilePhone}
-                  onChange={(e) => setMobilePhone(e.target.value)}
+                  onChange={(e) => {
+                    setMobilePhone(e.target.value);
+                    if (errors.mobile_phone) setErrors(prev => ({ ...prev, mobile_phone: undefined }));
+                  }}
                   placeholder="07123 456789"
-                  className={cn(
-                    "w-full h-14 px-4 rounded-xl",
-                    "bg-muted border-0",
-                    "text-foreground placeholder:text-muted-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-primary"
-                  )}
+                  className={getInputClassName(!!errors.mobile_phone)}
                 />
-              </div>
+              </FormField>
 
               {/* Price and Frequency Row */}
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                    <PoundSterling className="w-4 h-4" />
-                    Price *
-                  </label>
+                <FormField 
+                  label="Price" 
+                  icon={<PoundSterling className="w-4 h-4" />} 
+                  required 
+                  error={errors.price}
+                >
                   <input
                     type="number"
                     value={price}
-                    onChange={(e) => setPrice(e.target.value)}
+                    onChange={(e) => {
+                      setPrice(e.target.value);
+                      if (errors.price) setErrors(prev => ({ ...prev, price: undefined }));
+                    }}
                     min="0"
                     step="0.01"
-                    required
-                    className={cn(
-                      "w-full h-14 px-4 rounded-xl",
-                      "bg-muted border-0",
-                      "text-foreground placeholder:text-muted-foreground",
-                      "focus:outline-none focus:ring-2 focus:ring-primary"
-                    )}
+                    className={getInputClassName(!!errors.price)}
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                    <Repeat className="w-4 h-4" />
-                    Frequency
-                  </label>
+                <FormField 
+                  label="Frequency" 
+                  icon={<Repeat className="w-4 h-4" />}
+                  error={errors.frequency_weeks}
+                >
                   <select
                     value={frequencyWeeks}
                     onChange={(e) => setFrequencyWeeks(e.target.value)}
-                    className={cn(
-                      "w-full h-14 px-4 rounded-xl",
-                      "bg-muted border-0",
-                      "text-foreground",
-                      "focus:outline-none focus:ring-2 focus:ring-primary"
-                    )}
+                    className={getInputClassName(!!errors.frequency_weeks)}
                   >
                     <option value="2">2 weeks</option>
                     <option value="4">4 weeks</option>
                     <option value="6">6 weeks</option>
                     <option value="8">8 weeks</option>
                   </select>
-                </div>
+                </FormField>
               </div>
 
               {/* Notes */}
-              <div>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                  <FileText className="w-4 h-4" />
-                  Notes
-                </label>
+              <FormField 
+                label="Notes" 
+                icon={<FileText className="w-4 h-4" />}
+                error={errors.notes}
+              >
                 <textarea
                   value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                  onChange={(e) => {
+                    setNotes(e.target.value);
+                    if (errors.notes) setErrors(prev => ({ ...prev, notes: undefined }));
+                  }}
                   placeholder="Gate code, pet warnings, special instructions..."
                   rows={3}
                   className={cn(
-                    "w-full px-4 py-3 rounded-xl resize-none",
-                    "bg-muted border-0",
+                    "w-full px-4 py-3 rounded-xl resize-none border-2 transition-colors",
+                    "bg-muted",
                     "text-foreground placeholder:text-muted-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-primary"
+                    "focus:outline-none focus:ring-2 focus:ring-primary",
+                    errors.notes ? "border-destructive focus:ring-destructive" : "border-transparent"
                   )}
                 />
-              </div>
+              </FormField>
             </div>
 
             {/* Submit Button */}
