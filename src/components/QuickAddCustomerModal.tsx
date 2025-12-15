@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/drawer';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { quickAddCustomerSchema, validateForm, sanitizeString } from '@/lib/validations';
+import { useToast } from '@/hooks/use-toast';
 
 interface QuickAddCustomerModalProps {
   isOpen: boolean;
@@ -29,18 +31,38 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
   const [address, setAddress] = useState('');
   const [price, setPrice] = useState('20');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !address.trim()) return;
+    setErrors({});
+
+    // Validate with Zod
+    const validation = validateForm(quickAddCustomerSchema, {
+      name: sanitizeString(name),
+      address: sanitizeString(address),
+      price: parseFloat(price) || 0,
+    });
+
+    if (!validation.success) {
+      setErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast({
+        title: 'Validation Error',
+        description: firstError,
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       await onSubmit({
-        name: name.trim(),
-        address: address.trim(),
+        name: validation.data.name,
+        address: validation.data.address,
         mobile_phone: '',
-        price: parseFloat(price) || 20,
+        price: validation.data.price,
         frequency_weeks: 4,
         first_clean_date: format(new Date(), 'yyyy-MM-dd'),
       });
@@ -48,6 +70,7 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
       setName('');
       setAddress('');
       setPrice('20');
+      setErrors({});
       onClose();
     } finally {
       setIsSubmitting(false);
