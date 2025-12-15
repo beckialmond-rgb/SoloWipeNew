@@ -186,7 +186,7 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
       <button
         onClick={handleSkip}
         className={cn(
-          "w-16 flex items-center justify-center min-h-[52px]",
+          "w-16 h-14 flex items-center justify-center",
           "bg-muted hover:bg-muted/80 transition-colors border-l border-border",
           "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
         )}
