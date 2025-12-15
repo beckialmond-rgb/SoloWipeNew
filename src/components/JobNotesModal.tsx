@@ -4,6 +4,8 @@ import { X, StickyNote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { jobNotesSchema, validateForm, sanitizeString } from '@/lib/validations';
+import { useToast } from '@/hooks/use-toast';
 
 interface JobNotesModalProps {
   job: JobWithCustomer | null;
@@ -15,6 +17,7 @@ interface JobNotesModalProps {
 export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalProps) {
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (job) {
@@ -24,9 +27,25 @@ export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalPro
 
   const handleSave = async () => {
     if (!job) return;
+
+    // Validate with Zod
+    const validation = validateForm(jobNotesSchema, {
+      notes: sanitizeString(notes),
+    });
+
+    if (!validation.success) {
+      const firstError = Object.values(validation.errors)[0];
+      toast({
+        title: 'Validation Error',
+        description: firstError,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSaving(true);
     try {
-      await onSave(job.id, notes.trim() || null);
+      await onSave(job.id, validation.data.notes || null);
       onClose();
     } finally {
       setIsSaving(false);
