@@ -4,6 +4,8 @@ import { X, User, MapPin, Phone, PoundSterling, Repeat, FileText } from 'lucide-
 import { Button } from '@/components/ui/button';
 import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { customerSchema, validateForm, sanitizeString } from '@/lib/validations';
+import { useToast } from '@/hooks/use-toast';
 
 interface EditCustomerModalProps {
   customer: Customer | null;
@@ -27,6 +29,8 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
   const [frequencyWeeks, setFrequencyWeeks] = useState('4');
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { toast } = useToast();
 
   useEffect(() => {
     if (customer) {
@@ -36,22 +40,45 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
       setPrice(customer.price.toString());
       setFrequencyWeeks(customer.frequency_weeks.toString());
       setNotes(customer.notes || '');
+      setErrors({});
     }
   }, [customer]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customer || !name.trim() || !address.trim()) return;
+    if (!customer) return;
+    setErrors({});
+
+    // Validate with Zod
+    const validation = validateForm(customerSchema, {
+      name: sanitizeString(name),
+      address: sanitizeString(address),
+      mobile_phone: sanitizeString(mobilePhone),
+      price: parseFloat(price) || 0,
+      frequency_weeks: parseInt(frequencyWeeks) || 4,
+      notes: sanitizeString(notes),
+    });
+
+    if (!validation.success) {
+      setErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast({
+        title: 'Validation Error',
+        description: firstError,
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       await onSubmit(customer.id, {
-        name: name.trim(),
-        address: address.trim(),
-        mobile_phone: mobilePhone.trim() || null,
-        price: parseFloat(price) || 20,
-        frequency_weeks: parseInt(frequencyWeeks) || 4,
-        notes: notes.trim() || null,
+        name: validation.data.name,
+        address: validation.data.address,
+        mobile_phone: validation.data.mobile_phone || null,
+        price: validation.data.price,
+        frequency_weeks: validation.data.frequency_weeks,
+        notes: validation.data.notes || null,
       });
       onClose();
     } finally {
