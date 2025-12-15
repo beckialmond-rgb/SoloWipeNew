@@ -15,8 +15,7 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
-      style={{ height: '72px', minHeight: '72px', maxHeight: '72px' }}
-      className="flex-shrink-0"
+      className="h-full w-full"
     >
       <button
         onClick={onClick}
