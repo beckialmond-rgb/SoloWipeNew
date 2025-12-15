@@ -18,10 +18,11 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
       onClick={onClick}
     className={cn(
       "w-full bg-card rounded-xl shadow-sm border border-border p-4",
-      "flex items-center gap-4 text-left touch-lg",
+      "flex items-center gap-4 text-left",
       "hover:bg-muted/50 transition-colors",
       "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-      "h-[72px] max-h-[72px] sm:h-[80px] sm:max-h-[80px] md:h-[88px] md:max-h-[88px] overflow-hidden flex-shrink-0"
+      "!h-[72px] !max-h-[72px] sm:!h-[80px] sm:!max-h-[80px] md:!h-[88px] md:!max-h-[88px]",
+      "overflow-hidden flex-shrink-0 box-border"
     )}
     >
       <div className="flex-1 min-w-0 overflow-hidden">
