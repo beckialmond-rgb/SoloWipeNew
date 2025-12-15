@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { quickAddCustomerSchema, validateForm, sanitizeString } from '@/lib/validations';
 import { useToast } from '@/hooks/use-toast';
+import { FormField, getInputClassName } from '@/components/ui/form-field';
 
 interface QuickAddCustomerModalProps {
   isOpen: boolean;
@@ -95,78 +96,72 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
         <form onSubmit={handleSubmit} autoComplete="off" className="px-6 pb-10 overflow-y-auto flex-1">
           <div className="space-y-3">
             {/* Name */}
-            <div>
-              <label htmlFor="quick-add-name" className="flex items-center gap-2 text-sm text-muted-foreground mb-1.5">
-                <User className="w-4 h-4" />
-                Name
-              </label>
+            <FormField 
+              label="Name" 
+              icon={<User className="w-4 h-4" />} 
+              required 
+              error={errors.name}
+            >
               <input
                 id="quick-add-name"
                 name="customer_name"
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  if (errors.name) setErrors(prev => ({ ...prev, name: undefined }));
+                }}
                 placeholder="Customer name"
-                required
                 autoFocus
                 autoComplete="off"
-                className={cn(
-                  "w-full h-14 px-4 rounded-xl",
-                  "bg-muted border-0",
-                  "text-foreground placeholder:text-muted-foreground",
-                  "focus:outline-none focus:ring-2 focus:ring-primary"
-                )}
+                className={getInputClassName(!!errors.name)}
               />
-            </div>
+            </FormField>
 
             {/* Address */}
-            <div>
-              <label htmlFor="quick-add-address" className="flex items-center gap-2 text-sm text-muted-foreground mb-1.5">
-                <MapPin className="w-4 h-4" />
-                Address
-              </label>
+            <FormField 
+              label="Address" 
+              icon={<MapPin className="w-4 h-4" />} 
+              required 
+              error={errors.address}
+            >
               <input
                 id="quick-add-address"
                 name="customer_address"
                 type="text"
                 value={address}
-                onChange={(e) => setAddress(e.target.value)}
+                onChange={(e) => {
+                  setAddress(e.target.value);
+                  if (errors.address) setErrors(prev => ({ ...prev, address: undefined }));
+                }}
                 placeholder="Full address"
-                required
                 autoComplete="off"
-                className={cn(
-                  "w-full h-14 px-4 rounded-xl",
-                  "bg-muted border-0",
-                  "text-foreground placeholder:text-muted-foreground",
-                  "focus:outline-none focus:ring-2 focus:ring-primary"
-                )}
+                className={getInputClassName(!!errors.address)}
               />
-            </div>
+            </FormField>
 
             {/* Price */}
-            <div>
-              <label htmlFor="quick-add-price" className="flex items-center gap-2 text-sm text-muted-foreground mb-1.5">
-                <PoundSterling className="w-4 h-4" />
-                Price
-              </label>
+            <FormField 
+              label="Price" 
+              icon={<PoundSterling className="w-4 h-4" />} 
+              required 
+              error={errors.price}
+            >
               <input
                 id="quick-add-price"
                 name="customer_price"
                 type="number"
                 value={price}
-                onChange={(e) => setPrice(e.target.value)}
+                onChange={(e) => {
+                  setPrice(e.target.value);
+                  if (errors.price) setErrors(prev => ({ ...prev, price: undefined }));
+                }}
                 min="0"
                 step="0.01"
-                required
                 autoComplete="off"
-                className={cn(
-                  "w-full h-14 px-4 rounded-xl",
-                  "bg-muted border-0",
-                  "text-foreground placeholder:text-muted-foreground",
-                  "focus:outline-none focus:ring-2 focus:ring-primary"
-                )}
+                className={getInputClassName(!!errors.price)}
               />
-            </div>
+            </FormField>
           </div>
 
           <p className="text-xs text-muted-foreground text-center mt-4">
