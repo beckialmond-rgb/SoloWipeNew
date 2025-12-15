@@ -370,7 +370,10 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
           <div className="mt-4 pt-4 border-t space-y-3">
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">
-                Organisation ID: {profile?.gocardless_organisation_id?.substring(0, 12)}...
+                <div>Organisation ID: {profile?.gocardless_organisation_id?.substring(0, 12)}...</div>
+                <p className="text-xs text-muted-foreground/70 mt-1">
+                  Standard platform & processing fees apply to payout.
+                </p>
               </div>
               <Button
                 variant="outline"
