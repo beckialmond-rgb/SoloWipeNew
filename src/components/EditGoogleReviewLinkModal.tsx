@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Link as LinkIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { googleReviewLinkSchema, validateForm } from '@/lib/validations';
-import { useToast } from '@/hooks/use-toast';
+import { FormField, getInputClassName } from '@/components/ui/form-field';
 
 interface EditGoogleReviewLinkModalProps {
   isOpen: boolean;
@@ -22,11 +21,12 @@ export function EditGoogleReviewLinkModal({
 }: EditGoogleReviewLinkModalProps) {
   const [link, setLink] = useState(currentLink || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+  const [error, setError] = useState<string | undefined>();
 
   useEffect(() => {
     if (isOpen) {
       setLink(currentLink || '');
+      setError(undefined);
     }
   }, [isOpen, currentLink]);
 
@@ -41,16 +41,12 @@ export function EditGoogleReviewLinkModal({
       });
 
       if (!validation.success) {
-        const firstError = Object.values(validation.errors)[0];
-        toast({
-          title: 'Validation Error',
-          description: firstError,
-          variant: 'destructive',
-        });
+        setError(validation.errors.link);
         return;
       }
     }
 
+    setError(undefined);
     setIsSubmitting(true);
     try {
       await onSubmit(trimmedLink || null);
@@ -103,26 +99,26 @@ export function EditGoogleReviewLinkModal({
               Add your Google Business review link to enable "Ask for Review" buttons after completing jobs.
             </p>
 
-            <div className="space-y-2 mb-6">
-              <label className="text-sm font-medium text-foreground">
-                Review Link URL
-              </label>
-              <Input
+            <FormField
+              label="Review Link URL"
+              icon={<LinkIcon className="w-4 h-4" />}
+              error={error}
+              className="mb-2"
+            >
+              <input
                 type="url"
                 value={link}
-                onChange={(e) => setLink(e.target.value)}
+                onChange={(e) => {
+                  setLink(e.target.value);
+                  if (error) setError(undefined);
+                }}
                 placeholder="https://g.page/r/YOUR_BUSINESS_ID/review"
-                className={cn(
-                  "h-14 px-4",
-                  "bg-muted border-0",
-                  "text-foreground placeholder:text-muted-foreground",
-                  "focus:ring-2 focus:ring-primary"
-                )}
+                className={getInputClassName(!!error)}
               />
-              <p className="text-xs text-muted-foreground">
-                Find this in your Google Business Profile → Share → Ask for reviews
-              </p>
-            </div>
+            </FormField>
+            <p className="text-xs text-muted-foreground mb-6">
+              Find this in your Google Business Profile → Share → Ask for reviews
+            </p>
 
             <div className="flex gap-3">
               <Button
