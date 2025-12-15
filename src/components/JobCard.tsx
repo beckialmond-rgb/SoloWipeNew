@@ -153,7 +153,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
           </div>
           
           {/* Content */}
-          <div className="flex-1 p-4 flex flex-col justify-center">
+          <div className="flex-1 min-w-0 p-4 flex flex-col justify-center">
             <div className="flex items-start gap-2 mb-1">
               <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
               <h3 className="font-semibold text-foreground text-base leading-tight truncate">
@@ -164,7 +164,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
               <span className="text-xl font-bold text-foreground">
                 £{job.customer.price}
               </span>
-              <span className="text-sm text-muted-foreground truncate max-w-[120px]">
+              <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
                 {job.customer.name}
               </span>
               {/* Mandate Status Indicator */}
@@ -212,7 +212,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
               whileTap={{ scale: 0.95 }}
               onClick={handleSkip}
               className={cn(
-                "w-16 flex-1 flex items-center justify-center min-h-[52px]",
+                "w-16 h-14 flex items-center justify-center",
                 "bg-muted/50 hover:bg-muted transition-colors border-b border-border",
                 "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-muted"
               )}
@@ -226,7 +226,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
               whileTap={{ scale: 0.95 }}
               onClick={handleComplete}
               className={cn(
-                "w-16 flex-1 flex items-center justify-center min-h-[52px]",
+                "w-16 h-14 flex items-center justify-center",
                 "bg-success hover:bg-success/90 transition-colors",
                 "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-success"
               )}
