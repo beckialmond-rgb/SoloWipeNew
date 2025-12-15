@@ -39,8 +39,8 @@ export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner'
       <div className="p-4">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="font-semibold text-foreground truncate text-lg">
+            <div className="flex items-center gap-2 min-w-0">
+              <p className="font-semibold text-foreground truncate text-lg max-w-[70%]">
                 {job.customer.name}
               </p>
               {/* Mandate Status Indicator */}
@@ -52,7 +52,7 @@ export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner'
             </div>
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-1">
               <MapPin className="w-4 h-4 flex-shrink-0" />
-              <span className="truncate">{job.customer.address}</span>
+              <span className="truncate min-w-0">{job.customer.address}</span>
             </div>
             <p className="text-xs text-muted-foreground mt-2">
               Completed: {job.completed_at ? format(new Date(job.completed_at), 'd MMM yyyy') : 'Unknown'}
