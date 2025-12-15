@@ -140,8 +140,8 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       className={cn(
-        "flex items-stretch rounded-xl bg-muted/50",
-        "border border-border/50 overflow-hidden"
+        "flex items-stretch rounded-xl bg-card shadow-sm",
+        "border border-border overflow-hidden"
       )}
     >
       <button
@@ -159,9 +159,9 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
             </p>
             {/* Mandate Status Indicator */}
             {job.customer.gocardless_mandate_status === 'pending' ? (
-              <span title="DD Pending"><Clock className="w-3.5 h-3.5 text-warning flex-shrink-0" /></span>
+              <span title="DD Pending"><Clock className="w-4 h-4 text-warning flex-shrink-0" /></span>
             ) : job.customer.gocardless_id ? (
-              <span title="DD Active"><CreditCard className="w-3.5 h-3.5 text-success flex-shrink-0" /></span>
+              <span title="DD Active"><CreditCard className="w-4 h-4 text-success flex-shrink-0" /></span>
             ) : null}
           </div>
           <div className="flex items-center gap-1 mt-1">
@@ -186,8 +186,8 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
       <button
         onClick={handleSkip}
         className={cn(
-          "w-12 flex items-center justify-center",
-          "bg-muted hover:bg-muted/80 transition-colors border-l border-border/50",
+          "w-14 flex items-center justify-center",
+          "bg-muted hover:bg-muted/80 transition-colors border-l border-border",
           "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
         )}
         aria-label={`Skip ${job.customer.name}`}
