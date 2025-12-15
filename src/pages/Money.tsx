@@ -198,6 +198,9 @@ const Money = () => {
                 </span>
               </div>
             </div>
+            <p className="text-[10px] text-muted-foreground/70 mt-2">
+              Standard platform & processing fees apply to payout.
+            </p>
           </motion.div>
         )}
 
