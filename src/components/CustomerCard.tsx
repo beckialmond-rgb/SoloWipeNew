@@ -16,12 +16,13 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
       onClick={onClick}
-      className={cn(
-        "w-full bg-card rounded-xl shadow-sm border border-border p-4",
-        "flex items-center gap-4 text-left touch-lg",
-        "hover:bg-muted/50 transition-colors",
-        "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-      )}
+    className={cn(
+      "w-full bg-card rounded-xl shadow-sm border border-border p-4",
+      "flex items-center gap-4 text-left touch-lg",
+      "hover:bg-muted/50 transition-colors",
+      "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+      "min-h-[80px]"
+    )}
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 min-w-0">
