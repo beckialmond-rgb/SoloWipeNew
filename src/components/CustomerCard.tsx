@@ -24,7 +24,7 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
       )}
     >
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <h3 className="font-semibold text-foreground truncate text-base max-w-[70%]">
             {customer.name}
           </h3>

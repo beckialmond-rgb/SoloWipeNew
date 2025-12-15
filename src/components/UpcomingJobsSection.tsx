@@ -153,7 +153,7 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
         )}
       >
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <p className="font-medium text-foreground truncate max-w-[60%]">
               {job.customer.name}
             </p>
@@ -164,9 +164,9 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
               <span title="DD Active"><CreditCard className="w-4 h-4 text-success flex-shrink-0" /></span>
             ) : null}
           </div>
-          <div className="flex items-center gap-1 mt-1">
+          <div className="flex items-center gap-1 mt-1 min-w-0">
             <MapPin className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-            <p className="text-sm text-muted-foreground truncate">
+            <p className="text-sm text-muted-foreground truncate min-w-0">
               {job.customer.address}
             </p>
           </div>
