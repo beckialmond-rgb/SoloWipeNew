@@ -21,10 +21,10 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
       "flex items-center gap-4 text-left touch-lg",
       "hover:bg-muted/50 transition-colors",
       "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-      "h-[72px] sm:h-[80px] md:h-[88px] overflow-hidden"
+      "h-[72px] max-h-[72px] sm:h-[80px] sm:max-h-[80px] md:h-[88px] md:max-h-[88px] overflow-hidden flex-shrink-0"
     )}
     >
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center gap-2 min-w-0">
           <h3 className="font-semibold text-foreground truncate text-base max-w-[70%]">
             {customer.name}
@@ -45,9 +45,9 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-1.5 mt-1.5 text-sm text-muted-foreground min-w-0">
+        <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground min-w-0 overflow-hidden">
           <MapPin className="w-4 h-4 flex-shrink-0" />
-          <span className="truncate min-w-0">{customer.address}</span>
+          <span className="truncate min-w-0 whitespace-nowrap">{customer.address}</span>
         </div>
       </div>
       
