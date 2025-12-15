@@ -9,6 +9,8 @@ import {
 } from '@/components/ui/drawer';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { customerSchema, validateForm, sanitizeString } from '@/lib/validations';
+import { useToast } from '@/hooks/use-toast';
 
 interface AddCustomerModalProps {
   isOpen: boolean;
@@ -33,21 +35,44 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
   const [firstCleanDate, setFirstCleanDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !address.trim()) return;
+    setErrors({});
+
+    // Validate with Zod
+    const validation = validateForm(customerSchema, {
+      name: sanitizeString(name),
+      address: sanitizeString(address),
+      mobile_phone: sanitizeString(mobilePhone),
+      price: parseFloat(price) || 0,
+      frequency_weeks: parseInt(frequencyWeeks) || 4,
+      notes: sanitizeString(notes),
+    });
+
+    if (!validation.success) {
+      setErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      toast({
+        title: 'Validation Error',
+        description: firstError,
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsSubmitting(true);
     try {
       await onSubmit({
-        name: name.trim(),
-        address: address.trim(),
-        mobile_phone: mobilePhone.trim(),
-        price: parseFloat(price) || 20,
-        frequency_weeks: parseInt(frequencyWeeks) || 4,
+        name: validation.data.name,
+        address: validation.data.address,
+        mobile_phone: validation.data.mobile_phone || '',
+        price: validation.data.price,
+        frequency_weeks: validation.data.frequency_weeks,
         first_clean_date: firstCleanDate,
-        notes: notes.trim() || undefined,
+        notes: validation.data.notes || undefined,
       });
       // Reset form
       setName('');
@@ -57,6 +82,7 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
       setFrequencyWeeks('4');
       setFirstCleanDate(format(new Date(), 'yyyy-MM-dd'));
       setNotes('');
+      setErrors({});
       onClose();
     } finally {
       setIsSubmitting(false);
