@@ -890,6 +890,9 @@ export function useSupabaseData() {
     mutationFn: async (newName: string) => {
       if (!user) throw new Error('Not authenticated');
 
+      // Validate session before critical operation
+      await validateSession(user.id);
+
       const { error } = await supabase
         .from('profiles')
         .update({ business_name: newName })
@@ -916,6 +919,9 @@ export function useSupabaseData() {
   const updateGoogleReviewLinkMutation = useMutation({
     mutationFn: async (link: string | null) => {
       if (!user) throw new Error('Not authenticated');
+
+      // Validate session before critical operation
+      await validateSession(user.id);
 
       const { error } = await supabase
         .from('profiles')
