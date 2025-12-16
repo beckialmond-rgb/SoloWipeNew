@@ -9,19 +9,25 @@ import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SoftPaywallProvider } from "@/hooks/useSoftPaywall";
-import { TrialGateModal } from "@/components/TrialGateModal";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 import { OfflineProvider } from "@/contexts/OfflineContext";
-import { OfflineIndicator } from "@/components/OfflineIndicator";
 import { ReloadPrompt } from "@/components/ReloadPrompt";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { WhatsNewModal } from "@/components/WhatsNewModal";
 import { LoadingState } from "@/components/LoadingState";
 import { queryPersister, CACHE_TIME, STALE_TIME } from "@/lib/queryPersister";
 
-// Eagerly loaded pages (most frequently used)
-import Index from "./pages/Index";
-import Auth from "./pages/Auth";
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+
+const OfflineIndicator = lazy(() =>
+  import("@/components/OfflineIndicator").then((m) => ({ default: m.OfflineIndicator }))
+);
+const WhatsNewModal = lazy(() =>
+  import("@/components/WhatsNewModal").then((m) => ({ default: m.WhatsNewModal }))
+);
+const TrialGateModal = lazy(() =>
+  import("@/components/TrialGateModal").then((m) => ({ default: m.TrialGateModal }))
+);
 
 // Lazy loaded pages (less frequently used, heavier bundles)
 const Customers = lazy(() => import("./pages/Customers"));
@@ -74,13 +80,19 @@ const App = () => (
           <SoftPaywallProvider>
             <OfflineProvider>
               <TooltipProvider>
-              <OfflineIndicator />
+              <Suspense fallback={null}>
+                <OfflineIndicator />
+              </Suspense>
               <ReloadPrompt />
-              <WhatsNewModal />
+              <Suspense fallback={null}>
+                <WhatsNewModal />
+              </Suspense>
               <Toaster />
               <Sonner />
                 <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-                  <TrialGateModal />
+                  <Suspense fallback={null}>
+                    <TrialGateModal />
+                  </Suspense>
                   <KeyboardShortcutsProvider>
                     <Suspense fallback={<LoadingState message="Loading..." />}>
                       <Routes>

@@ -80,7 +80,7 @@ function isValidEmail(email: string): boolean {
 function sanitizeString(str: unknown, maxLength: number = 100): string {
   if (typeof str !== 'string') return '';
   return str
-    .replace(/[<>\"'&]/g, '')
+    .replace(/[<>"'&]/g, '')
     .slice(0, maxLength)
     .trim();
 }

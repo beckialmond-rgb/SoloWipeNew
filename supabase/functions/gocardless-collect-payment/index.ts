@@ -84,7 +84,7 @@ function sanitizeDescription(description: unknown): string {
   if (typeof description !== 'string') return '';
   // Remove any potentially harmful characters, limit length
   return description
-    .replace(/[<>\"'&]/g, '')
+    .replace(/[<>"'&]/g, '')
     .slice(0, 200)
     .trim();
 }

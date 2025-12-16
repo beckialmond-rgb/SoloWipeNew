@@ -10,12 +10,11 @@ export function ReloadPrompt() {
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(swUrl, r) {
-      console.log('SW registered:', swUrl);
-      // Check for updates every 30 seconds
+      // Check for updates periodically (keep it light for mobile battery/CPU).
       if (r) {
         setInterval(() => {
           r.update();
-        }, 30 * 1000);
+        }, 5 * 60 * 1000); // 5 minutes
       }
     },
     onRegisterError(error) {

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, differenceInDays } from 'date-fns';
 import { AnimatePresence, motion, Reorder } from 'framer-motion';
-import confetti from 'canvas-confetti';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { JobCard } from '@/components/JobCard';
@@ -211,6 +210,8 @@ const Index = () => {
   const handleCompleteRequest = (job: JobWithCustomer) => {
     setJobToComplete(job);
     setCapturedPhotoUrl(null);
+    // Prefetch confetti chunk during the completion flow (keeps initial bundle smaller).
+    void import('canvas-confetti');
     setPriceAdjustOpen(true);
   };
 
@@ -221,13 +222,18 @@ const Index = () => {
     setPriceAdjustOpen(false);
     setCompletingJobId(jobId);
 
-    // Fire confetti immediately for responsiveness
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#22C55E', '#007AFF', '#FFD700'],
-    });
+    // Fire confetti (loaded on-demand to keep the initial bundle smaller).
+    try {
+      const { default: confetti } = await import('canvas-confetti');
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#22C55E', '#007AFF', '#FFD700'],
+      });
+    } catch {
+      // Non-critical: ignore if confetti fails to load.
+    }
 
     // Optimistically remove from local state
     setLocalJobs(prev => prev.filter(job => job.id !== jobId));
