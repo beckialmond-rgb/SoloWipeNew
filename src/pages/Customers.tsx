@@ -441,7 +441,7 @@ const Customers = () => {
         <CustomerDetailModal
           customer={selectedCustomer}
           businessName={businessName}
-          profile={profile as any}
+          profile={profile}
           onClose={() => setSelectedCustomer(null)}
           onEdit={handleEditCustomer}
           onArchive={handleArchiveCustomer}

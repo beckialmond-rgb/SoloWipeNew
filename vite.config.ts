@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
+import { visualizer } from "rollup-plugin-visualizer";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -16,6 +17,13 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === "development" && componentTagger(),
+    mode === "analyze" &&
+      visualizer({
+        filename: "dist/stats.html",
+        gzipSize: true,
+        brotliSize: true,
+        open: false,
+      }),
     VitePWA({
       registerType: "prompt",
       includeAssets: ["favicon.ico", "logo.png", "app-icon.png"],
@@ -85,6 +93,42 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  build: {
+    // Keep sourcemaps off by default for smaller production payloads.
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        // Improve long-term caching by splitting large dependencies into stable chunks.
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+
+          if (
+            id.includes("/react/") ||
+            id.includes("/react-dom/") ||
+            id.includes("react-router-dom") ||
+            id.includes("/scheduler/")
+          )
+            return "react";
+
+          if (id.includes("framer-motion")) return "motion";
+          if (id.includes("recharts") || id.includes("/d3-")) return "charts";
+          if (id.includes("@radix-ui")) return "radix";
+          if (id.includes("@tanstack")) return "tanstack";
+          if (id.includes("@supabase")) return "supabase";
+          if (id.includes("lucide-react")) return "icons";
+          if (
+            id.includes("react-hook-form") ||
+            id.includes("@hookform/") ||
+            id.includes("/zod/")
+          )
+            return "forms";
+          if (id.includes("/date-fns/") || id.includes("react-day-picker")) return "dates";
+
+          return "vendor";
+        },
+      },
     },
   },
 }));
