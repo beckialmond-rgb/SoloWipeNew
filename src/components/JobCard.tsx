@@ -39,7 +39,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
     }
   };
 
-  const handleDragEnd = (_: any, info: PanInfo) => {
+  const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     setIsDragging(false);
     if (info.offset.x < -SWIPE_THRESHOLD) {
       if (!requirePremium('complete')) return;
