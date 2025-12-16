@@ -88,9 +88,10 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
 
       toast.success('SMS opened with DD link');
       onRefresh?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to send DD link:', error);
-      toast.error(error.message || 'Failed to generate DD link');
+      const message = error instanceof Error ? error.message : 'Failed to generate DD link';
+      toast.error(message);
     } finally {
       setIsSendingDDLink(false);
     }

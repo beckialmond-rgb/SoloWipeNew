@@ -1,11 +1,12 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useOfflineSync } from '@/hooks/useOfflineSync';
+import type { OfflineMutation } from '@/lib/offlineStorage';
 
 interface OfflineContextType {
   isOnline: boolean;
   isSyncing: boolean;
   pendingCount: number;
-  queueMutation: (type: any, payload: Record<string, unknown>) => Promise<void>;
+  queueMutation: (type: OfflineMutation['type'], payload: Record<string, unknown>) => Promise<void>;
   syncPendingMutations: () => Promise<void>;
 }
 

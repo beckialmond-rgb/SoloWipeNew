@@ -223,7 +223,7 @@ const Settings = () => {
           <SubscriptionSection />
 
           {/* GoCardless Section */}
-          <GoCardlessSection profile={profile as any} onRefresh={refetchAll} />
+          <GoCardlessSection profile={profile} onRefresh={refetchAll} />
 
           {/* Business Name - Clickable */}
           <motion.button

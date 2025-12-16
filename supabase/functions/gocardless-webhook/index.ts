@@ -6,6 +6,17 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, webhook-signature',
 };
 
+type SupabaseClient = ReturnType<typeof createClient>;
+
+type GoCardlessEvent = {
+  resource_type?: string;
+  action?: string;
+  links?: Record<string, string | undefined>;
+  details?: {
+    metadata?: Record<string, string | undefined>;
+  };
+};
+
 async function verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean> {
   try {
     const encoder = new TextEncoder();
@@ -91,7 +102,7 @@ serve(async (req) => {
     }
 
     const payload = JSON.parse(body);
-    const events = payload.events || [];
+    const events: GoCardlessEvent[] = (payload?.events ?? []) as GoCardlessEvent[];
     
     console.log(`[WEBHOOK ${requestId}] Parsed payload with ${events.length} events`);
 
@@ -133,7 +144,7 @@ serve(async (req) => {
   }
 });
 
-async function handleMandateEvent(adminClient: any, event: any) {
+async function handleMandateEvent(adminClient: SupabaseClient, event: GoCardlessEvent) {
   const { action, links } = event;
   const mandateId = links?.mandate;
   const billingRequestId = links?.billing_request;
@@ -181,7 +192,7 @@ async function handleMandateEvent(adminClient: any, event: any) {
   }
 }
 
-async function handlePaymentEvent(adminClient: any, event: any) {
+async function handlePaymentEvent(adminClient: SupabaseClient, event: GoCardlessEvent) {
   const { action, links } = event;
   const paymentId = links?.payment;
 
@@ -219,7 +230,7 @@ async function handlePaymentEvent(adminClient: any, event: any) {
   }
 }
 
-async function handleBillingRequestEvent(adminClient: any, event: any) {
+async function handleBillingRequestEvent(adminClient: SupabaseClient, event: GoCardlessEvent) {
   const { action, details } = event;
   
   console.log('Handling billing request event:', action);
