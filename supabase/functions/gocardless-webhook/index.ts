@@ -62,9 +62,11 @@ serve(async (req) => {
   }
 
   try {
-    const webhookSecret = Deno.env.get('GOCARDLESS_WEBHOOK_SECRET');
+    // Support both GOCARDLESS_WEBHOOK_SECRET and webhook_endpoint_secret (GoCardless convention)
+    const webhookSecret = Deno.env.get('GOCARDLESS_WEBHOOK_SECRET') || Deno.env.get('webhook_endpoint_secret');
     if (!webhookSecret) {
       console.error(`[WEBHOOK ${requestId}] ❌ Webhook secret not configured`);
+      console.error(`[WEBHOOK ${requestId}] Expected: GOCARDLESS_WEBHOOK_SECRET or webhook_endpoint_secret`);
       return new Response(JSON.stringify({ error: 'Webhook not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -75,7 +77,8 @@ serve(async (req) => {
     const body = await req.text();
     console.log(`[WEBHOOK ${requestId}] Request body length: ${body.length} chars`);
     
-    const signature = req.headers.get('webhook-signature');
+    // GoCardless sends signature in Webhook-Signature header (case-insensitive)
+    const signature = req.headers.get('webhook-signature') || req.headers.get('Webhook-Signature');
     console.log(`[WEBHOOK ${requestId}] Signature header: ${signature ? `present (${signature.length} chars)` : 'MISSING'}`);
 
     // ALWAYS require valid signature in all environments for security
@@ -136,7 +139,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
-    console.error('Error processing webhook:', error);
+    console.error('❌ CRITICAL GOCARDLESS ERROR:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
@@ -220,6 +223,11 @@ async function handlePaymentEvent(adminClient: SupabaseClient, event: GoCardless
       .from('jobs')
       .update({ gocardless_payment_status: status })
       .eq('gocardless_payment_id', paymentId);
+
+    // Log payment confirmation
+    if (action === 'confirmed' || action === 'paid_out') {
+      console.log(`✅ Payment confirmed: ${paymentId}`);
+    }
 
     // If payment failed, update payment_status to unpaid
     if (action === 'failed' || action === 'cancelled' || action === 'charged_back') {

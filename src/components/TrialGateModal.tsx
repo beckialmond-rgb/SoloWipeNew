@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
-import { Sparkles, Check, Clock, Shield, Zap, TrendingUp, AlertCircle } from 'lucide-react';
+import { Sparkles, Check, Clock, Shield, Zap, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useState } from 'react';
@@ -60,17 +60,34 @@ export function TrialGateModal() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubscribe = async (priceType: 'monthly' | 'annual') => {
+    // Prevent double-clicks
+    if (isLoading) {
+      console.warn('⚠️ Checkout already in progress, ignoring duplicate click');
+      return;
+    }
+    
     setIsLoading(true);
     try {
+      console.log(`💰 Starting Stripe checkout flow for ${priceType} plan...`);
       const url = await createCheckout(priceType);
       if (url) {
+        console.log(`➡️ Redirecting to Stripe checkout: ${url}`);
         window.location.href = url;
         closePaywall();
+      } else {
+        throw new Error('No checkout URL received');
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start checkout. Please try again.';
+      console.error('❌ STRIPE CHECKOUT ERROR: Failed to create checkout session', {
+        priceType,
+        error: errorMessage,
+        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+      });
+      
       toast({
-        title: 'Error',
-        description: 'Failed to start checkout. Please try again.',
+        title: 'Payment Error',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -189,8 +206,17 @@ export function TrialGateModal() {
                 className="w-full h-14 rounded-xl text-base font-bold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all"
                 size="lg"
               >
-                {isLoading ? 'Loading...' : 'Start Free Trial - £15/month'}
-                <Sparkles className="w-5 h-5 ml-2" />
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    Start Free Trial - £15/month
+                    <Sparkles className="w-5 h-5 ml-2" />
+                  </>
+                )}
               </Button>
               <Button
                 onClick={() => handleSubscribe('annual')}
@@ -198,7 +224,7 @@ export function TrialGateModal() {
                 variant="outline"
                 className="w-full h-12 rounded-xl text-sm font-medium"
               >
-                Or £150/year (save £30)
+                {isLoading ? 'Processing...' : 'Or £150/year (save £30)'}
               </Button>
             </motion.div>
           </div>

@@ -1350,5 +1350,7 @@ export function useSupabaseData() {
     isLoading,
     isOnline,
     userEmail: user?.email || '',
+    isMarkingPaid: markJobPaidMutation.isPending,
+    isBatchMarkingPaid: batchMarkPaidMutation.isPending,
   };
 }

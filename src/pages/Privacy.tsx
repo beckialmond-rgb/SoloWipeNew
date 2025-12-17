@@ -124,7 +124,10 @@ const Privacy = () => {
             <h2 className="text-xl font-semibold text-foreground mb-3">10. Contact Us</h2>
             <p className="text-muted-foreground leading-relaxed">
               If you have any questions about this Privacy Policy or our data practices, please 
-              contact us through the app settings or email support.
+              contact us through the app settings or email us at{' '}
+              <a href="mailto:aaron@solowipe.co.uk" className="text-primary hover:underline">
+                aaron@solowipe.co.uk
+              </a>.
             </p>
           </section>
         </div>
