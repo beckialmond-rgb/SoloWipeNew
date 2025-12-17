@@ -101,6 +101,10 @@ export default defineConfig(({ mode }) => ({
     sourcemap: false,
     rollupOptions: {
       output: {
+        // Content hashing for aggressive cache busting - prevents stale bundle errors
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]',
         // Improve long-term caching by splitting large dependencies into stable chunks.
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
