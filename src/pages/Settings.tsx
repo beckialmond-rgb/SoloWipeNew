@@ -58,6 +58,7 @@ const Settings = () => {
   useEffect(() => {
     const subscription = searchParams.get('subscription');
     if (subscription === 'success') {
+      console.log('✅ Payment confirmed: Stripe checkout successful');
       toast({
         title: "Subscription activated!",
         description: "Welcome to SoloWipe Pro. Enjoy all premium features.",
@@ -65,6 +66,7 @@ const Settings = () => {
       checkSubscription();
       setSearchParams({});
     } else if (subscription === 'cancelled') {
+      console.log('⚠️ Stripe checkout cancelled by user');
       toast({
         title: "Subscription cancelled",
         description: "You can subscribe anytime to unlock Pro features.",
