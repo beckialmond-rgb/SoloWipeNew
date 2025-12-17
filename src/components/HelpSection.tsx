@@ -52,7 +52,7 @@ export function HelpSection({ isOpen, onClose }: HelpSectionProps) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
 
   const handleContactSupport = () => {
-    window.location.href = 'mailto:support@solowipe.app?subject=SoloWipe Support Request';
+    window.location.href = 'mailto:aaron@solowipe.co.uk?subject=SoloWipe Support Request';
   };
 
   return (
