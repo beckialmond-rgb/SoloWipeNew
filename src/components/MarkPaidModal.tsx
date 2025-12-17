@@ -110,7 +110,7 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
             onClick={handleConfirm}
             disabled={!selectedMethod || isSubmitting}
           >
-            {isSubmitting ? 'Saving...' : 'Confirm Payment'}
+            {isSubmitting ? 'Processing...' : 'Confirm Payment'}
           </Button>
         </div>
       </DialogContent>

@@ -18,7 +18,7 @@ import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 import { format } from 'date-fns';
 
 const Money = () => {
-  const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, batchMarkPaid, undoMarkPaid, isLoading, profile } = useSupabaseData();
+  const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, batchMarkPaid, undoMarkPaid, isLoading, profile, isMarkingPaid, isBatchMarkingPaid } = useSupabaseData();
   const { toast, dismiss } = useToast();
   const { requirePremium } = useSoftPaywall();
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
@@ -298,7 +298,8 @@ const Money = () => {
                           job={job}
                           index={index}
                           businessName={businessName}
-                          onMarkPaid={() => !selectMode && handleMarkPaid(job)}
+                          onMarkPaid={() => !selectMode && !isMarkingPaid && handleMarkPaid(job)}
+                          isProcessing={isMarkingPaid}
                         />
                       </div>
                     </div>
@@ -412,14 +413,14 @@ const Money = () => {
       <MarkPaidModal
         isOpen={isMarkPaidOpen}
         job={selectedJob}
-        onClose={() => setIsMarkPaidOpen(false)}
+        onClose={() => !isMarkingPaid && setIsMarkPaidOpen(false)}
         onConfirm={handleConfirmPaid}
       />
 
       <BatchPaymentModal
         isOpen={batchModalOpen}
         selectedJobs={selectedJobsForBatch}
-        onClose={() => setBatchModalOpen(false)}
+        onClose={() => !isBatchMarkingPaid && setBatchModalOpen(false)}
         onConfirm={handleBatchConfirm}
       />
     </div>

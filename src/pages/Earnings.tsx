@@ -73,7 +73,7 @@ interface GroupedCustomer {
 
 const Earnings = () => {
   const { user } = useAuth();
-  const { todayEarnings, weeklyEarnings, markJobPaid, isLoading: baseLoading } = useSupabaseData();
+  const { todayEarnings, weeklyEarnings, markJobPaid, isLoading: baseLoading, isMarkingPaid } = useSupabaseData();
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
   const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
   const [showUnpaidOnly, setShowUnpaidOnly] = useState(false);
@@ -423,6 +423,7 @@ const Earnings = () => {
                                   job={job} 
                                   index={index}
                                   onMarkPaid={handleMarkPaid}
+                                  isProcessing={isMarkingPaid}
                                 />
                               ))}
                             </div>
@@ -439,6 +440,7 @@ const Earnings = () => {
                         job={job} 
                         index={index}
                         onMarkPaid={handleMarkPaid}
+                        isProcessing={isMarkingPaid}
                       />
                     ))}
                   </div>
@@ -460,7 +462,7 @@ const Earnings = () => {
       <MarkPaidModal
         isOpen={isMarkPaidOpen}
         job={selectedJob}
-        onClose={() => setIsMarkPaidOpen(false)}
+        onClose={() => !isMarkingPaid && setIsMarkPaidOpen(false)}
         onConfirm={handleConfirmPaid}
       />
     </div>
