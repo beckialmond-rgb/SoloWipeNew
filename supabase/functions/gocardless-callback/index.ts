@@ -83,6 +83,7 @@ serve(async (req) => {
       });
     }
 
+    console.log(`💰 Starting GoCardless flow for user ${user.id}...`);
     console.log('[GC-CALLBACK] User authenticated:', user.id);
 
     // Create admin client for database operations
@@ -279,6 +280,7 @@ serve(async (req) => {
       });
     }
 
+    console.log(`✅ Payment confirmed: GoCardless connection successful for user ${user.id}`);
     console.log('[GC-CALLBACK] ✅ GoCardless connected and verified for user:', user.id);
     console.log('[GC-CALLBACK] ✅ Stored token length:', verifyProfile.gocardless_access_token_encrypted.length);
     console.log('[GC-CALLBACK] ✅ Connected at:', verifyProfile.gocardless_connected_at);
@@ -290,7 +292,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
-    console.error('[GC-CALLBACK] Unexpected error:', error);
+    console.error('❌ CRITICAL GOCARDLESS ERROR:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: message }), {
       status: 500,

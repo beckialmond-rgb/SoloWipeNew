@@ -99,7 +99,10 @@ const Terms = () => {
             <h2 className="text-xl font-semibold text-foreground mb-3">9. Contact Information</h2>
             <p className="text-muted-foreground leading-relaxed">
               If you have any questions about these Terms of Service, please contact us through the app settings 
-              or email support.
+              or email us at{' '}
+              <a href="mailto:aaron@solowipe.co.uk" className="text-primary hover:underline">
+                aaron@solowipe.co.uk
+              </a>.
             </p>
           </section>
         </div>

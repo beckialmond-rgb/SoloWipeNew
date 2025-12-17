@@ -117,6 +117,8 @@ serve(async (req) => {
       });
     }
 
+    console.log(`💰 Starting GoCardless flow for user ${user.id}...`);
+
     const body = await req.json();
     const { jobId, customerId, amount, description } = body;
 
@@ -286,6 +288,7 @@ serve(async (req) => {
     const paymentStatus = paymentData.payments.status;
     const chargeDate = paymentData.payments.charge_date;
 
+    console.log(`✅ Payment confirmed: ${paymentId}`);
     console.log('[GC-COLLECT] ✅ Payment created successfully');
     console.log('[GC-COLLECT] Payment ID:', paymentId);
     console.log('[GC-COLLECT] Status:', paymentStatus);
@@ -324,7 +327,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
-    console.error('Error in gocardless-collect-payment:', error);
+    console.error('❌ CRITICAL GOCARDLESS ERROR:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: message }), {
       status: 500,

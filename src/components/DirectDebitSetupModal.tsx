@@ -55,10 +55,11 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
     setDebugLogs([]);
     
     try {
-    // Use production domain for customer redirects, detect based on current origin
+    // Dynamically set redirect URLs based on environment
+    // Use localhost:3000 for dev, production domain for prod
     const currentHostname = window.location.hostname;
     const isProduction = currentHostname === 'solowipe.co.uk' || currentHostname === 'www.solowipe.co.uk';
-    const REDIRECT_DOMAIN = isProduction ? 'https://solowipe.co.uk' : window.location.origin;
+    const REDIRECT_DOMAIN = isProduction ? 'https://solowipe.co.uk' : 'http://localhost:3000';
     const exitUrl = `${REDIRECT_DOMAIN}/customers`;
     const successUrl = `${REDIRECT_DOMAIN}/customers?mandate=success&customer=${customer.id}`;
 

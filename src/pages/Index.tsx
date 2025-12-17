@@ -46,7 +46,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 const Index = () => {
   const navigate = useNavigate();
-  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading, markJobPaid, profile } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading, markJobPaid, profile, isMarkingPaid } = useSupabaseData();
   const { user } = useAuth();
   const { subscribed, status } = useSubscription();
   const { toast, dismiss } = useToast();
@@ -725,7 +725,8 @@ const Index = () => {
                         job={job}
                         index={index}
                         onAddNote={(job) => setNotesJob(job)}
-                        onMarkPaid={(job) => handleMarkPaidRequest(job)}
+                        onMarkPaid={(job) => !isMarkingPaid && handleMarkPaidRequest(job)}
+                        isProcessing={isMarkingPaid}
                       />
                       {/* Ask for Review button after completion - only if google review link is configured */}
                       {job.customer.mobile_phone && profile?.google_review_link && (
@@ -831,8 +832,10 @@ const Index = () => {
         isOpen={markPaidModalOpen}
         job={jobToMarkPaid}
         onClose={() => {
-          setMarkPaidModalOpen(false);
-          setJobToMarkPaid(null);
+          if (!isMarkingPaid) {
+            setMarkPaidModalOpen(false);
+            setJobToMarkPaid(null);
+          }
         }}
         onConfirm={handleConfirmMarkPaid}
       />

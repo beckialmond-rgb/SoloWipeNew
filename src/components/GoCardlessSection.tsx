@@ -140,7 +140,13 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
     setDebugLogs([]);
     
     try {
-      const redirectUrl = `${window.location.origin}/settings?gocardless=callback`;
+      // Dynamically set redirect URL based on environment
+      // Use localhost:3000 for dev, production domain for prod
+      const currentHostname = window.location.hostname;
+      const isProduction = currentHostname === 'solowipe.co.uk' || currentHostname === 'www.solowipe.co.uk';
+      const redirectUrl = isProduction 
+        ? 'https://solowipe.co.uk/settings?gocardless=callback'
+        : 'http://localhost:3000/settings?gocardless=callback';
       addDebugLog('Connect Started', `Redirect URL: ${redirectUrl}`, 'info');
       
       const { data, error } = await supabase.functions.invoke('gocardless-connect', {
