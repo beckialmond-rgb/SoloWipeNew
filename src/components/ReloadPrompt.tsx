@@ -1,8 +1,16 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { clearAllCaches } from './ErrorBoundary';
+
+// Expose a global function for forcing updates from anywhere in the app
+declare global {
+  interface Window {
+    __forcePWAUpdate?: () => void;
+  }
+}
 
 export function ReloadPrompt() {
   const {
@@ -21,6 +29,45 @@ export function ReloadPrompt() {
       console.error('SW registration error:', error);
     },
   });
+
+  const forceUpdate = useCallback(async () => {
+    console.log('[ReloadPrompt] Force update triggered');
+    await clearAllCaches();
+    window.location.reload();
+  }, []);
+
+  // Expose force update globally for emergency recovery
+  useEffect(() => {
+    window.__forcePWAUpdate = forceUpdate;
+    return () => {
+      delete window.__forcePWAUpdate;
+    };
+  }, [forceUpdate]);
+
+  // Listen for global error events that might indicate stale bundles
+  useEffect(() => {
+    const handleGlobalError = (event: ErrorEvent) => {
+      const errorPatterns = [
+        'forwardRef',
+        'ChunkLoadError',
+        'Loading chunk',
+        'Failed to fetch dynamically imported module',
+      ];
+      
+      const errorMessage = event.message || '';
+      const isStaleError = errorPatterns.some(pattern => 
+        errorMessage.toLowerCase().includes(pattern.toLowerCase())
+      );
+      
+      if (isStaleError) {
+        console.log('[ReloadPrompt] Detected stale bundle error, forcing update...');
+        forceUpdate();
+      }
+    };
+
+    window.addEventListener('error', handleGlobalError);
+    return () => window.removeEventListener('error', handleGlobalError);
+  }, [forceUpdate]);
 
   useEffect(() => {
     if (needRefresh) {
