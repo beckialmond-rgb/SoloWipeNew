@@ -6,7 +6,7 @@ export interface Profile {
   // Stripe subscription fields
   stripe_customer_id: string | null;
   subscription_id: string | null;
-  subscription_status: 'active' | 'inactive' | 'cancelled' | 'past_due' | null;
+  subscription_status: 'active' | 'inactive' | 'cancelled' | 'past_due' | 'trialing' | string | null;
   subscription_ends_at: string | null;
   // GoCardless connection fields
   gocardless_access_token_encrypted: string | null;

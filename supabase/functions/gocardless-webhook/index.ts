@@ -6,7 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, webhook-signature',
 };
 
-type SupabaseClient = ReturnType<typeof createClient>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseClient = any;
 
 type GoCardlessEvent = {
   resource_type?: string;
@@ -213,7 +214,7 @@ async function handlePaymentEvent(adminClient: SupabaseClient, event: GoCardless
     charged_back: 'charged_back',
   };
 
-  const status = statusMap[action];
+  const status = action ? statusMap[action] : undefined;
   if (status) {
     await adminClient
       .from('jobs')
