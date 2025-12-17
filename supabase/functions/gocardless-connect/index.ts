@@ -77,6 +77,8 @@ serve(async (req) => {
       });
     }
 
+    console.log(`💰 Starting GoCardless flow for user ${user.id}...`);
+
     const { redirectUrl: clientRedirectUrl } = await req.json();
     
     const clientId = Deno.env.get('GOCARDLESS_CLIENT_ID');
@@ -134,13 +136,14 @@ serve(async (req) => {
     authUrl.searchParams.set('initial_view', 'login');
 
     console.log('Full OAuth URL:', authUrl.toString());
+    console.log(`➡️ Generated Redirect URL: ${redirectUrl}`);
     console.log('=== End Debug ===');
 
     return new Response(JSON.stringify({ url: authUrl.toString(), state }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
-    console.error('Error in gocardless-connect:', error);
+    console.error('❌ CRITICAL GOCARDLESS ERROR:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: message }), {
       status: 500,

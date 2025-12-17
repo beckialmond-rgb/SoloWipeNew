@@ -122,6 +122,8 @@ serve(async (req) => {
       });
     }
 
+    console.log(`💰 Starting GoCardless flow for user ${user.id}...`);
+
     const body = await req.json();
     const { customerId, customerName, customerEmail, exitUrl, successUrl } = body;
 
@@ -297,6 +299,7 @@ serve(async (req) => {
     const flowData = await flowResponse.json();
     const authorisationUrl = flowData.billing_request_flows.authorisation_url;
 
+    console.log(`➡️ Generated Redirect URL: ${authorisationUrl}`);
     console.log('Created billing request flow for customer:', customerId);
 
     // Update customer with pending mandate status and billing request ID for webhook matching
@@ -315,7 +318,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
-    console.error('Error in gocardless-create-mandate:', error);
+    console.error('❌ CRITICAL GOCARDLESS ERROR:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
