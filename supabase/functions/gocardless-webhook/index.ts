@@ -62,9 +62,11 @@ serve(async (req) => {
   }
 
   try {
-    const webhookSecret = Deno.env.get('GOCARDLESS_WEBHOOK_SECRET');
+    // Support both GOCARDLESS_WEBHOOK_SECRET and webhook_endpoint_secret (GoCardless convention)
+    const webhookSecret = Deno.env.get('GOCARDLESS_WEBHOOK_SECRET') || Deno.env.get('webhook_endpoint_secret');
     if (!webhookSecret) {
       console.error(`[WEBHOOK ${requestId}] ❌ Webhook secret not configured`);
+      console.error(`[WEBHOOK ${requestId}] Expected: GOCARDLESS_WEBHOOK_SECRET or webhook_endpoint_secret`);
       return new Response(JSON.stringify({ error: 'Webhook not configured' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -75,7 +77,8 @@ serve(async (req) => {
     const body = await req.text();
     console.log(`[WEBHOOK ${requestId}] Request body length: ${body.length} chars`);
     
-    const signature = req.headers.get('webhook-signature');
+    // GoCardless sends signature in Webhook-Signature header (case-insensitive)
+    const signature = req.headers.get('webhook-signature') || req.headers.get('Webhook-Signature');
     console.log(`[WEBHOOK ${requestId}] Signature header: ${signature ? `present (${signature.length} chars)` : 'MISSING'}`);
 
     // ALWAYS require valid signature in all environments for security
