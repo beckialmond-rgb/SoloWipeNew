@@ -115,7 +115,16 @@ serve(async (req) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR", { message: errorMessage });
+    const errorDetails = error instanceof Error ? {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+    } : { message: String(error) };
+    
+    // Log full error details for debugging
+    console.error('❌ CRITICAL STRIPE CHECKOUT ERROR:', JSON.stringify(errorDetails, Object.getOwnPropertyNames(error)));
+    logStep("ERROR", errorDetails);
+    
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

@@ -78,20 +78,58 @@ export function useSubscription() {
 
   const createCheckout = async (priceType: 'monthly' | 'annual') => {
     if (!session?.access_token) {
-      throw new Error('Not authenticated');
+      const authError = new Error('Not authenticated');
+      console.error('❌ STRIPE CHECKOUT ERROR: Authentication failed', { priceType });
+      throw authError;
     }
 
-    const { data, error } = await supabase.functions.invoke('create-checkout', {
-      body: { priceType },
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { priceType },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
-    if (error) throw error;
-    if (data?.error) throw new Error(data.error);
-    
-    return data.url;
+      if (error) {
+        console.error('❌ STRIPE CHECKOUT ERROR: Function invocation failed', {
+          priceType,
+          error: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+        });
+        throw error;
+      }
+      
+      if (data?.error) {
+        console.error('❌ STRIPE CHECKOUT ERROR: Server returned error', {
+          priceType,
+          error: data.error,
+        });
+        throw new Error(data.error);
+      }
+      
+      if (!data?.url) {
+        const noUrlError = new Error('No checkout URL returned from server');
+        console.error('❌ STRIPE CHECKOUT ERROR: Missing checkout URL', {
+          priceType,
+          data,
+        });
+        throw noUrlError;
+      }
+      
+      console.log('✅ Stripe checkout session created successfully', { priceType, url: data.url });
+      return data.url;
+    } catch (err) {
+      // Re-throw after logging
+      console.error('❌ STRIPE CHECKOUT ERROR: Unexpected error', {
+        priceType,
+        error: err instanceof Error ? {
+          message: err.message,
+          name: err.name,
+          stack: err.stack,
+        } : String(err),
+      });
+      throw err;
+    }
   };
 
   const openCustomerPortal = async () => {

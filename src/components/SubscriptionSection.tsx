@@ -26,16 +26,33 @@ export function SubscriptionSection() {
   const isInGracePeriod = !subscribed && gracePeriodDaysRemaining > 0;
 
   const handleSubscribe = async (priceType: 'monthly' | 'annual') => {
+    // Prevent double-clicks
+    if (checkoutLoading !== null) {
+      console.warn('⚠️ Checkout already in progress, ignoring duplicate click');
+      return;
+    }
+    
     setCheckoutLoading(priceType);
     try {
+      console.log(`💰 Starting Stripe checkout flow for ${priceType} plan...`);
       const url = await createCheckout(priceType);
       if (url) {
+        console.log(`➡️ Redirecting to Stripe checkout: ${url}`);
         window.location.href = url;
+      } else {
+        throw new Error('No checkout URL received');
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Failed to start checkout";
+      console.error('❌ STRIPE CHECKOUT ERROR: Failed to create checkout session', {
+        priceType,
+        error: errorMessage,
+        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+      });
+      
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to start checkout",
+        title: "Payment Error",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -226,9 +243,13 @@ export function SubscriptionSection() {
             disabled={checkoutLoading !== null}
           >
             {checkoutLoading === 'monthly' ? (
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-            ) : null}
-            Start Free Trial — then £15/month
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Processing...
+              </>
+            ) : (
+              'Start Free Trial — then £15/month'
+            )}
           </Button>
         </div>
 
@@ -254,9 +275,13 @@ export function SubscriptionSection() {
             disabled={checkoutLoading !== null}
           >
             {checkoutLoading === 'annual' ? (
-              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-            ) : null}
-            Start Free Trial — then £150/year
+              <>
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                Processing...
+              </>
+            ) : (
+              'Start Free Trial — then £150/year'
+            )}
           </Button>
         </div>
 
