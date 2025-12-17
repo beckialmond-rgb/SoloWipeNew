@@ -139,7 +139,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
-    console.error('Error processing webhook:', error);
+    console.error('❌ CRITICAL GOCARDLESS ERROR:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
@@ -223,6 +223,11 @@ async function handlePaymentEvent(adminClient: SupabaseClient, event: GoCardless
       .from('jobs')
       .update({ gocardless_payment_status: status })
       .eq('gocardless_payment_id', paymentId);
+
+    // Log payment confirmation
+    if (action === 'confirmed' || action === 'paid_out') {
+      console.log(`✅ Payment confirmed: ${paymentId}`);
+    }
 
     // If payment failed, update payment_status to unpaid
     if (action === 'failed' || action === 'cancelled' || action === 'charged_back') {
