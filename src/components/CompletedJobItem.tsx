@@ -11,9 +11,10 @@ interface CompletedJobItemProps {
   index: number;
   onMarkPaid?: (job: JobWithCustomer) => void;
   onAddNote?: (job: JobWithCustomer) => void;
+  isProcessing?: boolean;
 }
 
-export function CompletedJobItem({ job, index, onMarkPaid, onAddNote }: CompletedJobItemProps) {
+export function CompletedJobItem({ job, index, onMarkPaid, onAddNote, isProcessing = false }: CompletedJobItemProps) {
   const [showPhoto, setShowPhoto] = useState(false);
   const completedTime = job.completed_at 
     ? format(new Date(job.completed_at), 'HH:mm')
@@ -128,8 +129,9 @@ export function CompletedJobItem({ job, index, onMarkPaid, onAddNote }: Complete
               size="sm"
               variant="success"
               onClick={() => onMarkPaid(job)}
+              disabled={isProcessing}
             >
-              Mark Paid
+              {isProcessing ? 'Processing...' : 'Mark Paid'}
             </Button>
           )}
         </div>

@@ -9,9 +9,10 @@ interface UnpaidJobCardProps {
   index: number;
   businessName?: string;
   onMarkPaid: () => void;
+  isProcessing?: boolean;
 }
 
-export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner', onMarkPaid }: UnpaidJobCardProps) {
+export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner', onMarkPaid, isProcessing = false }: UnpaidJobCardProps) {
   const firstName = job.customer.name.split(' ')[0];
   const completedDate = job.completed_at ? format(new Date(job.completed_at), 'd MMM') : 'recently';
   const amount = (job.amount_collected || 0).toFixed(2);
@@ -93,8 +94,9 @@ export function UnpaidJobCard({ job, index, businessName = 'Your window cleaner'
             size="lg"
             className="flex-1"
             onClick={onMarkPaid}
+            disabled={isProcessing}
           >
-            Mark Paid
+            {isProcessing ? 'Processing...' : 'Mark Paid'}
           </Button>
         </div>
       </div>
