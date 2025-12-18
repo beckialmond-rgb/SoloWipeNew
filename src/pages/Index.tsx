@@ -193,7 +193,8 @@ const Index = () => {
         duration: 2000,
       });
     }
-  }, [pendingJobs, applyPersistedOrder]); // Remove toast and orderRestored from deps to prevent loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingJobs, applyPersistedOrder]); // toast and orderRestored intentionally omitted to prevent infinite loops
 
   // Show welcome flow for new users
   useEffect(() => {

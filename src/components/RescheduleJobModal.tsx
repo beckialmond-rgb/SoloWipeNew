@@ -40,7 +40,8 @@ export function RescheduleJobModal({
     if (job && open) {
       setSelectedDate(new Date(job.scheduled_date));
     }
-  }, [job?.id, open]); // Only reset when job changes or modal opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.id, open]); // Only reset when job.id changes or modal opens (job object reference may change)
 
   // Clean up state when modal closes
   useEffect(() => {

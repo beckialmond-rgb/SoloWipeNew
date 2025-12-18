@@ -19,10 +19,31 @@ async function validateSession(userId: string | undefined): Promise<void> {
     .eq('id', userId)
     .maybeSingle();
 
-  if (profileError || !profileCheck) {
+  if (profileError) {
+    // Only sign out on authentication errors, not on network or other errors
+    const errorCode = profileError.code || '';
+    const errorMessage = profileError.message?.toLowerCase() || '';
+    
+    if (errorCode === 'PGRST301' || // Not authenticated
+        errorCode === '42501' ||     // Insufficient privilege
+        errorMessage.includes('jwt') ||
+        errorMessage.includes('authentication') ||
+        errorMessage.includes('unauthorized')) {
+      console.warn('Authentication error during profile check, signing out');
+      await supabase.auth.signOut();
+      throw new Error('Your session has expired. Please sign in again.');
+    }
+    
+    // For other errors (network, etc.), throw without signing out
+    console.error('Profile check error:', profileError);
+    throw new Error('Failed to verify your profile. Please try again.');
+  }
+
+  if (!profileCheck) {
+    // Profile doesn't exist - this means the account was deleted
     console.warn('Profile not found for user, signing out');
     await supabase.auth.signOut();
-    throw new Error('Your session has expired. Please sign in again.');
+    throw new Error('Your account is no longer available. Please contact support.');
   }
 }
 
@@ -753,18 +774,40 @@ export function useSupabaseData() {
         .single();
 
       if (customerError) {
-        // Check for foreign key constraint error specifically (profile doesn't exist)
-        // RLS errors are different - they mention "row-level security" or "policy"
-        if (customerError.message?.includes('foreign key constraint') && 
-            customerError.message?.includes('profiles')) {
+        // Only log out on actual authentication errors (401/403)
+        // Check for authentication-related errors
+        const errorCode = customerError.code || '';
+        const errorMessage = customerError.message?.toLowerCase() || '';
+        
+        // Authentication errors - user session is invalid
+        if (errorCode === 'PGRST301' || // Not authenticated
+            errorCode === '42501' ||     // Insufficient privilege (auth issue)
+            errorMessage.includes('jwt') ||
+            errorMessage.includes('authentication') ||
+            errorMessage.includes('unauthorized')) {
+          console.warn('Authentication error detected, signing out');
           await supabase.auth.signOut();
           throw new Error('Your session has expired. Please sign in again.');
         }
-        // RLS errors should show a helpful message, not log out
-        if (customerError.message?.includes('row-level security') || 
-            customerError.message?.includes('policy')) {
-          throw new Error('Permission denied. Please check your Row Level Security policies.');
+        
+        // Foreign key constraint error - profile doesn't exist (session invalid)
+        if (errorMessage.includes('foreign key constraint') && 
+            errorMessage.includes('profiles')) {
+          console.warn('Profile not found - session invalid, signing out');
+          await supabase.auth.signOut();
+          throw new Error('Your session has expired. Please sign in again.');
         }
+        
+        // RLS policy errors - show helpful message, don't log out
+        if (errorMessage.includes('row-level security') || 
+            errorMessage.includes('policy') ||
+            errorCode === '42501') {
+          console.error('RLS policy error:', customerError);
+          throw new Error('Permission denied. Please ensure you have the correct permissions to create customers.');
+        }
+        
+        // Other errors - pass through with original message
+        console.error('Customer creation error:', customerError);
         throw customerError;
       }
 
