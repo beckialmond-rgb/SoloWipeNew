@@ -1,7 +1,6 @@
 import { Home, Users, Wallet, CalendarDays, Settings } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { cn } from '@/lib/utils';
-import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useOffline } from '@/contexts/OfflineContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
