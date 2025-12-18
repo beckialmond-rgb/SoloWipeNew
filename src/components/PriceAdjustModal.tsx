@@ -37,8 +37,6 @@ export const PriceAdjustModal = ({
     }
   }, [isOpen]);
 
-  if (!isOpen || !job) return null;
-
   const quickAdjust = (adjustment: number) => {
     setAmount(prev => Math.max(0, prev + adjustment));
   };
@@ -49,6 +47,7 @@ export const PriceAdjustModal = ({
 
   return (
     <AnimatePresence>
+      {isOpen && job && (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -176,6 +175,7 @@ export const PriceAdjustModal = ({
           </Button>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 };

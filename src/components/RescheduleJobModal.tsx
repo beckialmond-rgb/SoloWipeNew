@@ -31,9 +31,7 @@ export function RescheduleJobModal({
   onOpenChange,
   onReschedule,
 }: RescheduleJobModalProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    job ? new Date(job.scheduled_date) : undefined
-  );
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset selected date when job changes (using useEffect to avoid state update during render)

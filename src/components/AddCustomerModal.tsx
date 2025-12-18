@@ -90,8 +90,13 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
     }
   };
 
+  const handleClose = () => {
+    if (isSubmitting) return; // Prevent closing during submission
+    onClose();
+  };
+
   return (
-    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Drawer open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DrawerContent className="max-h-[90vh]">
         <DrawerHeader className="text-left">
           <DrawerTitle>Add Customer</DrawerTitle>

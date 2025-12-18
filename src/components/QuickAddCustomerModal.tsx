@@ -78,8 +78,13 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
     }
   };
 
+  const handleClose = () => {
+    if (isSubmitting) return; // Prevent closing during submission
+    onClose();
+  };
+
   return (
-    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Drawer open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DrawerContent className="max-h-[85vh] flex flex-col">
         <DrawerHeader className="text-left flex-shrink-0">
           <div className="flex items-center gap-2">
