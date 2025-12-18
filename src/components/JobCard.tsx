@@ -7,6 +7,7 @@ import { CustomerNotesPreview } from './CustomerNotesPreview';
 import { Button } from './ui/button';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
+import { useSubscription } from '@/hooks/useSubscription';
 
 interface JobCardProps {
   job: JobWithCustomer;
@@ -25,6 +26,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
   const dragControls = useDragControls();
   const { lightTap, success } = useHaptics();
   const { requirePremium } = useSoftPaywall();
+  const { subscribed, status } = useSubscription();
   
   // Background colors based on swipe direction
   const backgroundColor = useTransform(
@@ -41,12 +43,18 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
 
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     setIsDragging(false);
+    
+    // Check if user has premium access (subscribed or trialing)
+    const hasPremium = subscribed || status === 'trialing';
+    
     if (info.offset.x < -SWIPE_THRESHOLD) {
-      if (!requirePremium('complete')) return;
+      // Show paywall modal if not premium, otherwise complete
+      if (!hasPremium && !requirePremium('complete')) return;
       triggerHaptic('medium');
       onComplete(job);
     } else if (info.offset.x > SWIPE_THRESHOLD) {
-      if (!requirePremium('skip')) return;
+      // Show paywall modal if not premium, otherwise skip
+      if (!hasPremium && !requirePremium('skip')) return;
       triggerHaptic('light');
       onSkip(job.id);
     }

@@ -34,15 +34,12 @@ export function RescheduleJobModal({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Properly sync selected date when job changes or modal opens
+  // Reset selected date when job changes (using useEffect to avoid state update during render)
   useEffect(() => {
     if (job && open) {
       setSelectedDate(new Date(job.scheduled_date));
-    } else if (!open) {
-      // Reset when modal closes
-      setSelectedDate(undefined);
     }
-  }, [job, open]);
+  }, [job?.id, open]); // Only reset when job changes or modal opens
 
   const handleReschedule = async () => {
     if (!job || !selectedDate) return;
