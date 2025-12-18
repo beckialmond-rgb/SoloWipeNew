@@ -3,8 +3,13 @@ import { NavLink } from '@/components/NavLink';
 import { cn } from '@/lib/utils';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useOffline } from '@/contexts/OfflineContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 
 export function BottomNav() {
+  const { user } = useAuth();
   const { pendingCount } = useOffline();
   const today = format(new Date(), 'yyyy-MM-dd');
 
@@ -57,9 +62,9 @@ export function BottomNav() {
   });
 
   const navItems = [
-    { to: '/', icon: Home, label: 'Today', badge: pendingJobs.length, badgeColor: 'bg-primary' },
+    { to: '/', icon: Home, label: 'Today', badge: pendingTodayCount, badgeColor: 'bg-primary' },
     { to: '/customers', icon: Users, label: 'Customers', badge: 0, badgeColor: '' },
-    { to: '/money', icon: Wallet, label: 'Money', badge: unpaidJobs.length, badgeColor: 'bg-amber-500' },
+    { to: '/money', icon: Wallet, label: 'Money', badge: unpaidCount, badgeColor: 'bg-amber-500' },
     { to: '/calendar', icon: CalendarDays, label: 'Calendar', badge: 0, badgeColor: '' },
     { to: '/settings', icon: Settings, label: 'Settings', badge: pendingCount, badgeColor: 'bg-orange-500' },
   ];

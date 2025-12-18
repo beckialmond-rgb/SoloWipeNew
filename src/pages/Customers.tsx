@@ -161,7 +161,7 @@ const Customers = () => {
 
       <main className="px-4 py-6 max-w-lg mx-auto">
         {isLoading ? (
-          <LoadingState type="skeleton" skeletonType="customer-card" count={5} />
+          <LoadingState type="skeleton" skeletonType="customer-card" skeletonCount={5} />
         ) : customers.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

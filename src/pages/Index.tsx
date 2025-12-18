@@ -510,7 +510,7 @@ const Index = () => {
 
       <main className="px-4 py-6 max-w-lg mx-auto">
         {isLoading ? (
-          <LoadingState type="skeleton" skeletonType="job-card" count={3} />
+          <LoadingState type="skeleton" skeletonType="job-card" skeletonCount={3} />
         ) : showWelcome ? (
           <WelcomeFlow 
             businessName={businessName}
