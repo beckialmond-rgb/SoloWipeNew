@@ -116,20 +116,10 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Minimal chunking strategy to prevent circular dependency and initialization issues
-        // Only split very large, independent libraries
-        manualChunks(id) {
-          if (!id.includes("node_modules")) return;
-
-          // CRITICAL: Put everything except Supabase in react-vendor
-          // This prevents ALL circular dependency and initialization order issues
-          // Only Supabase is truly independent and can be split safely
-          if (id.includes("@supabase")) return "supabase";
-          
-          // Everything else (React, React deps, zod, date-fns, d3, etc.) goes in one chunk
-          // This eliminates circular dependency issues completely
-          return "react-vendor";
-        },
+        // Disable manual chunking - let Vite handle it automatically
+        // Vite's automatic chunking is better at resolving circular dependencies
+        // This eliminates "Cannot access before initialization" errors
+        manualChunks: undefined,
       },
     },
     // Ensure proper chunk loading order
