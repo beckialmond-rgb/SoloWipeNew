@@ -240,7 +240,7 @@ const Earnings = () => {
 
       <main className="px-4 py-6 max-w-lg mx-auto">
         {isLoading ? (
-          <LoadingState message="Loading earnings..." />
+          <LoadingState type="skeleton" skeletonType="earnings" />
         ) : (
           <>
             {/* Today's Earnings Card */}
@@ -456,8 +456,6 @@ const Earnings = () => {
           </>
         )}
       </main>
-
-      <BottomNav />
 
       <MarkPaidModal
         isOpen={isMarkPaidOpen}

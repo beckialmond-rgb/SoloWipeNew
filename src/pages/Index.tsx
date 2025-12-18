@@ -119,8 +119,11 @@ const Index = () => {
   // Get today's date key for localStorage
   const todayKey = `solowipe_job_order_${format(new Date(), 'yyyy-MM-dd')}`;
 
-  // Track if order was restored (to show toast only once)
-  const [orderRestored, setOrderRestored] = useState(false);
+  // Track if order was restored (to show toast only once per day)
+  const [orderRestored, setOrderRestored] = useState(() => {
+    const restoredKey = `solowipe_order_restored_${format(new Date(), 'yyyy-MM-dd')}`;
+    return localStorage.getItem(restoredKey) === 'true';
+  });
 
   // Apply saved order to jobs
   const applyPersistedOrder = useCallback((jobs: JobWithCustomer[]): { jobs: JobWithCustomer[], wasRestored: boolean } => {
@@ -182,6 +185,8 @@ const Index = () => {
     // Use a more stable check to prevent duplicate toasts
     if (wasRestored && !orderRestored && pendingJobs.length > 0) {
       setOrderRestored(true);
+      const restoredKey = `solowipe_order_restored_${format(new Date(), 'yyyy-MM-dd')}`;
+      localStorage.setItem(restoredKey, 'true');
       toast({
         title: 'Order restored',
         description: 'Your custom job order has been applied',
@@ -222,6 +227,9 @@ const Index = () => {
     const jobId = jobToComplete.id;
     setPriceAdjustOpen(false);
     setCompletingJobId(jobId);
+
+    // Save current state for rollback
+    const previousJobs = [...localJobs];
 
     // Fire confetti (loaded on-demand to keep the initial bundle smaller).
     try {
@@ -270,11 +278,11 @@ const Index = () => {
         ) : undefined,
       });
     } catch (error) {
-      // Rollback on error
-      setLocalJobs(pendingJobs);
+      // Rollback on error - restore previous state including any reordering
+      setLocalJobs(previousJobs);
       toast({
         title: 'Error',
-        description: 'Failed to complete job. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to complete job. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -304,7 +312,7 @@ const Index = () => {
       await markJobPaid(jobToMarkPaid.id, method);
       toast({
         title: 'Payment recorded',
-        description: `${jobToMarkPaid.customer.name} marked as paid via ${method}`,
+        description: `${jobToMarkPaid.customer?.name || 'Customer'} marked as paid via ${method}`,
       });
     } catch (error) {
       toast({
@@ -327,6 +335,13 @@ const Index = () => {
     const job = localJobs.find(j => j.id === jobId);
     if (job) {
       handleSkipRequest(job);
+    } else {
+      // Job not found - might have been completed or removed
+      toast({
+        title: 'Job not found',
+        description: 'This job may have already been completed or removed.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -334,8 +349,11 @@ const Index = () => {
     if (!jobToSkip) return;
     
     const jobId = jobToSkip.id;
-    const customerName = jobToSkip.customer.name;
+    const customerName = jobToSkip.customer?.name || 'Customer';
     setSkipConfirmOpen(false);
+    
+    // Save current state for rollback
+    const previousJobs = [...localJobs];
     
     // Optimistically remove from local state
     setLocalJobs(prev => prev.filter(job => job.id !== jobId));
@@ -372,8 +390,13 @@ const Index = () => {
         ),
       });
     } catch (error) {
-      // Rollback on error
-      setLocalJobs(pendingJobs);
+      // Rollback on error - restore previous state including any reordering
+      setLocalJobs(previousJobs);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to skip job. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setJobToSkip(null);
     }
@@ -392,26 +415,47 @@ const Index = () => {
     setIsSkippingAll(true);
     
     const jobsToSkip = [...localJobs];
+    const previousJobs = [...localJobs];
     
     // Optimistically clear local state
     setLocalJobs([]);
     
     try {
       // Skip all jobs in sequence
+      const skippedJobs: string[] = [];
+      const failedJobs: string[] = [];
+      
       for (const job of jobsToSkip) {
-        await skipJob(job.id);
+        try {
+          await skipJob(job.id);
+          skippedJobs.push(job.id);
+        } catch (error) {
+          failedJobs.push(job.id);
+          console.error(`Failed to skip job ${job.id}:`, error);
+        }
       }
       
-      toast({
-        title: 'All jobs skipped',
-        description: `${jobsToSkip.length} jobs rescheduled to their next intervals.`,
-      });
+      if (failedJobs.length > 0) {
+        // Partial failure - restore failed jobs
+        const remainingJobs = previousJobs.filter(job => failedJobs.includes(job.id));
+        setLocalJobs(remainingJobs);
+        toast({
+          title: 'Some jobs skipped',
+          description: `${skippedJobs.length} jobs skipped, ${failedJobs.length} failed. Please try again.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'All jobs skipped',
+          description: `${jobsToSkip.length} jobs rescheduled to their next intervals.`,
+        });
+      }
     } catch (error) {
-      // Rollback on error
-      setLocalJobs(pendingJobs);
+      // Rollback on error - restore all jobs
+      setLocalJobs(previousJobs);
       toast({
         title: 'Error',
-        description: 'Failed to skip some jobs. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to skip jobs. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -465,7 +509,7 @@ const Index = () => {
 
       <main className="px-4 py-6 max-w-lg mx-auto">
         {isLoading ? (
-          <LoadingState message="Loading your jobs..." />
+          <LoadingState type="skeleton" skeletonType="job-card" count={3} />
         ) : showWelcome ? (
           <WelcomeFlow 
             businessName={businessName}
@@ -611,7 +655,7 @@ const Index = () => {
             </motion.div>
 
             {/* On My Way Button - shows only if there's a next job with phone */}
-            {nextJob && nextJob.customer.mobile_phone && (
+            {nextJob && nextJob.customer?.mobile_phone && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -646,6 +690,7 @@ const Index = () => {
                     variant="outline"
                     size="default"
                     onClick={() => setQuickAddOpen(true)}
+                    disabled={completingJobId !== null || isSkippingAll}
                     className="gap-2"
                   >
                     <UserPlus className="w-4 h-4" />
@@ -655,11 +700,11 @@ const Index = () => {
                     variant="outline"
                     size="default"
                     onClick={handleSkipAllRequest}
-                    disabled={isSkippingAll}
+                    disabled={isSkippingAll || completingJobId !== null}
                     className="gap-2"
                   >
                     <SkipForward className="w-4 h-4" />
-                    Skip All
+                    {isSkippingAll ? 'Skipping...' : 'Skip All'}
                   </Button>
                 </div>
               </motion.div>
@@ -730,10 +775,10 @@ const Index = () => {
                         isProcessing={isMarkingPaid}
                       />
                       {/* Ask for Review button after completion - only if google review link is configured */}
-                      {job.customer.mobile_phone && profile?.google_review_link && (
+                      {job.customer?.mobile_phone && profile?.google_review_link && (
                         <div className="mt-2 flex justify-end">
                           <AskForReviewButton
-                            customerName={job.customer.name}
+                            customerName={job.customer.name || 'Customer'}
                             customerPhone={job.customer.mobile_phone}
                             businessName={businessName}
                             googleReviewLink={profile.google_review_link}
@@ -779,9 +824,9 @@ const Index = () => {
             <AlertDialogDescription>
               {jobToSkip && (
                 <>
-                  This will reschedule <strong>{jobToSkip.customer.name}</strong> at{' '}
-                  <strong>{jobToSkip.customer.address}</strong> to the next scheduled interval 
-                  ({jobToSkip.customer.frequency_weeks} weeks from today).
+                  This will reschedule <strong>{jobToSkip.customer?.name || 'Customer'}</strong> at{' '}
+                  <strong>{jobToSkip.customer?.address || 'this address'}</strong> to the next scheduled interval 
+                  ({jobToSkip.customer?.frequency_weeks || 0} weeks from today).
                 </>
               )}
             </AlertDialogDescription>
@@ -840,8 +885,6 @@ const Index = () => {
         }}
         onConfirm={handleConfirmMarkPaid}
       />
-
-      <BottomNav />
 
       {/* Welcome Tour for first-time users */}
       {showTour && <WelcomeTour onComplete={completeTour} />}

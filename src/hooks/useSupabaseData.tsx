@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Customer, JobWithCustomer } from '@/types/database';
@@ -550,7 +551,7 @@ export function useSupabaseData() {
           return { jobId, method, offline: true };
         }
 
-        const { error, count } = await supabase
+        const { data: updatedRows, error } = await supabase
           .from('jobs')
           .update({
             payment_status: 'paid',
@@ -558,10 +559,11 @@ export function useSupabaseData() {
             payment_date: now,
           })
           .eq('id', jobId)
-          .eq('payment_status', 'unpaid');
+          .eq('payment_status', 'unpaid')
+          .select('id');
 
         if (error) throw error;
-        if (count === 0) throw new Error('Job already paid');
+        if (!updatedRows || updatedRows.length === 0) throw new Error('Job already paid');
         
         return { jobId, method };
       } finally {
@@ -580,7 +582,7 @@ export function useSupabaseData() {
 
       const previousUnpaid = queryClient.getQueryData(['unpaidJobs', user?.id]);
       const previousPaid = queryClient.getQueryData(['paidThisWeek', user?.id]);
-      const previousCompletedToday = queryClient.getQueryData(['completedToday', user?.id]);
+      const previousCompletedToday = queryClient.getQueryData(['completedToday', user?.id, today]);
 
       const job = unpaidJobs.find(j => j.id === jobId);
       if (job) {
@@ -601,7 +603,7 @@ export function useSupabaseData() {
         );
 
         // Update completedToday cache to reflect paid status immediately
-        queryClient.setQueryData(['completedToday', user?.id], (old: JobWithCustomer[] | undefined) =>
+        queryClient.setQueryData(['completedToday', user?.id, today], (old: JobWithCustomer[] | undefined) =>
           (old || []).map(j => j.id === jobId ? paidJob : j)
         );
       }
@@ -616,7 +618,7 @@ export function useSupabaseData() {
         queryClient.setQueryData(['paidThisWeek', user?.id], context.previousPaid);
       }
       if (context?.previousCompletedToday) {
-        queryClient.setQueryData(['completedToday', user?.id], context.previousCompletedToday);
+        queryClient.setQueryData(['completedToday', user?.id, today], context.previousCompletedToday);
       }
       toast({
         title: 'Error',

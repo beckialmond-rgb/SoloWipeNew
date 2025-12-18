@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
@@ -56,7 +55,6 @@ const EXPIRED_CONTEXT = {
 export function TrialGateModal() {
   const { isModalOpen, triggerAction, isTrialExpired, closePaywall } = useSoftPaywall();
   const { createCheckout } = useSubscription();
-  const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubscribe = async (priceType: 'monthly' | 'annual') => {

@@ -669,8 +669,6 @@ const Settings = () => {
         </div>
       </main>
 
-      <BottomNav />
-
       {/* Edit Business Name Modal */}
       <EditBusinessNameModal
         isOpen={isEditBusinessNameOpen}

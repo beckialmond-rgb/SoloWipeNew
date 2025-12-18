@@ -156,7 +156,14 @@ const Money = () => {
   };
 
   if (isLoading) {
-    return <LoadingState />;
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <Header showLogo />
+        <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
+          <LoadingState type="skeleton" skeletonType="earnings" />
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -415,15 +422,6 @@ const Money = () => {
           </TabsContent>
         </Tabs>
       </main>
-
-      <BottomNav />
-
-      <MarkPaidModal
-        isOpen={isMarkPaidOpen}
-        job={selectedJob}
-        onClose={() => !isMarkingPaid && setIsMarkPaidOpen(false)}
-        onConfirm={handleConfirmPaid}
-      />
 
       <BatchPaymentModal
         isOpen={batchModalOpen}
