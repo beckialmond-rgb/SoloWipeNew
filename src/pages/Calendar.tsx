@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, isSameWeek, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, Clock, Plus, Grid3X3, List } from 'lucide-react';
 import { Header } from '@/components/Header';
@@ -87,8 +87,13 @@ const Calendar = () => {
   };
 
   const handleReschedule = async (jobId: string, newDate: string) => {
-    await rescheduleJob(jobId, newDate);
-    setSelectedJob(null);
+    try {
+      await rescheduleJob(jobId, newDate);
+      setSelectedJob(null);
+    } catch (error) {
+      // Error is already handled by the mutation, but we need to keep the modal open
+      console.error('Failed to reschedule job:', error);
+    }
   };
 
   const toggleViewMode = () => {
@@ -166,7 +171,11 @@ const Calendar = () => {
                 <h2 className="text-lg font-semibold text-foreground text-center">
                   {getHeaderText()}
                 </h2>
-                {!isToday(currentDate) && (
+                {/* Show "Today" button when viewing a different month/week than current */}
+                {(viewMode === 'month' 
+                  ? !isSameMonth(currentDate, new Date()) 
+                  : !isSameWeek(currentDate, new Date(), { weekStartsOn: 0 })
+                ) && (
                   <Button
                     variant="ghost"
                     size="sm"
