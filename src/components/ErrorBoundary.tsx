@@ -182,7 +182,7 @@ export class ErrorBoundary extends Component<Props, State> {
               </p>
             </div>
 
-            {(process.env.NODE_ENV === 'development' || isSupabaseConfigError) && displayError && (
+            {((import.meta.env?.DEV ?? false) || isSupabaseConfigError) && displayError && (
               <div className="bg-muted/50 rounded-lg p-4 text-left">
                 <p className="text-sm font-mono text-destructive break-all">
                   {displayError.message}
