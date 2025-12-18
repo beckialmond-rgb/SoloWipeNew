@@ -78,6 +78,7 @@ const Settings = () => {
 
   // Ref to prevent double-execution of GoCardless callback
   const processingCallbackRef = useRef(false);
+  const callbackProcessedRef = useRef(false);
 
   // Handle GoCardless OAuth callback
   useEffect(() => {
@@ -85,11 +86,9 @@ const Settings = () => {
     const code = searchParams.get('code');
     
     // Guard against multiple executions
-    if (gocardless === 'callback' && code && !processingCallbackRef.current) {
+    if (gocardless === 'callback' && code && !processingCallbackRef.current && !callbackProcessedRef.current) {
       processingCallbackRef.current = true;
-      
-      // Clear URL params immediately to prevent re-triggers
-      setSearchParams({});
+      callbackProcessedRef.current = true; // Mark as processed to prevent any re-runs
       
       const handleCallback = async () => {
         const redirectUrl = localStorage.getItem('gocardless_redirect_url');
@@ -125,6 +124,10 @@ const Settings = () => {
           localStorage.removeItem('gocardless_state');
           localStorage.removeItem('gocardless_redirect_url');
           processingCallbackRef.current = false;
+          // Clear URL params after processing (delayed to avoid re-triggering the effect)
+          setTimeout(() => {
+            setSearchParams({}, { replace: true });
+          }, 100);
         }
       };
       

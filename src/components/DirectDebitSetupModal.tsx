@@ -133,14 +133,23 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
   const handleCopyLink = async () => {
     if (!authorisationUrl) return;
     
-    await navigator.clipboard.writeText(authorisationUrl);
-    setCopied(true);
-    addDebugLog('Link Copied', 'Copied to clipboard', 'success');
-    toast({
-      title: 'Link copied',
-      description: 'Direct Debit setup link copied to clipboard.',
-    });
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(authorisationUrl);
+      setCopied(true);
+      addDebugLog('Link Copied', 'Copied to clipboard', 'success');
+      toast({
+        title: 'Link copied',
+        description: 'Direct Debit setup link copied to clipboard.',
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      addDebugLog('Copy Failed', error instanceof Error ? error.message : 'Unknown error', 'error');
+      toast({
+        title: 'Copy failed',
+        description: 'Could not copy link. Please try manually selecting it.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSendSms = () => {
