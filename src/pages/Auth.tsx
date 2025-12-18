@@ -409,7 +409,18 @@ const Auth = () => {
               disabled={oauthLoading !== null}
               onClick={async () => {
                 setOauthLoading('google');
-                await signInWithOAuth('google');
+                try {
+                  const { error } = await signInWithOAuth('google');
+                  if (error) {
+                    toast({
+                      title: 'Sign in failed',
+                      description: error.message,
+                      variant: 'destructive',
+                    });
+                  }
+                } finally {
+                  setOauthLoading(null);
+                }
               }}
               className="w-full h-14 rounded-xl"
             >

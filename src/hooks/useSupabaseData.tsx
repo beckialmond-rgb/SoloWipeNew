@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Customer, JobWithCustomer } from '@/types/database';
@@ -299,14 +300,14 @@ export function useSupabaseData() {
   });
 
   // Complete job mutation with OFFLINE SUPPORT
-  const completingJobIds = new Set<string>();
+  const completingJobIdsRef = useRef<Set<string>>(new Set());
 
   const completeJobMutation = useMutation({
     mutationFn: async ({ jobId, customAmount, photoUrl }: { jobId: string; customAmount?: number; photoUrl?: string }) => {
-      if (completingJobIds.has(jobId)) {
+      if (completingJobIdsRef.current.has(jobId)) {
         throw new Error('Job completion already in progress');
       }
-      completingJobIds.add(jobId);
+      completingJobIdsRef.current.add(jobId);
 
       try {
         // Validate session before critical operation
@@ -438,7 +439,7 @@ export function useSupabaseData() {
           ddRequiresReconnect,
         };
       } finally {
-        completingJobIds.delete(jobId);
+        completingJobIdsRef.current.delete(jobId);
       }
     },
     onMutate: async ({ jobId, customAmount }) => {
@@ -505,14 +506,14 @@ export function useSupabaseData() {
   });
 
   // Mark job as paid with OFFLINE SUPPORT
-  const payingJobIds = new Set<string>();
+  const payingJobIdsRef = useRef<Set<string>>(new Set());
 
   const markJobPaidMutation = useMutation({
     mutationFn: async ({ jobId, method }: { jobId: string; method: 'cash' | 'transfer' }) => {
-      if (payingJobIds.has(jobId)) {
+      if (payingJobIdsRef.current.has(jobId)) {
         throw new Error('Payment already in progress');
       }
-      payingJobIds.add(jobId);
+      payingJobIdsRef.current.add(jobId);
 
       try {
         // Validate session before critical operation
@@ -536,7 +537,7 @@ export function useSupabaseData() {
           return { jobId, method, offline: true };
         }
 
-        const { error, count } = await supabase
+        const { data: updatedRows, error } = await supabase
           .from('jobs')
           .update({
             payment_status: 'paid',
@@ -544,14 +545,15 @@ export function useSupabaseData() {
             payment_date: now,
           })
           .eq('id', jobId)
-          .eq('payment_status', 'unpaid');
+          .eq('payment_status', 'unpaid')
+          .select('id');
 
         if (error) throw error;
-        if (count === 0) throw new Error('Job already paid');
+        if (!updatedRows || updatedRows.length === 0) throw new Error('Job already paid');
         
         return { jobId, method };
       } finally {
-        payingJobIds.delete(jobId);
+        payingJobIdsRef.current.delete(jobId);
       }
     },
     onMutate: async ({ jobId, method }) => {
@@ -561,7 +563,7 @@ export function useSupabaseData() {
 
       const previousUnpaid = queryClient.getQueryData(['unpaidJobs', user?.id]);
       const previousPaid = queryClient.getQueryData(['paidThisWeek', user?.id]);
-      const previousCompletedToday = queryClient.getQueryData(['completedToday', user?.id]);
+      const previousCompletedToday = queryClient.getQueryData(['completedToday', user?.id, today]);
 
       const job = unpaidJobs.find(j => j.id === jobId);
       if (job) {
@@ -582,7 +584,7 @@ export function useSupabaseData() {
         );
 
         // Update completedToday cache to reflect paid status immediately
-        queryClient.setQueryData(['completedToday', user?.id], (old: JobWithCustomer[] | undefined) =>
+        queryClient.setQueryData(['completedToday', user?.id, today], (old: JobWithCustomer[] | undefined) =>
           (old || []).map(j => j.id === jobId ? paidJob : j)
         );
       }
@@ -597,7 +599,7 @@ export function useSupabaseData() {
         queryClient.setQueryData(['paidThisWeek', user?.id], context.previousPaid);
       }
       if (context?.previousCompletedToday) {
-        queryClient.setQueryData(['completedToday', user?.id], context.previousCompletedToday);
+        queryClient.setQueryData(['completedToday', user?.id, today], context.previousCompletedToday);
       }
       toast({
         title: 'Error',
@@ -616,14 +618,14 @@ export function useSupabaseData() {
   });
 
   // Batch mark jobs as paid with OFFLINE SUPPORT
-  const batchPaymentInProgress = { current: false };
+  const batchPaymentInProgressRef = useRef(false);
 
   const batchMarkPaidMutation = useMutation({
     mutationFn: async ({ jobIds, method }: { jobIds: string[]; method: 'cash' | 'transfer' }) => {
-      if (batchPaymentInProgress.current) {
+      if (batchPaymentInProgressRef.current) {
         throw new Error('Batch payment already in progress');
       }
-      batchPaymentInProgress.current = true;
+      batchPaymentInProgressRef.current = true;
 
       try {
         // Validate session before critical operation
@@ -662,7 +664,7 @@ export function useSupabaseData() {
         
         return { count: jobIds.length, method };
       } finally {
-        batchPaymentInProgress.current = false;
+        batchPaymentInProgressRef.current = false;
       }
     },
     onMutate: async ({ jobIds, method }) => {

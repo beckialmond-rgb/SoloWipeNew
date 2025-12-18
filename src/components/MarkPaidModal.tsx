@@ -48,12 +48,12 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
   if (!job) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Mark as Paid</DialogTitle>
           <DialogDescription>
-            How did {job.customer.name} pay for this job?
+            How did {job.customer?.name || 'the customer'} pay for this job?
           </DialogDescription>
         </DialogHeader>
 
@@ -63,7 +63,7 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
               £{(job.amount_collected || 0).toFixed(2)}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              {job.customer.address}
+              {job.customer?.address || 'No address'}
             </p>
           </div>
 
@@ -113,6 +113,7 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
             variant="outline"
             className="flex-1 h-12"
             onClick={handleClose}
+            disabled={isSubmitting}
           >
             Cancel
           </Button>

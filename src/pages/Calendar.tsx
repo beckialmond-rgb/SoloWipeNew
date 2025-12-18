@@ -87,8 +87,13 @@ const Calendar = () => {
   };
 
   const handleReschedule = async (jobId: string, newDate: string) => {
-    await rescheduleJob(jobId, newDate);
-    setSelectedJob(null);
+    try {
+      await rescheduleJob(jobId, newDate);
+      setSelectedJob(null);
+    } catch (error) {
+      // Error is already handled by the mutation, but we need to keep the modal open
+      console.error('Failed to reschedule job:', error);
+    }
   };
 
   const toggleViewMode = () => {
@@ -450,7 +455,6 @@ const Calendar = () => {
         />
       )}
 
-      <BottomNav />
     </div>
   );
 };
