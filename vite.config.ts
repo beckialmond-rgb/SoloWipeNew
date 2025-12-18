@@ -116,14 +116,13 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Simplified chunking strategy to prevent React loading issues
-        // CRITICAL: Bundle ALL React-dependent packages together to ensure React loads first
+        // Minimal chunking strategy to prevent circular dependency and initialization issues
+        // Only split very large, independent libraries
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
 
-          // CRITICAL: Bundle React and ALL React-dependent libraries together
-          // This ensures React is always available when any React-dependent code runs
-          // Prevents circular dependencies and initialization order issues
+          // Keep React ecosystem together - ALL React-dependent packages in one chunk
+          // This prevents circular dependencies and initialization order issues
           if (
             id.includes("/react/") ||
             id.includes("/react-dom/") ||
@@ -140,18 +139,20 @@ export default defineConfig(({ mode }) => ({
             id.includes("react-day-picker") ||
             id.includes("recharts") ||
             id.includes("embla-carousel-react") ||
-            id.includes("react-resizable-panels")
+            id.includes("react-resizable-panels") ||
+            id.includes("lucide-react") ||
+            id.includes("sonner")
           )
             return "react-vendor";
           
-          // Other large dependencies that don't depend on React
+          // Only split truly independent, large libraries
           if (id.includes("@supabase")) return "supabase";
-          if (id.includes("lucide-react")) return "icons";
           if (id.includes("/zod/")) return "forms";
           if (id.includes("/date-fns/")) return "dates";
           if (id.includes("/d3-")) return "d3";
 
-          return "vendor";
+          // Everything else goes in react-vendor to avoid circular dependencies
+          return "react-vendor";
         },
       },
     },
