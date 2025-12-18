@@ -29,7 +29,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
+        // Handle OAuth sign-up - ensure profile exists and has business_name
+        if (event === 'SIGNED_IN' && session?.user) {
+          // Check if this is a Google OAuth user
+          const isOAuthUser = session.user.app_metadata?.provider === 'google';
+          
+          if (isOAuthUser) {
+            // Small delay to ensure profile trigger has completed
+            setTimeout(async () => {
+              try {
+                // Verify profile exists and check business_name
+                const { data: profile, error } = await supabase
+                  .from('profiles')
+                  .select('business_name')
+                  .eq('id', session.user.id)
+                  .maybeSingle();
+                
+                // If profile exists but business_name is default, mark for update
+                if (!error && profile && profile.business_name === 'My Window Cleaning') {
+                  // Store flag to show business name collection modal
+                  sessionStorage.setItem('needs_business_name', 'true');
+                  // Trigger a custom event to notify components
+                  window.dispatchEvent(new Event('needs-business-name'));
+                }
+              } catch (err) {
+                console.error('Error checking profile after OAuth:', err);
+              }
+            }, 500);
+          }
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
@@ -110,6 +140,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       provider,
       options: {
         redirectTo: `${window.location.origin}/`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     });
     return { error };
