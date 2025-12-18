@@ -116,42 +116,19 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Simplified chunking strategy to prevent React loading issues
-        // CRITICAL: Bundle ALL React-dependent packages together to ensure React loads first
+        // Minimal chunking strategy to prevent circular dependency and initialization issues
+        // Only split very large, independent libraries
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
 
-          // CRITICAL: Bundle React and ALL React-dependent libraries together
-          // This ensures React is always available when any React-dependent code runs
-          // Prevents circular dependencies and initialization order issues
-          if (
-            id.includes("/react/") ||
-            id.includes("/react-dom/") ||
-            id.includes("/scheduler/") ||
-            id.includes("@radix-ui") ||
-            id.includes("react-router-dom") ||
-            id.includes("react-hook-form") ||
-            id.includes("@hookform/") ||
-            id.includes("@tanstack/react-query") ||
-            id.includes("@tanstack/query-async-storage-persister") ||
-            id.includes("@tanstack/react-query-persist-client") ||
-            id.includes("next-themes") ||
-            id.includes("framer-motion") ||
-            id.includes("react-day-picker") ||
-            id.includes("recharts") ||
-            id.includes("embla-carousel-react") ||
-            id.includes("react-resizable-panels")
-          )
-            return "react-vendor";
-          
-          // Other large dependencies that don't depend on React
+          // CRITICAL: Put everything except Supabase in react-vendor
+          // This prevents ALL circular dependency and initialization order issues
+          // Only Supabase is truly independent and can be split safely
           if (id.includes("@supabase")) return "supabase";
-          if (id.includes("lucide-react")) return "icons";
-          if (id.includes("/zod/")) return "forms";
-          if (id.includes("/date-fns/")) return "dates";
-          if (id.includes("/d3-")) return "d3";
-
-          return "vendor";
+          
+          // Everything else (React, React deps, zod, date-fns, d3, etc.) goes in one chunk
+          // This eliminates circular dependency issues completely
+          return "react-vendor";
         },
       },
     },
