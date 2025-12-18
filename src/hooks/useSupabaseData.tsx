@@ -753,10 +753,17 @@ export function useSupabaseData() {
         .single();
 
       if (customerError) {
-        // Check for foreign key constraint error specifically
-        if (customerError.message?.includes('foreign key constraint')) {
+        // Check for foreign key constraint error specifically (profile doesn't exist)
+        // RLS errors are different - they mention "row-level security" or "policy"
+        if (customerError.message?.includes('foreign key constraint') && 
+            customerError.message?.includes('profiles')) {
           await supabase.auth.signOut();
           throw new Error('Your session has expired. Please sign in again.');
+        }
+        // RLS errors should show a helpful message, not log out
+        if (customerError.message?.includes('row-level security') || 
+            customerError.message?.includes('policy')) {
+          throw new Error('Permission denied. Please check your Row Level Security policies.');
         }
         throw customerError;
       }
