@@ -3,8 +3,12 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 
 // Verify React is available before proceeding
-if (!React || typeof React.forwardRef !== 'function') {
+if (!React) {
   throw new Error('React is not properly loaded. Please clear your browser cache and try again.');
+}
+
+if (typeof React.forwardRef !== 'function' || typeof React.createContext !== 'function') {
+  throw new Error('React APIs are not available. Please clear your browser cache and try again.');
 }
 
 import App from "./App.tsx";
