@@ -20,8 +20,6 @@ export const BatchPaymentModal = ({
   const [selectedMethod, setSelectedMethod] = useState<'cash' | 'transfer' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  if (!isOpen || selectedJobs.length === 0) return null;
-
   const totalAmount = selectedJobs.reduce(
     (sum, job) => sum + (job.amount_collected || job.customer.price), 
     0
@@ -39,14 +37,20 @@ export const BatchPaymentModal = ({
     }
   };
 
+  const handleClose = () => {
+    if (isProcessing) return; // Prevent closing during processing
+    onClose();
+  };
+
   return (
     <AnimatePresence>
+      {isOpen && selectedJobs.length > 0 && (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
-        onClick={onClose}
+        onClick={handleClose}
       >
         <motion.div
           initial={{ y: '100%' }}
@@ -58,7 +62,11 @@ export const BatchPaymentModal = ({
         >
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-foreground">Mark {selectedJobs.length} Jobs Paid</h2>
-            <button onClick={onClose} className="p-2 hover:bg-muted rounded-full">
+            <button 
+              onClick={handleClose} 
+              disabled={isProcessing}
+              className="p-2 hover:bg-muted rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <X className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
@@ -119,6 +127,7 @@ export const BatchPaymentModal = ({
           </Button>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 };
