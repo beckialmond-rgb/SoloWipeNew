@@ -409,7 +409,24 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
               disabled={oauthLoading !== null}
               onClick={async () => {
                 setOauthLoading('google');
-                await signInWithOAuth('google');
+                try {
+                  const { error } = await signInWithOAuth('google');
+                  if (error) {
+                    toast({
+                      title: 'Sign in failed',
+                      description: error.message || 'Failed to sign in with Google',
+                      variant: 'destructive',
+                    });
+                  }
+                } catch (err) {
+                  toast({
+                    title: 'Sign in failed',
+                    description: err instanceof Error ? err.message : 'Failed to sign in with Google',
+                    variant: 'destructive',
+                  });
+                } finally {
+                  setOauthLoading(null);
+                }
               }}
               className="w-full h-14 rounded-xl"
             >

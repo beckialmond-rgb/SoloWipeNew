@@ -12,7 +12,7 @@ export function BottomNav() {
   const { pendingCount } = useOffline();
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Count unpaid jobs
+  // Count unpaid jobs (only for active customers)
   const { data: unpaidCount = 0 } = useQuery({
     queryKey: ['unpaidCount', user?.id],
     queryFn: async () => {
@@ -20,9 +20,10 @@ export function BottomNav() {
       
       const { count, error } = await supabase
         .from('jobs')
-        .select('*', { count: 'exact', head: true })
+        .select('*, customer:customers!inner(*)', { count: 'exact', head: true })
         .eq('status', 'completed')
-        .eq('payment_status', 'unpaid');
+        .eq('payment_status', 'unpaid')
+        .eq('customer.status', 'active');
       
       if (error) return 0;
       return count || 0;

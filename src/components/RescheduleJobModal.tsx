@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import {
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { JobWithCustomer } from '@/types/database';
+import { useToast } from '@/hooks/use-toast';
 
 interface RescheduleJobModalProps {
   job: JobWithCustomer | null;
@@ -31,10 +32,18 @@ export function RescheduleJobModal({
   onOpenChange,
   onReschedule,
 }: RescheduleJobModalProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    job ? new Date(job.scheduled_date) : undefined
-  );
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+
+  // Reset selected date when job changes
+  useEffect(() => {
+    if (job && open) {
+      setSelectedDate(new Date(job.scheduled_date));
+    } else if (!open) {
+      setSelectedDate(undefined);
+    }
+  }, [job, open]);
 
   const handleReschedule = async () => {
     if (!job || !selectedDate) return;
@@ -43,15 +52,16 @@ export function RescheduleJobModal({
     try {
       await onReschedule(job.id, format(selectedDate, 'yyyy-MM-dd'));
       onOpenChange(false);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to reschedule job. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // Reset selected date when job changes
-  if (job && selectedDate === undefined) {
-    setSelectedDate(new Date(job.scheduled_date));
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -106,6 +116,7 @@ export function RescheduleJobModal({
                 variant="outline"
                 className="flex-1 min-h-[60px]"
                 onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>

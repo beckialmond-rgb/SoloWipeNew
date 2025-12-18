@@ -6,6 +6,7 @@ import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { jobNotesSchema, validateForm, sanitizeString } from '@/lib/validations';
 import { FormField } from '@/components/ui/form-field';
+import { useToast } from '@/hooks/use-toast';
 
 interface JobNotesModalProps {
   job: JobWithCustomer | null;
@@ -18,6 +19,7 @@ export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalPro
   const [notes, setNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | undefined>();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (job) {
@@ -44,6 +46,12 @@ export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalPro
     try {
       await onSave(job.id, validation.data.notes || null);
       onClose();
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: err instanceof Error ? err.message : 'Failed to save notes. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSaving(false);
     }

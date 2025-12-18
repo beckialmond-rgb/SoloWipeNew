@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface MarkPaidModalProps {
   isOpen: boolean;
@@ -21,15 +22,22 @@ interface MarkPaidModalProps {
 export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModalProps) {
   const [selectedMethod, setSelectedMethod] = useState<'cash' | 'transfer' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   const handleConfirm = async () => {
     if (!selectedMethod) return;
     setIsSubmitting(true);
     try {
       await onConfirm(selectedMethod);
+      setSelectedMethod(null);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to mark job as paid. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
-      setSelectedMethod(null);
     }
   };
 
@@ -102,6 +110,7 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
             variant="outline"
             className="flex-1 h-12"
             onClick={handleClose}
+            disabled={isSubmitting}
           >
             Cancel
           </Button>
