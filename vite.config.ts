@@ -121,37 +121,13 @@ export default defineConfig(({ mode }) => ({
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
 
-          // Keep React ecosystem together - ALL React-dependent packages in one chunk
-          // This prevents circular dependencies and initialization order issues
-          if (
-            id.includes("/react/") ||
-            id.includes("/react-dom/") ||
-            id.includes("/scheduler/") ||
-            id.includes("@radix-ui") ||
-            id.includes("react-router-dom") ||
-            id.includes("react-hook-form") ||
-            id.includes("@hookform/") ||
-            id.includes("@tanstack/react-query") ||
-            id.includes("@tanstack/query-async-storage-persister") ||
-            id.includes("@tanstack/react-query-persist-client") ||
-            id.includes("next-themes") ||
-            id.includes("framer-motion") ||
-            id.includes("react-day-picker") ||
-            id.includes("recharts") ||
-            id.includes("embla-carousel-react") ||
-            id.includes("react-resizable-panels") ||
-            id.includes("lucide-react") ||
-            id.includes("sonner")
-          )
-            return "react-vendor";
-          
-          // Only split truly independent, large libraries
+          // CRITICAL: Put everything except Supabase in react-vendor
+          // This prevents ALL circular dependency and initialization order issues
+          // Only Supabase is truly independent and can be split safely
           if (id.includes("@supabase")) return "supabase";
-          if (id.includes("/zod/")) return "forms";
-          if (id.includes("/date-fns/")) return "dates";
-          if (id.includes("/d3-")) return "d3";
-
-          // Everything else goes in react-vendor to avoid circular dependencies
+          
+          // Everything else (React, React deps, zod, date-fns, d3, etc.) goes in one chunk
+          // This eliminates circular dependency issues completely
           return "react-vendor";
         },
       },
