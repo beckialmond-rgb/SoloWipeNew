@@ -95,6 +95,8 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    // Dedupe React to ensure single instance and prevent circular deps
+    dedupe: ['react', 'react-dom'],
   },
   optimizeDeps: {
     // Force pre-bundling of React and React-dependent packages
@@ -106,6 +108,19 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-slot',
       '@tanstack/react-query',
     ],
+    // Ensure proper dependency resolution
+    esbuildOptions: {
+      // Ensure proper hoisting of React
+      target: 'es2020',
+    },
+  },
+  // Ensure proper module resolution
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+    // Dedupe React to ensure single instance
+    dedupe: ['react', 'react-dom'],
   },
   build: {
     // Enable sourcemaps temporarily to help debug circular dependency issues
