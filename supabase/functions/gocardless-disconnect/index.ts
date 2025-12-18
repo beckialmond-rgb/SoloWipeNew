@@ -37,7 +37,7 @@ serve(async (req) => {
     // Clear GoCardless credentials from profile using service role
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SERVICE_ROLE_KEY') ?? ''
     );
 
     const { error: updateError } = await adminClient
