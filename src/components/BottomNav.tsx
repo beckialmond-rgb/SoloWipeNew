@@ -1,59 +1,17 @@
 import { Home, Users, Wallet, CalendarDays, Settings } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { cn } from '@/lib/utils';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useOffline } from '@/contexts/OfflineContext';
-import { format } from 'date-fns';
 
 export function BottomNav() {
-  const { user } = useAuth();
   const { pendingCount } = useOffline();
-  const today = format(new Date(), 'yyyy-MM-dd');
-
-  // Count unpaid jobs
-  const { data: unpaidCount = 0 } = useQuery({
-    queryKey: ['unpaidCount', user?.id],
-    queryFn: async () => {
-      if (!user) return 0;
-      
-      const { count, error } = await supabase
-        .from('jobs')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'completed')
-        .eq('payment_status', 'unpaid');
-      
-      if (error) return 0;
-      return count || 0;
-    },
-    enabled: !!user,
-    refetchInterval: 30000,
-  });
-
-  // Count today's pending jobs
-  const { data: pendingTodayCount = 0 } = useQuery({
-    queryKey: ['pendingTodayCount', user?.id, today],
-    queryFn: async () => {
-      if (!user) return 0;
-      
-      const { count, error } = await supabase
-        .from('jobs')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending')
-        .lte('scheduled_date', today);
-      
-      if (error) return 0;
-      return count || 0;
-    },
-    enabled: !!user,
-    refetchInterval: 30000,
-  });
+  const { pendingJobs, unpaidJobs } = useSupabaseData();
 
   const navItems = [
-    { to: '/', icon: Home, label: 'Today', badge: pendingTodayCount, badgeColor: 'bg-primary' },
+    { to: '/', icon: Home, label: 'Today', badge: pendingJobs.length, badgeColor: 'bg-primary' },
     { to: '/customers', icon: Users, label: 'Customers', badge: 0, badgeColor: '' },
-    { to: '/money', icon: Wallet, label: 'Money', badge: unpaidCount, badgeColor: 'bg-amber-500' },
+    { to: '/money', icon: Wallet, label: 'Money', badge: unpaidJobs.length, badgeColor: 'bg-amber-500' },
     { to: '/calendar', icon: CalendarDays, label: 'Calendar', badge: 0, badgeColor: '' },
     { to: '/settings', icon: Settings, label: 'Settings', badge: pendingCount, badgeColor: 'bg-orange-500' },
   ];

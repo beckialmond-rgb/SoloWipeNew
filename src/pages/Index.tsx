@@ -508,7 +508,7 @@ const Index = () => {
 
       <main className="px-4 py-6 max-w-lg mx-auto">
         {isLoading ? (
-          <LoadingState message="Loading your jobs..." />
+          <LoadingState type="skeleton" skeletonType="job-card" count={3} />
         ) : showWelcome ? (
           <WelcomeFlow 
             businessName={businessName}
@@ -884,8 +884,6 @@ const Index = () => {
         }}
         onConfirm={handleConfirmMarkPaid}
       />
-
-      <BottomNav />
 
       {/* Welcome Tour for first-time users */}
       {showTour && <WelcomeTour onComplete={completeTour} />}

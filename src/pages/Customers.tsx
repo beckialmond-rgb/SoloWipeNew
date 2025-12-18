@@ -161,7 +161,7 @@ const Customers = () => {
 
       <main className="px-4 py-6 max-w-lg mx-auto">
         {isLoading ? (
-          <LoadingState message="Loading customers..." />
+          <LoadingState type="skeleton" skeletonType="customer-card" count={5} />
         ) : customers.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -433,8 +433,6 @@ const Customers = () => {
           <Plus className="w-6 h-6" />
         </motion.button>
       )}
-
-      <BottomNav />
 
       {/* Customer Detail Modal */}
       {selectedCustomer && (

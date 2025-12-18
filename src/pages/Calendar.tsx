@@ -443,7 +443,6 @@ const Calendar = () => {
         />
       )}
 
-      <BottomNav />
     </div>
   );
 };
