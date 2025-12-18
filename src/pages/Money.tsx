@@ -161,9 +161,10 @@ const Money = () => {
     return (
       <div className="min-h-screen bg-background pb-20">
         <Header showLogo />
-        <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-          <LoadingState type="skeleton" skeletonType="earnings" />
+        <main className="px-4 py-6 max-w-lg mx-auto">
+          <LoadingState message="Loading payments..." />
         </main>
+        <BottomNav />
       </div>
     );
   }

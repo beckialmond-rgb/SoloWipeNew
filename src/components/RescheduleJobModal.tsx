@@ -31,17 +31,18 @@ export function RescheduleJobModal({
   onOpenChange,
   onReschedule,
 }: RescheduleJobModalProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(
-    job ? new Date(job.scheduled_date) : undefined
-  );
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset selected date when job changes or modal opens
+  // Properly sync selected date when job changes or modal opens
   useEffect(() => {
     if (job && open) {
       setSelectedDate(new Date(job.scheduled_date));
+    } else if (!open) {
+      // Reset when modal closes
+      setSelectedDate(undefined);
     }
-  }, [job?.id, job?.scheduled_date, open]);
+  }, [job, open]);
 
   const handleReschedule = async () => {
     if (!job || !selectedDate) return;
