@@ -105,36 +105,34 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Simplified chunking strategy to prevent React/Radix UI loading issues
+        // Simplified chunking strategy to prevent React loading issues
+        // CRITICAL: Bundle ALL React-dependent packages together to ensure React loads first
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
 
-          // CRITICAL: Bundle React, React DOM, Scheduler, and Radix UI together
-          // This ensures React is always available when Radix UI initializes
+          // CRITICAL: Bundle React and ALL React-dependent libraries together
+          // This ensures React is always available when any React-dependent code runs
           if (
             id.includes("/react/") ||
             id.includes("/react-dom/") ||
             id.includes("/scheduler/") ||
-            id.includes("@radix-ui")
+            id.includes("@radix-ui") ||
+            id.includes("react-router-dom") ||
+            id.includes("react-hook-form") ||
+            id.includes("@hookform/") ||
+            id.includes("next-themes") ||
+            id.includes("framer-motion") ||
+            id.includes("react-day-picker")
           )
             return "react-vendor";
           
-          // React Router can be separate but depends on React
-          if (id.includes("react-router-dom")) return "react-router";
-          
-          // Other large dependencies
-          if (id.includes("framer-motion")) return "motion";
+          // Other large dependencies that don't depend on React
           if (id.includes("recharts") || id.includes("/d3-")) return "charts";
           if (id.includes("@tanstack")) return "tanstack";
           if (id.includes("@supabase")) return "supabase";
           if (id.includes("lucide-react")) return "icons";
-          if (
-            id.includes("react-hook-form") ||
-            id.includes("@hookform/") ||
-            id.includes("/zod/")
-          )
-            return "forms";
-          if (id.includes("/date-fns/") || id.includes("react-day-picker")) return "dates";
+          if (id.includes("/zod/")) return "forms";
+          if (id.includes("/date-fns/")) return "dates";
 
           return "vendor";
         },
