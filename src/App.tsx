@@ -17,12 +17,11 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingState } from "@/components/LoadingState";
 import { queryPersister, CACHE_TIME, STALE_TIME } from "@/lib/queryPersister";
 
+import { OfflineIndicator } from "@/components/OfflineIndicator";
+
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
 
-const OfflineIndicator = lazy(() =>
-  import("@/components/OfflineIndicator").then((m) => ({ default: m.OfflineIndicator }))
-);
 const WhatsNewModal = lazy(() =>
   import("@/components/WhatsNewModal").then((m) => ({ default: m.WhatsNewModal }))
 );
@@ -82,9 +81,7 @@ const App = () => {
           <SoftPaywallProvider>
             <OfflineProvider>
               <TooltipProvider>
-              <Suspense fallback={null}>
-                <OfflineIndicator />
-              </Suspense>
+              <OfflineIndicator />
               <ReloadPrompt />
               <Suspense fallback={null}>
                 <WhatsNewModal />

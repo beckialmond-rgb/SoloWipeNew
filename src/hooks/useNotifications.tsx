@@ -50,6 +50,11 @@ export const useNotifications = () => {
       return false;
     } catch (error) {
       console.error('Error requesting notification permission:', error);
+      toast({
+        title: "Error",
+        description: "Failed to enable notifications.",
+        variant: "destructive",
+      });
       return false;
     }
   }, [isSupported, toast]);

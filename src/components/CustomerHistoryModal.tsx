@@ -24,12 +24,14 @@ export function CustomerHistoryModal({ customer, isOpen, onClose }: CustomerHist
   const [jobs, setJobs] = useState<JobWithCustomer[]>([]);
   const [stats, setStats] = useState<CustomerStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!customer || !isOpen) return;
 
     const fetchHistory = async () => {
       setIsLoading(true);
+      setError(null);
       try {
         const { data, error } = await supabase
           .from('jobs')
@@ -66,6 +68,7 @@ export function CustomerHistoryModal({ customer, isOpen, onClose }: CustomerHist
         });
       } catch (err) {
         console.error('Failed to fetch customer history:', err);
+        setError('Failed to load history. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -117,6 +120,10 @@ export function CustomerHistoryModal({ customer, isOpen, onClose }: CustomerHist
 
             {isLoading ? (
               <div className="py-12 text-center text-muted-foreground">Loading...</div>
+            ) : error ? (
+              <div className="py-12 text-center text-destructive">
+                <p>{error}</p>
+              </div>
             ) : (
               <>
                 {/* Stats Cards */}
