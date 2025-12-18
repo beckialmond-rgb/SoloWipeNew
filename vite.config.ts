@@ -110,6 +110,7 @@ export default defineConfig(({ mode }) => ({
           if (!id.includes("node_modules")) return;
 
           // React and React DOM must be together and loaded first
+          // Include scheduler which is part of React
           if (
             id.includes("/react/") ||
             id.includes("/react-dom/") ||
@@ -117,9 +118,9 @@ export default defineConfig(({ mode }) => ({
           )
             return "react";
 
-          // Put Radix UI in vendor chunk to ensure React loads first
-          // This prevents "forwardRef" errors by ensuring React is available
-          if (id.includes("@radix-ui")) return "vendor";
+          // Put Radix UI in the same chunk as React to ensure React is available
+          // This prevents "forwardRef" errors
+          if (id.includes("@radix-ui")) return "react";
           
           // React Router depends on React
           if (id.includes("react-router-dom")) return "react-router";
