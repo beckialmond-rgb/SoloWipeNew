@@ -22,7 +22,7 @@ export function useOfflineSync() {
   }, []);
 
   // Process a single mutation
-  const processMutation = async (mutation: OfflineMutation): Promise<boolean> => {
+  const processMutation = useCallback(async (mutation: OfflineMutation): Promise<boolean> => {
     try {
       switch (mutation.type) {
         case 'completeJob': {
@@ -150,7 +150,7 @@ export function useOfflineSync() {
       console.error('Failed to process mutation:', mutation.type, error);
       return false;
     }
-  };
+  }, []);
 
   // Sync all pending mutations
   const syncPendingMutations = useCallback(async () => {
@@ -219,7 +219,7 @@ export function useOfflineSync() {
       syncingRef.current = false;
       setIsSyncing(false);
     }
-  }, [isOnline, queryClient, updatePendingCount]);
+  }, [isOnline, processMutation, queryClient, success, updatePendingCount, warning]);
 
   // Sync when coming back online
   useEffect(() => {

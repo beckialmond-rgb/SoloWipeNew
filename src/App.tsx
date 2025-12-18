@@ -1,5 +1,4 @@
 import { lazy, Suspense } from 'react';
-import { AlertTriangle } from 'lucide-react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,7 +12,6 @@ import { SoftPaywallProvider } from "@/hooks/useSoftPaywall";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import { ReloadPrompt } from "@/components/ReloadPrompt";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingState } from "@/components/LoadingState";
 import { queryPersister, CACHE_TIME, STALE_TIME } from "@/lib/queryPersister";
 
@@ -63,7 +61,6 @@ const queryClient = new QueryClient({
 
 const App = () => {
   return (
-  <ErrorBoundary>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <PersistQueryClientProvider
         client={queryClient}
@@ -163,7 +160,6 @@ const App = () => {
         </AuthProvider>
       </PersistQueryClientProvider>
     </ThemeProvider>
-  </ErrorBoundary>
   );
 };
 
