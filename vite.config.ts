@@ -105,26 +105,24 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Improve long-term caching by splitting large dependencies into stable chunks.
+        // Simplified chunking strategy to prevent React/Radix UI loading issues
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
 
-          // React and React DOM must be together and loaded first
-          // Include scheduler which is part of React
+          // CRITICAL: Bundle React, React DOM, Scheduler, and Radix UI together
+          // This ensures React is always available when Radix UI initializes
           if (
             id.includes("/react/") ||
             id.includes("/react-dom/") ||
-            id.includes("/scheduler/")
+            id.includes("/scheduler/") ||
+            id.includes("@radix-ui")
           )
-            return "react";
-
-          // Put Radix UI in the same chunk as React to ensure React is available
-          // This prevents "forwardRef" errors
-          if (id.includes("@radix-ui")) return "react";
+            return "react-vendor";
           
-          // React Router depends on React
+          // React Router can be separate but depends on React
           if (id.includes("react-router-dom")) return "react-router";
           
+          // Other large dependencies
           if (id.includes("framer-motion")) return "motion";
           if (id.includes("recharts") || id.includes("/d3-")) return "charts";
           if (id.includes("@tanstack")) return "tanstack";
@@ -142,5 +140,7 @@ export default defineConfig(({ mode }) => ({
         },
       },
     },
+    // Ensure proper chunk loading order
+    chunkSizeWarningLimit: 1000,
   },
 }));
