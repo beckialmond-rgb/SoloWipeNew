@@ -1,4 +1,6 @@
-project_id = "eovoluizcnikfkyyctwq"
+# Update this with your new Supabase project ID (found in project URL)
+# Example: If URL is https://abcdefghijklmnop.supabase.co, then ID is "abcdefghijklmnop"
+project_id = ""
 
 [functions.create-checkout]
 verify_jwt = true
