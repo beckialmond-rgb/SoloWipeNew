@@ -131,21 +131,21 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Use a function that returns undefined to disable chunking entirely
-        // This puts everything in one bundle, eliminating circular dependency issues
+        // Force everything into a single chunk to eliminate circular dependencies
+        // This is the most reliable way to prevent "Cannot access before initialization" errors
         manualChunks() {
+          // Return undefined to put everything in one bundle
+          // This completely eliminates chunk loading order and circular dependency issues
           return undefined;
         },
         // Ensure proper module format
         format: 'es',
-        // Preserve module structure to avoid circular dependency issues
-        preserveModules: false,
       },
       // Externalize nothing - bundle everything together
       external: [],
     },
-    // Increase chunk size warning limit since we're bundling everything
-    chunkSizeWarningLimit: 2000,
+    // Very high chunk size limit to allow single bundle
+    chunkSizeWarningLimit: 10000,
     // Use commonjs format for better compatibility
     commonjsOptions: {
       include: [/node_modules/],
