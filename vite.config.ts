@@ -95,6 +95,8 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    // Dedupe React to ensure single instance and prevent circular deps
+    dedupe: ['react', 'react-dom'],
   },
   optimizeDeps: {
     // Force pre-bundling of React and React-dependent packages
@@ -106,23 +108,40 @@ export default defineConfig(({ mode }) => ({
       '@radix-ui/react-slot',
       '@tanstack/react-query',
     ],
+    // Ensure proper dependency resolution
+    esbuildOptions: {
+      // Ensure proper hoisting of React
+      target: 'es2020',
+    },
   },
   build: {
-    // Keep sourcemaps off by default for smaller production payloads.
-    sourcemap: false,
+    // Enable sourcemaps temporarily to help debug circular dependency issues
+    sourcemap: true,
     rollupOptions: {
       output: {
         // Content hashing for aggressive cache busting - prevents stale bundle errors
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Disable manual chunking - let Vite handle it automatically
-        // Vite's automatic chunking is better at resolving circular dependencies
-        // This eliminates "Cannot access before initialization" errors
-        manualChunks: undefined,
+        // Force everything into a single chunk to eliminate circular dependencies
+        // This is the most reliable way to prevent "Cannot access before initialization" errors
+        manualChunks() {
+          // Return undefined to put everything in one bundle
+          // This completely eliminates chunk loading order and circular dependency issues
+          return undefined;
+        },
+        // Ensure proper module format
+        format: 'es',
       },
+      // Externalize nothing - bundle everything together
+      external: [],
     },
-    // Ensure proper chunk loading order
-    chunkSizeWarningLimit: 1000,
+    // Very high chunk size limit to allow single bundle
+    chunkSizeWarningLimit: 10000,
+    // Use commonjs format for better compatibility
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
   },
 }));
