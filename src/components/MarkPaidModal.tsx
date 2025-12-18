@@ -46,7 +46,7 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
         <DialogHeader>
           <DialogTitle>Mark as Paid</DialogTitle>
           <DialogDescription>
-            How did {job.customer.name} pay for this job?
+            How did {job.customer?.name || 'the customer'} pay for this job?
           </DialogDescription>
         </DialogHeader>
 
@@ -56,7 +56,7 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
               £{(job.amount_collected || 0).toFixed(2)}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              {job.customer.address}
+              {job.customer?.address || 'No address'}
             </p>
           </div>
 

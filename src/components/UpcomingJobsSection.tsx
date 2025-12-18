@@ -156,12 +156,12 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
         <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex items-center gap-2 min-w-0">
             <p className="font-medium text-foreground truncate max-w-[60%]">
-              {job.customer.name}
+              {job.customer?.name || 'Unknown Customer'}
             </p>
             {/* Mandate Status Indicator */}
-            {job.customer.gocardless_mandate_status === 'pending' ? (
+            {job.customer?.gocardless_mandate_status === 'pending' ? (
               <span title="DD Pending"><Clock className="w-4 h-4 text-warning flex-shrink-0" /></span>
-            ) : job.customer.gocardless_id ? (
+            ) : job.customer?.gocardless_id ? (
               <span title="DD Active"><CreditCard className="w-4 h-4 text-success flex-shrink-0" /></span>
             ) : null}
           </div>
