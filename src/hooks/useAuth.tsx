@@ -9,7 +9,11 @@ interface AuthContextType {
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, businessName: string) => Promise<{ error: Error | null }>;
+  signUp: (
+    email: string,
+    password: string,
+    businessName: string
+  ) => Promise<{ error: Error | null; needsEmailConfirmation: boolean }>;
   signInWithOAuth: (provider: Provider) => Promise<{ error: Error | null }>;
   resendVerificationEmail: (email: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -85,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, businessName: string) => {
     const redirectUrl = `${window.location.origin}/`;
     
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -95,7 +99,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         },
       },
     });
-    return { error };
+    // If email confirmations are enabled, Supabase returns no session.
+    // Treat that as a successful signup that still needs verification.
+    const needsEmailConfirmation = !data.session;
+    return { error, needsEmailConfirmation };
   };
 
   const signInWithOAuth = async (provider: Provider) => {
