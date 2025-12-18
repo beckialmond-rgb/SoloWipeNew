@@ -122,7 +122,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
           navigate('/');
         }
       } else {
-        const { error } = await signUp(email, password, businessName);
+        const { error, needsEmailConfirmation } = await signUp(email, password, businessName);
         if (error) {
           // Check for rate limiting
           if (error.message?.toLowerCase().includes('rate limit') || 
@@ -137,11 +137,20 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
             variant: 'destructive',
           });
         } else {
-          toast({
-            title: 'Welcome to SoloWipe!',
-            description: 'Your account has been created.',
-          });
-          navigate('/');
+          if (needsEmailConfirmation) {
+            toast({
+              title: 'Check your email to verify',
+              description: 'We sent you a verification link. After verifying, come back and sign in.',
+            });
+            setShowVerificationResend(true);
+            setIsLogin(true);
+          } else {
+            toast({
+              title: 'Welcome to SoloWipe!',
+              description: 'Your account has been created.',
+            });
+            navigate('/');
+          }
         }
       }
     } finally {
