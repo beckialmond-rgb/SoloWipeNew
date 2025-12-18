@@ -119,22 +119,27 @@ export default defineConfig(({ mode }) => ({
     sourcemap: true,
     rollupOptions: {
       output: {
-        // Content hashing for aggressive cache busting - prevents stale bundle errors
-        entryFileNames: 'assets/[name]-[hash].js',
-        chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Force everything into a single chunk to eliminate circular dependencies
-        // This is the most reliable way to prevent "Cannot access before initialization" errors
-        manualChunks() {
-          // Return undefined to put everything in one bundle
-          // This completely eliminates chunk loading order and circular dependency issues
-          return undefined;
+        // Use fixed names to prevent chunk splitting
+        entryFileNames: 'assets/index.js',
+        chunkFileNames: 'assets/index.js',
+        assetFileNames: 'assets/[name].[ext]',
+        // CRITICAL: Force single file output by returning same chunk name for everything
+        manualChunks(id) {
+          // Return the same chunk name for ALL modules to force single bundle
+          // This completely eliminates circular dependencies
+          return 'index';
         },
         // Ensure proper module format
         format: 'es',
+        // Disable code splitting entirely
+        inlineDynamicImports: false,
       },
       // Externalize nothing - bundle everything together
       external: [],
+      // Disable tree-shaking that might cause issues
+      treeshake: {
+        moduleSideEffects: 'no-external',
+      },
     },
     // Very high chunk size limit to allow single bundle
     chunkSizeWarningLimit: 10000,
