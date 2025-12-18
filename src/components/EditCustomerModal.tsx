@@ -267,6 +267,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
           </form>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }

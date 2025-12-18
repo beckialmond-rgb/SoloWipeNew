@@ -68,8 +68,8 @@ export function RescheduleJobModal({
           <div className="space-y-6 py-4">
             {/* Customer info */}
             <div className="space-y-1">
-              <p className="font-medium text-foreground">{job.customer.name}</p>
-              <p className="text-sm text-muted-foreground">{job.customer.address}</p>
+              <p className="font-medium text-foreground">{job.customer?.name || 'Unknown Customer'}</p>
+              <p className="text-sm text-muted-foreground">{job.customer?.address || 'No address'}</p>
             </div>
 
             {/* Date picker */}

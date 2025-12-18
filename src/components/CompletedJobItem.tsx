@@ -36,10 +36,10 @@ export function CompletedJobItem({ job, index, onMarkPaid, onAddNote, isProcessi
 
         <div className="flex-1 min-w-0">
           <p className="font-medium text-foreground truncate">
-            {job.customer.name}
+            {job.customer?.name || 'Unknown Customer'}
           </p>
           <p className="text-sm text-muted-foreground truncate">
-            {job.customer.address}
+            {job.customer?.address || 'No address'}
           </p>
         </div>
 

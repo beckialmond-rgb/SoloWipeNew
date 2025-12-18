@@ -1,5 +1,4 @@
 import { lazy, Suspense } from 'react';
-import { AlertTriangle } from 'lucide-react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,16 +12,15 @@ import { SoftPaywallProvider } from "@/hooks/useSoftPaywall";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 import { OfflineProvider } from "@/contexts/OfflineContext";
 import { ReloadPrompt } from "@/components/ReloadPrompt";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { LoadingState } from "@/components/LoadingState";
 import { queryPersister, CACHE_TIME, STALE_TIME } from "@/lib/queryPersister";
+import { Layout } from "@/components/Layout";
+
+import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
 
-const OfflineIndicator = lazy(() =>
-  import("@/components/OfflineIndicator").then((m) => ({ default: m.OfflineIndicator }))
-);
 const WhatsNewModal = lazy(() =>
   import("@/components/WhatsNewModal").then((m) => ({ default: m.WhatsNewModal }))
 );
@@ -63,7 +61,6 @@ const queryClient = new QueryClient({
 
 const App = () => {
   return (
-  <ErrorBoundary>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <PersistQueryClientProvider
         client={queryClient}
@@ -82,9 +79,7 @@ const App = () => {
           <SoftPaywallProvider>
             <OfflineProvider>
               <TooltipProvider>
-              <Suspense fallback={null}>
-                <OfflineIndicator />
-              </Suspense>
+              <OfflineIndicator />
               <ReloadPrompt />
               <Suspense fallback={null}>
                 <WhatsNewModal />
@@ -101,58 +96,61 @@ const App = () => {
                         <Route path="/auth" element={<Auth />} />
                         <Route path="/forgot-password" element={<ForgotPassword />} />
                         <Route path="/reset-password" element={<ResetPassword />} />
-                        <Route
-                          path="/"
-                          element={
-                            <ProtectedRoute>
-                              <Index />
-                            </ProtectedRoute>
-                          }
-                        />
-                        <Route
-                          path="/customers"
-                          element={
-                            <ProtectedRoute>
-                              <Customers />
-                            </ProtectedRoute>
-                          }
-                        />
-                        <Route
-                          path="/money"
-                          element={
-                            <ProtectedRoute>
-                              <Money />
-                            </ProtectedRoute>
-                          }
-                        />
-                        <Route
-                          path="/earnings"
-                          element={
-                            <ProtectedRoute>
-                              <Earnings />
-                            </ProtectedRoute>
-                          }
-                        />
-                        <Route
-                          path="/calendar"
-                          element={
-                            <ProtectedRoute>
-                              <Calendar />
-                            </ProtectedRoute>
-                          }
-                        />
-                        <Route
-                          path="/settings"
-                          element={
-                            <ProtectedRoute>
-                              <Settings />
-                            </ProtectedRoute>
-                          }
-                        />
                         <Route path="/install" element={<Install />} />
                         <Route path="/terms" element={<Terms />} />
                         <Route path="/privacy" element={<Privacy />} />
-                        <Route path="*" element={<NotFound />} />
+
+                        <Route element={<Layout />}>
+                          <Route
+                            path="/"
+                            element={
+                              <ProtectedRoute>
+                                <Index />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/customers"
+                            element={
+                              <ProtectedRoute>
+                                <Customers />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/money"
+                            element={
+                              <ProtectedRoute>
+                                <Money />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/earnings"
+                            element={
+                              <ProtectedRoute>
+                                <Earnings />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/calendar"
+                            element={
+                              <ProtectedRoute>
+                                <Calendar />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/settings"
+                            element={
+                              <ProtectedRoute>
+                                <Settings />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route path="*" element={<NotFound />} />
+                        </Route>
                       </Routes>
                     </Suspense>
                   </KeyboardShortcutsProvider>
@@ -163,7 +161,6 @@ const App = () => {
         </AuthProvider>
       </PersistQueryClientProvider>
     </ThemeProvider>
-  </ErrorBoundary>
   );
 };
 

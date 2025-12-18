@@ -1,5 +1,5 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ declare global {
 }
 
 export function ReloadPrompt() {
+  const updateIntervalRef = useRef<number | null>(null);
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
@@ -20,7 +21,10 @@ export function ReloadPrompt() {
     onRegisteredSW(swUrl, r) {
       // Check for updates periodically (keep it light for mobile battery/CPU).
       if (r) {
-        setInterval(() => {
+        if (updateIntervalRef.current) {
+          clearInterval(updateIntervalRef.current);
+        }
+        updateIntervalRef.current = window.setInterval(() => {
           r.update();
         }, 5 * 60 * 1000); // 5 minutes
       }
@@ -43,6 +47,16 @@ export function ReloadPrompt() {
       delete window.__forcePWAUpdate;
     };
   }, [forceUpdate]);
+
+  // Ensure we don't leak update intervals (StrictMode / HMR safety)
+  useEffect(() => {
+    return () => {
+      if (updateIntervalRef.current) {
+        clearInterval(updateIntervalRef.current);
+        updateIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   // Listen for global error events that might indicate stale bundles
   useEffect(() => {

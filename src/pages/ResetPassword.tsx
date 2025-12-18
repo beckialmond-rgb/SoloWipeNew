@@ -17,6 +17,7 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPasswordFeedback, setShowPasswordFeedback] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -27,12 +28,22 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
     // Check if we have a valid session from the reset link
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      
+      // If there's a session but it's from a normal login (not password recovery), redirect to home
+      if (session && !window.location.hash.includes('type=recovery')) {
+        navigate('/', { replace: true });
+        return;
+      }
+      
+      // If no session and not a recovery link, show error
       if (!session) {
         setError('Invalid or expired reset link. Please request a new one.');
       }
+      
+      setCheckingSession(false);
     };
     checkSession();
-  }, []);
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,6 +95,17 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
       setLoading(false);
     }
   };
+
+  // Show loading while checking session
+  if (checkingSession) {
+    return (
+      <div ref={ref} className="min-h-screen bg-background flex flex-col">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (

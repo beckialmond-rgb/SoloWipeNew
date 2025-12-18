@@ -42,6 +42,10 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
   if (!customer) return null;
 
   const sendSmsReminder = () => {
+    if (!customer.mobile_phone) {
+      toast.error('Customer has no phone number');
+      return;
+    }
     const message = encodeURIComponent(
       `Hi ${customer.name.split(' ')[0]}, ${businessName} here. We are cleaning your windows tomorrow. Please leave the gate unlocked!`
     );
