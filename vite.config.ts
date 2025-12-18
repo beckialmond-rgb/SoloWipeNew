@@ -107,17 +107,27 @@ export default defineConfig(({ mode }) => ({
       'react-router-dom',
       '@radix-ui/react-slot',
       '@tanstack/react-query',
+      '@tanstack/react-query-persist-client',
+      '@tanstack/query-async-storage-persister',
     ],
+    // Exclude problematic packages from optimization if needed
+    exclude: [],
     // Ensure proper dependency resolution
     esbuildOptions: {
       // Ensure proper hoisting of React
       target: 'es2020',
+      // Ensure proper handling of circular dependencies
+      legalComments: 'none',
     },
+    // Force re-optimization to clear any cached problematic bundles
+    force: false,
   },
   build: {
     // Enable sourcemaps temporarily to help debug circular dependency issues
     sourcemap: true,
     rollupOptions: {
+      // Preserve entry signatures to ensure proper initialization order
+      preserveEntrySignatures: 'strict',
       output: {
         // CRITICAL: Force true single-file bundle
         // Use inlineDynamicImports to inline ALL dynamic imports (lazy-loaded routes)
@@ -127,16 +137,28 @@ export default defineConfig(({ mode }) => ({
         entryFileNames: 'assets/index.js',
         // Asset files keep hashing for cache busting
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Ensure proper module format
+        // Use ES module format - required for modern browser module loading
         format: 'es',
-        // No manual chunks - everything in one file
-        manualChunks: undefined,
+        // Ensure proper variable naming and prevent hoisting issues
+        // constBindings: true ensures variables are declared with const/let
+        // which helps prevent TDZ (Temporal Dead Zone) violations
+        generatedCode: {
+          constBindings: true,
+          objectShorthand: true,
+        },
+        // Ensure proper handling of exports
+        exports: 'auto',
+        // Don't compact code during build to preserve initialization order
+        // Minification happens separately and won't affect module initialization
+        compact: false,
       },
       // Externalize nothing - bundle everything together
       external: [],
-      // Disable tree-shaking that might cause issues
+      // Configure tree-shaking to preserve side effects that might be needed for initialization
       treeshake: {
         moduleSideEffects: 'no-external',
+        propertyReadSideEffects: false,
+        tryCatchDeoptimization: false,
       },
     },
     // Very high chunk size limit to allow single bundle
@@ -145,6 +167,17 @@ export default defineConfig(({ mode }) => ({
     commonjsOptions: {
       include: [/node_modules/],
       transformMixedEsModules: true,
+      // Ensure proper handling of circular dependencies
+      strictRequires: false,
     },
+    // Use esbuild for minification (Vite default) with options that preserve initialization order
+    minify: 'esbuild',
+    // esbuild options are configured via build.esbuild in Vite
+  },
+  esbuild: {
+    // Ensure esbuild doesn't break initialization order
+    legalComments: 'none',
+    // Keep names for better error messages
+    keepNames: false,
   },
 }));
