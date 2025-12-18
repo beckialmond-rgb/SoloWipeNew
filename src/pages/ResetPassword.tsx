@@ -46,10 +46,10 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
       return;
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       toast({
         title: 'Password too short',
-        description: 'Password must be at least 6 characters.',
+        description: 'Password must be at least 8 characters.',
         variant: 'destructive',
       });
       return;
@@ -197,7 +197,7 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !passwordsMatch || passwordStrength.score < 3 || password.length < 8}
                 className={cn(
                   "w-full h-14 rounded-xl",
                   "bg-primary hover:bg-primary/90 text-primary-foreground",

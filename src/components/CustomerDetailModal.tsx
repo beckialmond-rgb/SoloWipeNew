@@ -99,8 +99,9 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
 
   return (
     <>
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         <motion.div
+          key={`customer-modal-${customer.id}`}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

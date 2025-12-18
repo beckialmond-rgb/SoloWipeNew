@@ -34,6 +34,7 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
   };
 
   const handleClose = () => {
+    if (isSubmitting) return; // Prevent closing during submission
     setSelectedMethod(null);
     onClose();
   };
@@ -41,7 +42,7 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
   if (!job) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Mark as Paid</DialogTitle>
@@ -102,6 +103,7 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
             variant="outline"
             className="flex-1 h-12"
             onClick={handleClose}
+            disabled={isSubmitting}
           >
             Cancel
           </Button>

@@ -87,16 +87,22 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
     }
   };
 
+  const handleClose = () => {
+    if (isSubmitting) return;
+    onClose();
+  };
+
   if (!isOpen || !customer) return null;
 
   return (
-    <AnimatePresence>
+    <AnimatePresence mode="wait">
       <motion.div
+        key={`edit-customer-modal-${customer.id}`}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm"
-        onClick={onClose}
+        onClick={handleClose}
       >
         <motion.div
           initial={{ y: '100%' }}
@@ -113,8 +119,9 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
 
           {/* Close button */}
           <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors"
+            onClick={handleClose}
+            disabled={isSubmitting}
+            className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors disabled:opacity-50"
             aria-label="Close"
           >
             <X className="w-5 h-5 text-muted-foreground" />
