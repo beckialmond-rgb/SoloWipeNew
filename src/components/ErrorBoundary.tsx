@@ -27,12 +27,30 @@ const CACHE_ERROR_PATTERNS = [
   'SyntaxError',
 ];
 
+// Patterns that indicate Supabase configuration errors
+const SUPABASE_ERROR_PATTERNS = [
+  'Missing VITE_SUPABASE',
+  'Invalid Supabase',
+  'Failed to initialize Supabase',
+  'Supabase',
+];
+
 function isStaleModuleError(error: Error): boolean {
   const message = error.message || '';
   const stack = error.stack || '';
   const combined = `${message} ${stack}`;
   
   return CACHE_ERROR_PATTERNS.some(pattern => 
+    combined.toLowerCase().includes(pattern.toLowerCase())
+  );
+}
+
+function isSupabaseError(error: Error): boolean {
+  const message = error.message || '';
+  const stack = error.stack || '';
+  const combined = `${message} ${stack}`;
+  
+  return SUPABASE_ERROR_PATTERNS.some(pattern => 
     combined.toLowerCase().includes(pattern.toLowerCase())
   );
 }
@@ -141,9 +159,11 @@ export class ErrorBoundary extends Component<Props, State> {
               <p className="text-muted-foreground">
                 {this.state.isRecovering 
                   ? 'Clearing cached files and reloading with the latest version.'
-                  : isModuleError
-                    ? 'A cached version of the app is out of date. Click below to load the latest version.'
-                    : 'We\'re sorry, but something unexpected happened. Please try reloading the app.'
+                  : isSupabaseError(this.state.error!)
+                    ? 'Supabase configuration error. Please check your environment variables in Netlify. See console for details.'
+                    : isModuleError
+                      ? 'A cached version of the app is out of date. Click below to load the latest version.'
+                      : 'We\'re sorry, but something unexpected happened. Please try reloading the app.'
                 }
               </p>
             </div>

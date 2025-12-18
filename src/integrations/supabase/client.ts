@@ -5,22 +5,68 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Validate environment variables
+// Validate environment variables with detailed error messages
 if (!SUPABASE_URL) {
-  throw new Error('Missing VITE_SUPABASE_URL environment variable. Please add it to Netlify environment variables.');
+  const errorMessage = `
+    Missing VITE_SUPABASE_URL environment variable.
+    
+    Please add this to Netlify:
+    1. Go to Site settings → Environment variables
+    2. Add: VITE_SUPABASE_URL = https://your-project.supabase.co
+    
+    Current value: ${SUPABASE_URL || 'undefined'}
+  `;
+  console.error(errorMessage);
+  throw new Error('Missing VITE_SUPABASE_URL. Check console for details.');
 }
 
 if (!SUPABASE_PUBLISHABLE_KEY) {
-  throw new Error('Missing VITE_SUPABASE_PUBLISHABLE_KEY environment variable. Please add it to Netlify environment variables.');
+  const errorMessage = `
+    Missing VITE_SUPABASE_PUBLISHABLE_KEY environment variable.
+    
+    Please add this to Netlify:
+    1. Go to Site settings → Environment variables
+    2. Add: VITE_SUPABASE_PUBLISHABLE_KEY = sb_publishable_...
+    
+    Get this from Supabase Dashboard → Project Settings → API → Publishable Keys
+    
+    Current value: ${SUPABASE_PUBLISHABLE_KEY ? '***' + SUPABASE_PUBLISHABLE_KEY.slice(-10) : 'undefined'}
+  `;
+  console.error(errorMessage);
+  throw new Error('Missing VITE_SUPABASE_PUBLISHABLE_KEY. Check console for details.');
+}
+
+// Validate URL format
+if (!SUPABASE_URL.startsWith('https://') || !SUPABASE_URL.includes('.supabase.co')) {
+  console.error('Invalid VITE_SUPABASE_URL format. Expected: https://xxxxx.supabase.co');
+  throw new Error('Invalid Supabase URL format. Check console for details.');
+}
+
+// Validate key format (should start with sb_publishable_ or eyJ for legacy)
+if (!SUPABASE_PUBLISHABLE_KEY.startsWith('sb_publishable_') && !SUPABASE_PUBLISHABLE_KEY.startsWith('eyJ')) {
+  console.error('Invalid VITE_SUPABASE_PUBLISHABLE_KEY format. Should start with sb_publishable_ or eyJ');
+  throw new Error('Invalid Supabase key format. Check console for details.');
 }
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-  }
-});
+let supabase: ReturnType<typeof createClient<Database>>;
+
+try {
+  supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      storage: localStorage,
+      persistSession: true,
+      autoRefreshToken: true,
+    }
+  });
+  
+  // Test the connection
+  console.log('[Supabase] Client initialized successfully');
+} catch (error) {
+  console.error('[Supabase] Failed to initialize client:', error);
+  throw new Error(`Failed to initialize Supabase client: ${error instanceof Error ? error.message : 'Unknown error'}`);
+}
+
+export { supabase };

@@ -1,6 +1,7 @@
 // Ensure React is loaded first before any other imports
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Verify React is available before proceeding
 if (!React) {
@@ -19,8 +20,11 @@ if (!rootElement) {
   throw new Error('Root element not found');
 }
 
+// Wrap app in ErrorBoundary at root level to catch all errors
 createRoot(rootElement).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </React.StrictMode>
 );
