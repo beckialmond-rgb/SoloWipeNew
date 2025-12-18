@@ -96,6 +96,17 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  optimizeDeps: {
+    // Force pre-bundling of React and React-dependent packages
+    // This helps resolve circular dependencies and initialization order issues
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@radix-ui/react-slot',
+      '@tanstack/react-query',
+    ],
+  },
   build: {
     // Keep sourcemaps off by default for smaller production payloads.
     sourcemap: false,
@@ -112,6 +123,7 @@ export default defineConfig(({ mode }) => ({
 
           // CRITICAL: Bundle React and ALL React-dependent libraries together
           // This ensures React is always available when any React-dependent code runs
+          // Prevents circular dependencies and initialization order issues
           if (
             id.includes("/react/") ||
             id.includes("/react-dom/") ||
@@ -120,19 +132,24 @@ export default defineConfig(({ mode }) => ({
             id.includes("react-router-dom") ||
             id.includes("react-hook-form") ||
             id.includes("@hookform/") ||
+            id.includes("@tanstack/react-query") ||
+            id.includes("@tanstack/query-async-storage-persister") ||
+            id.includes("@tanstack/react-query-persist-client") ||
             id.includes("next-themes") ||
             id.includes("framer-motion") ||
-            id.includes("react-day-picker")
+            id.includes("react-day-picker") ||
+            id.includes("recharts") ||
+            id.includes("embla-carousel-react") ||
+            id.includes("react-resizable-panels")
           )
             return "react-vendor";
           
           // Other large dependencies that don't depend on React
-          if (id.includes("recharts") || id.includes("/d3-")) return "charts";
-          if (id.includes("@tanstack")) return "tanstack";
           if (id.includes("@supabase")) return "supabase";
           if (id.includes("lucide-react")) return "icons";
           if (id.includes("/zod/")) return "forms";
           if (id.includes("/date-fns/")) return "dates";
+          if (id.includes("/d3-")) return "d3";
 
           return "vendor";
         },
