@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks, isWithinInterval } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, Clock, Plus, Grid3X3, List } from 'lucide-react';
 import { Header } from '@/components/Header';
@@ -166,7 +166,14 @@ const Calendar = () => {
                 <h2 className="text-lg font-semibold text-foreground text-center">
                   {getHeaderText()}
                 </h2>
-                {!isToday(currentDate) && (
+                {/* Show "Today" button only when today is not visible in current view */}
+                {(() => {
+                  const today = new Date();
+                  const isTodayVisible = viewMode === 'month' 
+                    ? isSameMonth(today, currentDate)
+                    : isWithinInterval(today, { start: weekStart, end: weekEnd });
+                  return !isTodayVisible;
+                })() && (
                   <Button
                     variant="ghost"
                     size="sm"
