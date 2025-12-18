@@ -32,7 +32,7 @@ const Auth = () => {
   const [failedAttempts, setFailedAttempts] = useState(0);
   
   const passwordsMatch = password === confirmPassword;
-  const { user, loading: authLoading, signIn, signUp, signInWithOAuth, resendVerificationEmail } = useAuth();
+  const { user, loading: authLoading, supabaseError, signIn, signUp, signInWithOAuth, resendVerificationEmail } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -237,6 +237,26 @@ const Auth = () => {
                 : 'Start managing your window cleaning business'}
             </p>
           </div>
+
+          {/* Supabase configuration error */}
+          {supabaseError && (
+            <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-left">
+              <p className="text-sm font-semibold text-destructive">Configuration required</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                SoloWipe can’t connect to Supabase yet. Add the required environment variables and redeploy.
+              </p>
+              <p className="mt-3 text-xs font-mono text-destructive break-all">
+                {supabaseError.message}
+              </p>
+              <div className="mt-3 text-sm text-muted-foreground">
+                <div className="font-medium text-foreground">Expected variables:</div>
+                <div className="mt-1 font-mono text-xs">
+                  VITE_SUPABASE_URL<br />
+                  VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY)
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
