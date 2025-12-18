@@ -8,7 +8,7 @@ const corsHeaders = {
 
 // Encryption key derived from a secret - in production this should use Supabase Vault
 async function getEncryptionKey(): Promise<CryptoKey> {
-  const secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'fallback-secret-key';
+  const secret = Deno.env.get('SERVICE_ROLE_KEY') || 'fallback-secret-key';
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -89,7 +89,7 @@ serve(async (req) => {
     // Create admin client for database operations
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SERVICE_ROLE_KEY') ?? ''
     );
 
     // IDEMPOTENCY CHECK: Check if user already has a valid GoCardless connection

@@ -8,7 +8,7 @@ const corsHeaders = {
 
 // Encryption key derived from a secret - matches gocardless-callback
 async function getEncryptionKey(): Promise<CryptoKey> {
-  const secret = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || 'fallback-secret-key';
+  const secret = Deno.env.get('SERVICE_ROLE_KEY') || 'fallback-secret-key';
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -170,7 +170,7 @@ serve(async (req) => {
     // Get user's GoCardless credentials
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SERVICE_ROLE_KEY') ?? ''
     );
 
     const { data: profile, error: profileError } = await adminClient
