@@ -109,17 +109,23 @@ export default defineConfig(({ mode }) => ({
         manualChunks(id) {
           if (!id.includes("node_modules")) return;
 
+          // React and React DOM must be together and loaded first
           if (
             id.includes("/react/") ||
             id.includes("/react-dom/") ||
-            id.includes("react-router-dom") ||
             id.includes("/scheduler/")
           )
             return "react";
 
+          // Put Radix UI in vendor chunk to ensure React loads first
+          // This prevents "forwardRef" errors by ensuring React is available
+          if (id.includes("@radix-ui")) return "vendor";
+          
+          // React Router depends on React
+          if (id.includes("react-router-dom")) return "react-router";
+          
           if (id.includes("framer-motion")) return "motion";
           if (id.includes("recharts") || id.includes("/d3-")) return "charts";
-          if (id.includes("@radix-ui")) return "radix";
           if (id.includes("@tanstack")) return "tanstack";
           if (id.includes("@supabase")) return "supabase";
           if (id.includes("lucide-react")) return "icons";
