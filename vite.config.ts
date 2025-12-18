@@ -119,20 +119,18 @@ export default defineConfig(({ mode }) => ({
     sourcemap: true,
     rollupOptions: {
       output: {
-        // Use fixed names to prevent chunk splitting
+        // CRITICAL: Force true single-file bundle
+        // Use inlineDynamicImports to inline ALL dynamic imports (lazy-loaded routes)
+        // This completely eliminates chunk loading and circular dependency issues
+        inlineDynamicImports: true,
+        // Single entry file name
         entryFileNames: 'assets/index.js',
-        chunkFileNames: 'assets/index.js',
-        assetFileNames: 'assets/[name].[ext]',
-        // CRITICAL: Force single file output by returning same chunk name for everything
-        manualChunks(id) {
-          // Return the same chunk name for ALL modules to force single bundle
-          // This completely eliminates circular dependencies
-          return 'index';
-        },
+        // Asset files keep hashing for cache busting
+        assetFileNames: 'assets/[name]-[hash].[ext]',
         // Ensure proper module format
         format: 'es',
-        // Disable code splitting entirely
-        inlineDynamicImports: false,
+        // No manual chunks - everything in one file
+        manualChunks: undefined,
       },
       // Externalize nothing - bundle everything together
       external: [],
