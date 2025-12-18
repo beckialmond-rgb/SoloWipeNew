@@ -20,6 +20,7 @@ import { PriceAdjustModal } from '@/components/PriceAdjustModal';
 import { PhotoCaptureModal } from '@/components/PhotoCaptureModal';
 import { OptimizeRouteButton } from '@/components/OptimizeRouteButton';
 import { MarkPaidModal } from '@/components/MarkPaidModal';
+import { BusinessNameModal } from '@/components/BusinessNameModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -96,6 +97,33 @@ const Index = () => {
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     return localStorage.getItem('solowipe_welcome_dismissed') === 'true';
   });
+  const [showBusinessNameModal, setShowBusinessNameModal] = useState(false);
+  
+  // Check if user needs to provide business name after OAuth sign-up
+  useEffect(() => {
+    const checkBusinessName = () => {
+      if (user && !isLoading && profile) {
+        const needsBusinessName = sessionStorage.getItem('needs_business_name') === 'true';
+        if (needsBusinessName && profile.business_name === 'My Window Cleaning') {
+          setShowBusinessNameModal(true);
+        }
+      }
+    };
+
+    checkBusinessName();
+    
+    // Listen for custom event from auth state change
+    window.addEventListener('needs-business-name', checkBusinessName);
+    
+    return () => {
+      window.removeEventListener('needs-business-name', checkBusinessName);
+    };
+  }, [user, isLoading, profile]);
+  
+  const handleBusinessNameComplete = () => {
+    setShowBusinessNameModal(false);
+    refetchAll();
+  };
   
   const handleDismissTrialBanner = () => {
     setTrialBannerDismissed(true);
@@ -889,6 +917,12 @@ const Index = () => {
 
       {/* Welcome Tour for first-time users */}
       {showTour && <WelcomeTour onComplete={completeTour} />}
+
+      {/* Business Name Modal for OAuth sign-ups */}
+      <BusinessNameModal
+        isOpen={showBusinessNameModal}
+        onComplete={handleBusinessNameComplete}
+      />
     </div>
   );
 };
