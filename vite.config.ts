@@ -114,14 +114,6 @@ export default defineConfig(({ mode }) => ({
       target: 'es2020',
     },
   },
-  // Ensure proper module resolution
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
-    },
-    // Dedupe React to ensure single instance
-    dedupe: ['react', 'react-dom'],
-  },
   build: {
     // Enable sourcemaps temporarily to help debug circular dependency issues
     sourcemap: true,
