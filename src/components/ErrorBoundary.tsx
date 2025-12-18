@@ -15,16 +15,16 @@ interface State {
 
 // Patterns that indicate a stale cache/module resolution error
 const CACHE_ERROR_PATTERNS = [
-  'forwardRef',
-  'Cannot read properties of undefined',
-  'Cannot read properties of null',
-  'is not a function',
-  'is not defined',
-  'Failed to fetch dynamically imported module',
-  'Loading chunk',
+  // These are relatively specific to stale bundles / code-splitting failures.
   'ChunkLoadError',
-  'Unexpected token',
-  'SyntaxError',
+  'Loading chunk',
+  'Failed to fetch dynamically imported module',
+  'Importing a module script failed',
+  'Unable to preload CSS',
+  // React/version mismatch symptoms that commonly occur with stale cached bundles.
+  'forwardRef',
+  'createContext',
+  'React is not defined',
 ];
 
 // Patterns that indicate Supabase configuration errors
@@ -102,6 +102,14 @@ export class ErrorBoundary extends Component<Props, State> {
     
     // Auto-recover from stale module errors
     if (isStaleModuleError(error) && !this.state.isRecovering) {
+      // Avoid getting stuck in reload loops.
+      const recoveryCount = Number(sessionStorage.getItem('errorBoundaryAutoRecoveryCount') || '0');
+      if (recoveryCount >= 1) {
+        console.warn('[ErrorBoundary] Auto-recovery already attempted this session; showing fallback UI instead.');
+        return;
+      }
+      sessionStorage.setItem('errorBoundaryAutoRecoveryCount', String(recoveryCount + 1));
+
       console.log('[ErrorBoundary] Detected stale module error, initiating auto-recovery...');
       this.handleAutoRecovery();
     }

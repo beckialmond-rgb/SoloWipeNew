@@ -181,7 +181,8 @@ const Index = () => {
     const { jobs: orderedJobs, wasRestored } = applyPersistedOrder(pendingJobs);
     setLocalJobs(orderedJobs);
     
-    // Show toast only once per day when order is restored
+    // Show toast only once when order is restored
+    // Use a more stable check to prevent duplicate toasts
     if (wasRestored && !orderRestored && pendingJobs.length > 0) {
       setOrderRestored(true);
       const restoredKey = `solowipe_order_restored_${format(new Date(), 'yyyy-MM-dd')}`;
@@ -192,7 +193,7 @@ const Index = () => {
         duration: 2000,
       });
     }
-  }, [pendingJobs, applyPersistedOrder, orderRestored, toast]);
+  }, [pendingJobs, applyPersistedOrder]); // Remove toast and orderRestored from deps to prevent loops
 
   // Show welcome flow for new users
   useEffect(() => {

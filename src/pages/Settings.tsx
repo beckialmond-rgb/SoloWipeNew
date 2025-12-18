@@ -76,19 +76,20 @@ const Settings = () => {
     }
   }, [searchParams, toast, checkSubscription, setSearchParams]);
 
-  // Ref to prevent double-execution of GoCardless callback
-  const processingCallbackRef = useRef(false);
-  const callbackProcessedRef = useRef(false);
+  // Use state instead of ref to prevent double-execution and track processing status
+  const [processingCallback, setProcessingCallback] = useState(false);
 
   // Handle GoCardless OAuth callback
   useEffect(() => {
     const gocardless = searchParams.get('gocardless');
     const code = searchParams.get('code');
     
-    // Guard against multiple executions
-    if (gocardless === 'callback' && code && !processingCallbackRef.current && !callbackProcessedRef.current) {
-      processingCallbackRef.current = true;
-      callbackProcessedRef.current = true; // Mark as processed to prevent any re-runs
+    // Guard against multiple executions using state
+    if (gocardless === 'callback' && code && !processingCallback) {
+      setProcessingCallback(true);
+      
+      // Clear URL params immediately to prevent re-triggers
+      setSearchParams({});
       
       const handleCallback = async () => {
         const redirectUrl = localStorage.getItem('gocardless_redirect_url');
@@ -123,17 +124,23 @@ const Settings = () => {
         } finally {
           localStorage.removeItem('gocardless_state');
           localStorage.removeItem('gocardless_redirect_url');
-          processingCallbackRef.current = false;
-          // Clear URL params after processing (delayed to avoid re-triggering the effect)
-          setTimeout(() => {
-            setSearchParams({}, { replace: true });
-          }, 100);
+          setProcessingCallback(false);
         }
       };
       
+      // Add timeout to prevent indefinite processing state
+      const timeoutId = setTimeout(() => {
+        if (processingCallback) {
+          console.warn('[Settings] GoCardless callback timeout - resetting state');
+          setProcessingCallback(false);
+        }
+      }, 30000); // 30 second timeout
+      
       handleCallback();
+      
+      return () => clearTimeout(timeoutId);
     }
-  }, [searchParams, setSearchParams, toast, refetchAll]);
+  }, [searchParams, setSearchParams, toast, refetchAll, processingCallback]);
 
   const formatLastSynced = () => {
     if (!lastSynced) return 'Never';

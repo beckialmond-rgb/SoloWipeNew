@@ -40,7 +40,7 @@ export function RescheduleJobModal({
     if (job && open) {
       setSelectedDate(new Date(job.scheduled_date));
     }
-  }, [job, open]);
+  }, [job?.id, open]); // Only reset when job changes or modal opens
 
   // Clean up state when modal closes
   useEffect(() => {

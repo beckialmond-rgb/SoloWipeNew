@@ -13,7 +13,9 @@ declare global {
 }
 
 export function ReloadPrompt() {
-  const updateIntervalRef = useRef<number | null>(null);
+  const swUpdateIntervalIdRef = useRef<number | null>(null);
+  const staleErrorToastShownRef = useRef(false);
+
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
@@ -21,10 +23,9 @@ export function ReloadPrompt() {
     onRegisteredSW(swUrl, r) {
       // Check for updates periodically (keep it light for mobile battery/CPU).
       if (r) {
-        if (updateIntervalRef.current) {
-          clearInterval(updateIntervalRef.current);
-        }
-        updateIntervalRef.current = window.setInterval(() => {
+        // Avoid creating multiple intervals if the SW re-registers.
+        if (swUpdateIntervalIdRef.current != null) return;
+        swUpdateIntervalIdRef.current = window.setInterval(() => {
           r.update();
         }, 5 * 60 * 1000); // 5 minutes
       }
@@ -48,12 +49,12 @@ export function ReloadPrompt() {
     };
   }, [forceUpdate]);
 
-  // Ensure we don't leak update intervals (StrictMode / HMR safety)
+  // Cleanup SW polling interval on unmount (defensive).
   useEffect(() => {
     return () => {
-      if (updateIntervalRef.current) {
-        clearInterval(updateIntervalRef.current);
-        updateIntervalRef.current = null;
+      if (swUpdateIntervalIdRef.current != null) {
+        window.clearInterval(swUpdateIntervalIdRef.current);
+        swUpdateIntervalIdRef.current = null;
       }
     };
   }, []);
@@ -74,8 +75,24 @@ export function ReloadPrompt() {
       );
       
       if (isStaleError) {
-        console.log('[ReloadPrompt] Detected stale bundle error, forcing update...');
-        forceUpdate();
+        // Don't surprise-reload; let the user opt-in to updating, and avoid toast spam.
+        if (staleErrorToastShownRef.current) return;
+        staleErrorToastShownRef.current = true;
+
+        console.log('[ReloadPrompt] Detected stale bundle error; prompting user to update.');
+        toast(
+          <div className="flex items-center gap-3">
+            <RefreshCw className="h-5 w-5 text-primary animate-spin" />
+            <div className="flex-1">
+              <p className="font-medium">Update available</p>
+              <p className="text-sm text-muted-foreground">Reload to load the latest version</p>
+            </div>
+            <Button size="sm" onClick={forceUpdate}>
+              Update now
+            </Button>
+          </div>,
+          { duration: Infinity, id: 'stale-bundle-update' }
+        );
       }
     };
 

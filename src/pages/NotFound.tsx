@@ -1,14 +1,14 @@
-import { useLocation, Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useEffect } from "react";
-import { Home } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 const NotFound = () => {
   const location = useLocation();
 
   useEffect(() => {
-    // Log as info rather than error - 404s are expected user navigation, not bugs
-    console.info("404: User navigated to non-existent route:", location.pathname);
+    // Avoid noisy console errors in production for normal navigation typos/bookmarks.
+    if (import.meta.env.DEV) {
+      console.warn("404 route:", location.pathname);
+    }
   }, [location.pathname]);
 
   return (
