@@ -24,19 +24,28 @@ async function validateSession(userId: string | undefined): Promise<void> {
     const errorCode = profileError.code || '';
     const errorMessage = profileError.message?.toLowerCase() || '';
     
+    // Check for RLS policy errors first - don't sign out for these
+    if (errorMessage.includes('row-level security') || 
+        errorMessage.includes('policy') ||
+        (errorCode === '42501' && (errorMessage.includes('policy') || errorMessage.includes('row-level')))) {
+      console.error('RLS policy error during profile check:', profileError);
+      throw new Error('Permission denied. Please check your account permissions.');
+    }
+    
+    // Authentication errors - user session is invalid
     if (errorCode === 'PGRST301' || // Not authenticated
-        errorCode === '42501' ||     // Insufficient privilege
-        errorMessage.includes('jwt') ||
-        errorMessage.includes('authentication') ||
-        errorMessage.includes('unauthorized')) {
+        (errorMessage.includes('jwt') && !errorMessage.includes('policy')) ||
+        (errorMessage.includes('authentication') && !errorMessage.includes('policy')) ||
+        (errorMessage.includes('unauthorized') && !errorMessage.includes('policy'))) {
       console.warn('Authentication error during profile check, signing out');
       await supabase.auth.signOut();
       throw new Error('Your session has expired. Please sign in again.');
     }
     
-    // For other errors (network, etc.), throw without signing out
-    console.error('Profile check error:', profileError);
-    throw new Error('Failed to verify your profile. Please try again.');
+    // Network errors or other non-auth errors - don't sign out, just throw
+    // This allows the operation to retry or show a helpful error
+    console.error('Profile check error (non-auth):', profileError);
+    throw new Error('Failed to verify your profile. Please check your connection and try again.');
   }
 
   if (!profileCheck) {
@@ -774,17 +783,24 @@ export function useSupabaseData() {
         .single();
 
       if (customerError) {
-        // Only log out on actual authentication errors (401/403)
-        // Check for authentication-related errors
         const errorCode = customerError.code || '';
         const errorMessage = customerError.message?.toLowerCase() || '';
         
-        // Authentication errors - user session is invalid
+        // Check for RLS policy errors FIRST (before auth errors)
+        // RLS errors mean user is authenticated but policy denies access - don't sign out
+        if (errorMessage.includes('row-level security') || 
+            errorMessage.includes('policy') ||
+            (errorCode === '42501' && (errorMessage.includes('policy') || errorMessage.includes('row-level')))) {
+          console.error('RLS policy error:', customerError);
+          throw new Error('Permission denied. Please ensure you have the correct permissions to create customers.');
+        }
+        
+        // Authentication errors - user session is invalid (only sign out on actual auth failures)
+        // PGRST301 = Not authenticated, JWT errors = invalid token
         if (errorCode === 'PGRST301' || // Not authenticated
-            errorCode === '42501' ||     // Insufficient privilege (auth issue)
-            errorMessage.includes('jwt') ||
-            errorMessage.includes('authentication') ||
-            errorMessage.includes('unauthorized')) {
+            (errorMessage.includes('jwt') && !errorMessage.includes('policy')) ||
+            (errorMessage.includes('authentication') && !errorMessage.includes('policy')) ||
+            (errorMessage.includes('unauthorized') && !errorMessage.includes('policy'))) {
           console.warn('Authentication error detected, signing out');
           await supabase.auth.signOut();
           throw new Error('Your session has expired. Please sign in again.');
@@ -798,12 +814,11 @@ export function useSupabaseData() {
           throw new Error('Your session has expired. Please sign in again.');
         }
         
-        // RLS policy errors - show helpful message, don't log out
-        if (errorMessage.includes('row-level security') || 
-            errorMessage.includes('policy') ||
-            errorCode === '42501') {
-          console.error('RLS policy error:', customerError);
-          throw new Error('Permission denied. Please ensure you have the correct permissions to create customers.');
+        // Generic 42501 without RLS context - could be auth or RLS, be conservative
+        // Don't sign out unless we're certain it's an auth error
+        if (errorCode === '42501') {
+          console.error('Permission error (42501):', customerError);
+          throw new Error('Permission denied. Please check your account permissions or try signing in again.');
         }
         
         // Other errors - pass through with original message
@@ -833,11 +848,16 @@ export function useSupabaseData() {
       });
     },
     onError: (error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      // Don't show toast if user was signed out (error message already shown via signOut)
+      // The signOut will trigger auth state change and redirect to login
+      if (!error.message.includes('session has expired') && 
+          !error.message.includes('no longer available')) {
+        toast({
+          title: 'Error adding customer',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
     },
   });
 
