@@ -1,23 +1,37 @@
 -- Fix RLS policy for INSERT on customers table
 -- This ensures authenticated users can insert customers with their own profile_id
 
--- First, drop the existing policy if it exists (to avoid conflicts)
+-- First, check if the table exists
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' 
+    AND table_name = 'customers'
+  ) THEN
+    RAISE EXCEPTION 'Table public.customers does not exist. Please run your migrations first.';
+  END IF;
+END $$;
+
+-- Drop the existing policy if it exists (to recreate it cleanly)
 DROP POLICY IF EXISTS "Users can insert their own customers" ON public.customers;
 
--- Create/Recreate the INSERT policy for customers
--- This allows authenticated users to insert customers where profile_id matches their auth.uid()
+-- Create the INSERT policy for authenticated users
+-- This allows users to insert customers where profile_id matches their auth.uid()
 CREATE POLICY "Users can insert their own customers"
-  ON public.customers 
-  FOR INSERT
+  ON public.customers FOR INSERT
   TO authenticated
-  WITH CHECK (
-    profile_id = auth.uid()
-  );
+  WITH CHECK (profile_id = auth.uid());
 
--- Verify RLS is enabled on the customers table
-ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
-
--- Optional: Check existing policies (for debugging)
--- SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
--- FROM pg_policies 
--- WHERE tablename = 'customers';
+-- Verify the policy was created
+SELECT 
+  schemaname,
+  tablename,
+  policyname,
+  permissive,
+  roles,
+  cmd,
+  qual,
+  with_check
+FROM pg_policies
+WHERE tablename = 'customers' AND policyname = 'Users can insert their own customers';
