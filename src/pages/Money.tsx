@@ -125,25 +125,33 @@ const Money = () => {
   const handleBulkReminder = () => {
     if (jobsWithPhones.length === 0) return;
     
-    // Build SMS message with all customers
-    const customerMessages = jobsWithPhones.map(job => {
+    // For better UX, open individual SMS for each customer
+    // This is more reliable than trying to send bulk SMS which isn't universally supported
+    let openedCount = 0;
+    
+    jobsWithPhones.forEach((job, index) => {
       const firstName = job.customer.name.split(' ')[0];
       const completedDate = job.completed_at ? format(new Date(job.completed_at), 'd MMM') : 'recently';
       const amount = (job.amount_collected || 0).toFixed(2);
-      return `${firstName}: £${amount} (${completedDate})`;
-    }).join('\n');
-    
-    const message = encodeURIComponent(
-      `Hi, ${businessName} here 👋\n\nFriendly reminder about outstanding payments:\n\n${customerMessages}\n\nThanks so much!`
-    );
-    
-    // Open SMS with first customer's number (bulk SMS not universally supported)
-    const phone = jobsWithPhones[0].customer.mobile_phone?.replace(/\s/g, '') || '';
-    window.open(`sms:${phone}?body=${message}`, '_self');
+      
+      const message = encodeURIComponent(
+        `Hi ${firstName}, ${businessName} here 👋\n\nFriendly reminder about your outstanding payment of £${amount} from ${completedDate}.\n\nThanks so much!`
+      );
+      
+      const phone = job.customer.mobile_phone?.replace(/\s/g, '') || '';
+      
+      // Open SMS with a slight delay between each to prevent browser blocking
+      setTimeout(() => {
+        window.open(`sms:${phone}?body=${message}`, '_blank');
+      }, index * 300); // 300ms delay between each
+      
+      openedCount++;
+    });
     
     toast({
-      title: 'Reminder ready',
-      description: `Message prepared for ${jobsWithPhones.length} customer${jobsWithPhones.length !== 1 ? 's' : ''}`,
+      title: `Opening ${openedCount} SMS reminder${openedCount !== 1 ? 's' : ''}`,
+      description: 'Individual messages prepared for each customer',
+      duration: 4000,
     });
   };
 

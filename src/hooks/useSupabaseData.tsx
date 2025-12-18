@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -299,14 +300,18 @@ export function useSupabaseData() {
   });
 
   // Complete job mutation with OFFLINE SUPPORT
-  const completingJobIds = new Set<string>();
+  // Use React state for tracking to ensure proper re-renders and prevent race conditions
+  const [completingJobIds, setCompletingJobIds] = useState<Set<string>>(new Set());
 
   const completeJobMutation = useMutation({
     mutationFn: async ({ jobId, customAmount, photoUrl }: { jobId: string; customAmount?: number; photoUrl?: string }) => {
+      // Check if already completing - use current state snapshot
       if (completingJobIds.has(jobId)) {
         throw new Error('Job completion already in progress');
       }
-      completingJobIds.add(jobId);
+      
+      // Mark as completing
+      setCompletingJobIds(prev => new Set(prev).add(jobId));
 
       try {
         // Validate session before critical operation
@@ -438,7 +443,12 @@ export function useSupabaseData() {
           ddRequiresReconnect,
         };
       } finally {
-        completingJobIds.delete(jobId);
+        // Clean up completion tracking
+        setCompletingJobIds(prev => {
+          const next = new Set(prev);
+          next.delete(jobId);
+          return next;
+        });
       }
     },
     onMutate: async ({ jobId, customAmount }) => {
@@ -505,14 +515,18 @@ export function useSupabaseData() {
   });
 
   // Mark job as paid with OFFLINE SUPPORT
-  const payingJobIds = new Set<string>();
+  // Use React state for tracking to ensure proper re-renders and prevent race conditions
+  const [payingJobIds, setPayingJobIds] = useState<Set<string>>(new Set());
 
   const markJobPaidMutation = useMutation({
     mutationFn: async ({ jobId, method }: { jobId: string; method: 'cash' | 'transfer' }) => {
+      // Check if already paying - use current state snapshot
       if (payingJobIds.has(jobId)) {
         throw new Error('Payment already in progress');
       }
-      payingJobIds.add(jobId);
+      
+      // Mark as paying
+      setPayingJobIds(prev => new Set(prev).add(jobId));
 
       try {
         // Validate session before critical operation
@@ -551,7 +565,12 @@ export function useSupabaseData() {
         
         return { jobId, method };
       } finally {
-        payingJobIds.delete(jobId);
+        // Clean up payment tracking
+        setPayingJobIds(prev => {
+          const next = new Set(prev);
+          next.delete(jobId);
+          return next;
+        });
       }
     },
     onMutate: async ({ jobId, method }) => {
@@ -616,14 +635,15 @@ export function useSupabaseData() {
   });
 
   // Batch mark jobs as paid with OFFLINE SUPPORT
-  const batchPaymentInProgress = { current: false };
+  // Use React state instead of ref for proper tracking
+  const [batchPaymentInProgress, setBatchPaymentInProgress] = useState(false);
 
   const batchMarkPaidMutation = useMutation({
     mutationFn: async ({ jobIds, method }: { jobIds: string[]; method: 'cash' | 'transfer' }) => {
-      if (batchPaymentInProgress.current) {
+      if (batchPaymentInProgress) {
         throw new Error('Batch payment already in progress');
       }
-      batchPaymentInProgress.current = true;
+      setBatchPaymentInProgress(true);
 
       try {
         // Validate session before critical operation
@@ -662,7 +682,7 @@ export function useSupabaseData() {
         
         return { count: jobIds.length, method };
       } finally {
-        batchPaymentInProgress.current = false;
+        setBatchPaymentInProgress(false);
       }
     },
     onMutate: async ({ jobIds, method }) => {

@@ -50,12 +50,15 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   }, [user, authLoading, navigate]);
 
   // Auto-focus first input when form loads or mode changes
+  // Also reset email verification state when switching modes to avoid stale state
   useEffect(() => {
     if (!authLoading && !user) {
       if (isLogin) {
         emailRef.current?.focus();
       } else {
         businessNameRef.current?.focus();
+        // Clear verification resend when switching to signup
+        setShowVerificationResend(false);
       }
     }
   }, [isLogin, authLoading, user]);
@@ -111,8 +114,11 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
             variant: 'destructive',
           });
         } else {
-          // Reset failed attempts on success
+          // Reset failed attempts and rate limiting on successful login
           setFailedAttempts(0);
+          setRateLimitedUntil(null);
+          setShowVerificationResend(false);
+          
           // Store remember me preference
           if (!rememberMe) {
             sessionStorage.setItem('clearSessionOnClose', 'true');

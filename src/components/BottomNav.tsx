@@ -12,7 +12,7 @@ export function BottomNav() {
   const { pendingCount } = useOffline();
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Count unpaid jobs
+  // Count unpaid jobs with better error handling
   const { data: unpaidCount = 0 } = useQuery({
     queryKey: ['unpaidCount', user?.id],
     queryFn: async () => {
@@ -24,14 +24,19 @@ export function BottomNav() {
         .eq('status', 'completed')
         .eq('payment_status', 'unpaid');
       
-      if (error) return 0;
+      if (error) {
+        console.error('Failed to fetch unpaid count:', error);
+        return 0;
+      }
       return count || 0;
     },
     enabled: !!user,
     refetchInterval: 30000,
+    retry: 2,
+    staleTime: 20000, // Keep data fresh for 20 seconds
   });
 
-  // Count today's pending jobs
+  // Count today's pending jobs with better error handling
   const { data: pendingTodayCount = 0 } = useQuery({
     queryKey: ['pendingTodayCount', user?.id, today],
     queryFn: async () => {
@@ -43,11 +48,16 @@ export function BottomNav() {
         .eq('status', 'pending')
         .lte('scheduled_date', today);
       
-      if (error) return 0;
+      if (error) {
+        console.error('Failed to fetch pending today count:', error);
+        return 0;
+      }
       return count || 0;
     },
     enabled: !!user,
     refetchInterval: 30000,
+    retry: 2,
+    staleTime: 20000, // Keep data fresh for 20 seconds
   });
 
   const navItems = [

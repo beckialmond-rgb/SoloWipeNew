@@ -179,6 +179,7 @@ const Index = () => {
     setLocalJobs(orderedJobs);
     
     // Show toast only once when order is restored
+    // Use a more stable check to prevent duplicate toasts
     if (wasRestored && !orderRestored && pendingJobs.length > 0) {
       setOrderRestored(true);
       toast({
@@ -187,7 +188,7 @@ const Index = () => {
         duration: 2000,
       });
     }
-  }, [pendingJobs, applyPersistedOrder, orderRestored, toast]);
+  }, [pendingJobs, applyPersistedOrder]); // Remove toast and orderRestored from deps to prevent loops
 
   // Show welcome flow for new users
   useEffect(() => {

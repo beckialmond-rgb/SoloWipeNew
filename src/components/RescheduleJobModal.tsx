@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import {
@@ -36,6 +36,13 @@ export function RescheduleJobModal({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Reset selected date when job changes (using useEffect to avoid state update during render)
+  useEffect(() => {
+    if (job && open) {
+      setSelectedDate(new Date(job.scheduled_date));
+    }
+  }, [job?.id, open]); // Only reset when job changes or modal opens
+
   const handleReschedule = async () => {
     if (!job || !selectedDate) return;
     
@@ -47,11 +54,6 @@ export function RescheduleJobModal({
       setIsSubmitting(false);
     }
   };
-
-  // Reset selected date when job changes
-  if (job && selectedDate === undefined) {
-    setSelectedDate(new Date(job.scheduled_date));
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
