@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Banknote, CreditCard } from 'lucide-react';
 import {
   Dialog,
@@ -22,20 +22,26 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
   const [selectedMethod, setSelectedMethod] = useState<'cash' | 'transfer' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Reset state when modal opens or closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedMethod(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
   const handleConfirm = async () => {
-    if (!selectedMethod) return;
+    if (!selectedMethod || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await onConfirm(selectedMethod);
     } finally {
       setIsSubmitting(false);
-      setSelectedMethod(null);
     }
   };
 
   const handleClose = () => {
-    if (isSubmitting) return; // Prevent closing during submission
-    setSelectedMethod(null);
+    if (isSubmitting) return; // Prevent closing while submitting
     onClose();
   };
 
@@ -65,9 +71,11 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
             <button
               type="button"
               onClick={() => setSelectedMethod('cash')}
+              disabled={isSubmitting}
               className={cn(
                 "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
                 "hover:border-primary hover:bg-primary/5",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
                 selectedMethod === 'cash'
                   ? "border-primary bg-primary/10"
                   : "border-border"
@@ -82,9 +90,11 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
             <button
               type="button"
               onClick={() => setSelectedMethod('transfer')}
+              disabled={isSubmitting}
               className={cn(
                 "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
                 "hover:border-primary hover:bg-primary/5",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
                 selectedMethod === 'transfer'
                   ? "border-primary bg-primary/10"
                   : "border-border"

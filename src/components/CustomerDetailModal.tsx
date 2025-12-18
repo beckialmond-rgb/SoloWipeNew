@@ -38,8 +38,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
 
   const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
   const hasActiveMandate = !!customer?.gocardless_id;
-
-  if (!customer) return null;
+  const isOpen = !!customer;
 
   const sendSmsReminder = () => {
     if (!customer.mobile_phone) {
@@ -103,15 +102,16 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
 
   return (
     <>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={`customer-modal-${customer.id}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm"
-          onClick={onClose}
-        >
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            key="customer-detail-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm"
+            onClick={onClose}
+          >
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
@@ -296,13 +296,14 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
             </div>
           </motion.div>
         </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Archive Confirmation Dialog */}
-      <AlertDialog open={showArchiveConfirm} onOpenChange={setShowArchiveConfirm}>
+      <AlertDialog open={showArchiveConfirm && isOpen} onOpenChange={setShowArchiveConfirm}>
         <AlertDialogContent className="bg-card">
           <AlertDialogHeader>
-            <AlertDialogTitle>Archive {customer.name}?</AlertDialogTitle>
+            <AlertDialogTitle>Archive {customer?.name}?</AlertDialogTitle>
             <AlertDialogDescription>
               This customer will no longer appear in your list. Their scheduled jobs will be cancelled.
             </AlertDialogDescription>
@@ -320,7 +321,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
         </AlertDialogContent>
       </AlertDialog>
       {/* Direct Debit Setup Modal */}
-      {customer && (
+      {isOpen && (
         <DirectDebitSetupModal
           customer={customer}
           isOpen={showDirectDebitSetup}

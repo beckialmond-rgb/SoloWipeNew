@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, forwardRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building, Loader2 } from 'lucide-react';
@@ -13,7 +13,7 @@ import { PasswordInput } from '@/components/PasswordInput';
 import { EmailInput } from '@/components/EmailInput';
 import { cn } from '@/lib/utils';
 
-const Auth = forwardRef<HTMLDivElement>((_, ref) => {
+const Auth = () => {
   const [searchParams] = useSearchParams();
   const initialMode = searchParams.get('mode') === 'signup' ? false : true;
   const [isLogin, setIsLogin] = useState(initialMode);
@@ -213,7 +213,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   }
 
   return (
-    <div ref={ref} className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
         <motion.div
@@ -506,8 +506,6 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
       </div>
     </div>
   );
-});
-
-Auth.displayName = 'Auth';
+};
 
 export default Auth;

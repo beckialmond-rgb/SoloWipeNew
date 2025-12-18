@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Banknote, CreditCard, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -20,13 +20,23 @@ export const BatchPaymentModal = ({
   const [selectedMethod, setSelectedMethod] = useState<'cash' | 'transfer' | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Reset state when modal opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedMethod(null);
+      setIsProcessing(false);
+    }
+  }, [isOpen]);
+
+  const showModal = isOpen && selectedJobs.length > 0;
+
   const totalAmount = selectedJobs.reduce(
     (sum, job) => sum + (job.amount_collected || job.customer?.price || 0), 
     0
   );
 
   const handleConfirm = async () => {
-    if (!selectedMethod) return;
+    if (!selectedMethod || isProcessing) return;
     
     setIsProcessing(true);
     try {
@@ -38,14 +48,15 @@ export const BatchPaymentModal = ({
   };
 
   const handleClose = () => {
-    if (isProcessing) return; // Prevent closing during processing
+    if (isProcessing) return;
     onClose();
   };
 
   return (
     <AnimatePresence>
-      {isOpen && selectedJobs.length > 0 && (
+      {showModal && (
       <motion.div
+        key="batch-payment-backdrop"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -96,6 +107,7 @@ export const BatchPaymentModal = ({
               variant={selectedMethod === 'cash' ? 'default' : 'outline'}
               className="h-16 flex-col gap-1"
               onClick={() => setSelectedMethod('cash')}
+              disabled={isProcessing}
             >
               <Banknote className="w-6 h-6" />
               <span>Cash</span>
@@ -104,6 +116,7 @@ export const BatchPaymentModal = ({
               variant={selectedMethod === 'transfer' ? 'default' : 'outline'}
               className="h-16 flex-col gap-1"
               onClick={() => setSelectedMethod('transfer')}
+              disabled={isProcessing}
             >
               <CreditCard className="w-6 h-6" />
               <span>Transfer</span>

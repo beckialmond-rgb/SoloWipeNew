@@ -23,6 +23,7 @@ export const PriceAdjustModal = ({
   capturedPhotoUrl 
 }: PriceAdjustModalProps) => {
   const [amount, setAmount] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (job && isOpen) {
@@ -34,6 +35,7 @@ export const PriceAdjustModal = ({
   useEffect(() => {
     if (!isOpen) {
       setAmount(0);
+      setIsSubmitting(false);
     }
   }, [isOpen]);
 
@@ -41,8 +43,14 @@ export const PriceAdjustModal = ({
     setAmount(prev => Math.max(0, prev + adjustment));
   };
 
-  const handleConfirm = () => {
-    onConfirm(amount, capturedPhotoUrl || undefined);
+  const handleConfirm = async () => {
+    if (isSubmitting) return; // Prevent double-clicks
+    setIsSubmitting(true);
+    try {
+      await onConfirm(amount, capturedPhotoUrl || undefined);
+    } finally {
+      // State will be reset when modal closes via useEffect
+    }
   };
 
   return (
@@ -53,7 +61,7 @@ export const PriceAdjustModal = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
-        onClick={onClose}
+        onClick={isSubmitting ? undefined : onClose}
       >
         <motion.div
           initial={{ y: '100%' }}
@@ -65,7 +73,11 @@ export const PriceAdjustModal = ({
         >
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-foreground">Complete Job</h2>
-            <button onClick={onClose} className="p-2 hover:bg-muted rounded-full">
+            <button 
+              onClick={onClose} 
+              disabled={isSubmitting}
+              className="p-2 hover:bg-muted rounded-full disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <X className="w-5 h-5 text-muted-foreground" />
             </button>
           </div>
@@ -168,10 +180,11 @@ export const PriceAdjustModal = ({
 
           {/* Confirm button */}
           <Button
-            className="w-full h-14 text-lg font-semibold bg-green-600 hover:bg-green-700"
+            className="w-full h-14 text-lg font-semibold bg-green-600 hover:bg-green-700 disabled:opacity-70"
             onClick={handleConfirm}
+            disabled={isSubmitting || amount < 0}
           >
-            Mark Complete · £{amount.toFixed(2)}
+            {isSubmitting ? 'Completing...' : `Mark Complete · £${amount.toFixed(2)}`}
           </Button>
         </motion.div>
       </motion.div>
