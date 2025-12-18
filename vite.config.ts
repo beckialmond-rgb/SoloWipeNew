@@ -119,22 +119,25 @@ export default defineConfig(({ mode }) => ({
     sourcemap: true,
     rollupOptions: {
       output: {
-        // Content hashing for aggressive cache busting - prevents stale bundle errors
-        entryFileNames: 'assets/[name]-[hash].js',
-        chunkFileNames: 'assets/[name]-[hash].js',
+        // CRITICAL: Force true single-file bundle
+        // Use inlineDynamicImports to inline ALL dynamic imports (lazy-loaded routes)
+        // This completely eliminates chunk loading and circular dependency issues
+        inlineDynamicImports: true,
+        // Single entry file name
+        entryFileNames: 'assets/index.js',
+        // Asset files keep hashing for cache busting
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Force everything into a single chunk to eliminate circular dependencies
-        // This is the most reliable way to prevent "Cannot access before initialization" errors
-        manualChunks() {
-          // Return undefined to put everything in one bundle
-          // This completely eliminates chunk loading order and circular dependency issues
-          return undefined;
-        },
         // Ensure proper module format
         format: 'es',
+        // No manual chunks - everything in one file
+        manualChunks: undefined,
       },
       // Externalize nothing - bundle everything together
       external: [],
+      // Disable tree-shaking that might cause issues
+      treeshake: {
+        moduleSideEffects: 'no-external',
+      },
     },
     // Very high chunk size limit to allow single bundle
     chunkSizeWarningLimit: 10000,

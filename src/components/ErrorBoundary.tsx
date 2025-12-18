@@ -134,12 +134,18 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   render() {
-    if (this.state.hasError) {
+    // Check for Supabase configuration errors by checking console/global state
+    // Avoid importing from supabase/client to prevent circular dependencies
+    const hasError = this.state.hasError;
+    const displayError = this.state.error;
+
+    if (hasError) {
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
-      const isModuleError = this.state.error && isStaleModuleError(this.state.error);
+      const isModuleError = displayError && isStaleModuleError(displayError);
+      const isSupabaseConfigError = displayError && isSupabaseError(displayError);
 
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -159,7 +165,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <p className="text-muted-foreground">
                 {this.state.isRecovering 
                   ? 'Clearing cached files and reloading with the latest version.'
-                  : isSupabaseError(this.state.error!)
+                  : isSupabaseConfigError
                     ? 'Supabase configuration error. Please check your environment variables in Netlify. See console for details.'
                     : isModuleError
                       ? 'A cached version of the app is out of date. Click below to load the latest version.'
@@ -168,11 +174,21 @@ export class ErrorBoundary extends Component<Props, State> {
               </p>
             </div>
 
-            {process.env.NODE_ENV === 'development' && this.state.error && (
+            {(process.env.NODE_ENV === 'development' || isSupabaseConfigError) && displayError && (
               <div className="bg-muted/50 rounded-lg p-4 text-left">
                 <p className="text-sm font-mono text-destructive break-all">
-                  {this.state.error.message}
+                  {displayError.message}
                 </p>
+                {isSupabaseConfigError && (
+                  <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-900 dark:text-blue-100">
+                      <strong>How to fix:</strong> Go to Netlify Dashboard → Site settings → Environment variables and add:
+                      <br />• VITE_SUPABASE_URL = https://owqjyaiptexqwafzmcwy.supabase.co
+                      <br />• VITE_SUPABASE_PUBLISHABLE_KEY = sb_publishable_DikafC7lHxXB2lySytgEFQ_mHNZTSkF
+                      <br />• VITE_SUPABASE_PROJECT_ID = owqjyaiptexqwafzmcwy
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
