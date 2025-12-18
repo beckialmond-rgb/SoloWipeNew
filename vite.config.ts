@@ -108,21 +108,33 @@ export default defineConfig(({ mode }) => ({
     ],
   },
   build: {
-    // Keep sourcemaps off by default for smaller production payloads.
-    sourcemap: false,
+    // Enable sourcemaps temporarily to help debug circular dependency issues
+    sourcemap: true,
     rollupOptions: {
       output: {
         // Content hashing for aggressive cache busting - prevents stale bundle errors
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
-        // Disable manual chunking - let Vite handle it automatically
-        // Vite's automatic chunking is better at resolving circular dependencies
-        // This eliminates "Cannot access before initialization" errors
-        manualChunks: undefined,
+        // Use a function that returns undefined to disable chunking entirely
+        // This puts everything in one bundle, eliminating circular dependency issues
+        manualChunks() {
+          return undefined;
+        },
+        // Ensure proper module format
+        format: 'es',
+        // Preserve module structure to avoid circular dependency issues
+        preserveModules: false,
       },
+      // Externalize nothing - bundle everything together
+      external: [],
     },
-    // Ensure proper chunk loading order
-    chunkSizeWarningLimit: 1000,
+    // Increase chunk size warning limit since we're bundling everything
+    chunkSizeWarningLimit: 2000,
+    // Use commonjs format for better compatibility
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
   },
 }));
