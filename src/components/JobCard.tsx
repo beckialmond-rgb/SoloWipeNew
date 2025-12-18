@@ -64,6 +64,9 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
 
   const handleNavigate = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!job.customer?.address) {
+      return;
+    }
     const encodedAddress = encodeURIComponent(job.customer.address);
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     
@@ -76,7 +79,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
 
   const handleCall = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (job.customer.mobile_phone) {
+    if (job.customer?.mobile_phone) {
       window.open(`tel:${job.customer.mobile_phone.replace(/\s/g, '')}`, '_self');
     }
   };
@@ -154,26 +157,34 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
           
           {/* Content */}
           <div className="flex-1 min-w-0 p-4 flex flex-col justify-center">
-            <div className="flex items-start gap-2 mb-1">
-              <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <h3 className="font-semibold text-foreground text-base leading-tight truncate min-w-0">
-                {job.customer.address}
-              </h3>
-            </div>
-            <div className="flex items-center gap-3 mt-2">
-              <span className="text-xl font-bold text-foreground">
-                £{job.customer.price}
-              </span>
-              <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
-                {job.customer.name}
-              </span>
-              {/* Mandate Status Indicator */}
-              {job.customer.gocardless_mandate_status === 'pending' ? (
-                <span title="DD Pending"><Clock className="w-4 h-4 text-warning" /></span>
-              ) : job.customer.gocardless_id ? (
-                <span title="DD Active"><CreditCard className="w-4 h-4 text-success" /></span>
-              ) : null}
-            </div>
+            {job.customer ? (
+              <>
+                <div className="flex items-start gap-2 mb-1">
+                  <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <h3 className="font-semibold text-foreground text-base leading-tight truncate min-w-0">
+                    {job.customer.address || 'No address'}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="text-xl font-bold text-foreground">
+                    £{job.customer.price || 0}
+                  </span>
+                  <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
+                    {job.customer.name || 'Unknown Customer'}
+                  </span>
+                  {/* Mandate Status Indicator */}
+                  {job.customer.gocardless_mandate_status === 'pending' ? (
+                    <span title="DD Pending"><Clock className="w-4 h-4 text-warning" /></span>
+                  ) : job.customer.gocardless_id ? (
+                    <span title="DD Active"><CreditCard className="w-4 h-4 text-success" /></span>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Customer data unavailable
+              </div>
+            )}
 
             {/* Quick action buttons */}
             <div className="flex items-center gap-2 mt-3">
@@ -187,7 +198,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
                 Navigate
               </Button>
               
-              {job.customer.mobile_phone && (
+              {job.customer?.mobile_phone && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -199,8 +210,8 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
                 </Button>
               )}
               
-              {job.customer.notes && (
-                <CustomerNotesPreview notes={job.customer.notes} customerName={job.customer.name} />
+              {job.customer?.notes && (
+                <CustomerNotesPreview notes={job.customer.notes} customerName={job.customer.name || 'Customer'} />
               )}
             </div>
           </div>
@@ -216,7 +227,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
                 "bg-muted/50 hover:bg-muted transition-colors border-b border-border",
                 "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-muted"
               )}
-              aria-label={`Skip ${job.customer.name}`}
+              aria-label={`Skip ${job.customer?.name || 'job'}`}
             >
               <SkipForward className="w-5 h-5 text-muted-foreground" />
             </motion.button>
@@ -230,7 +241,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
                 "bg-success hover:bg-success/90 transition-colors",
                 "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-success"
               )}
-              aria-label={`Mark ${job.customer.name} as complete`}
+              aria-label={`Mark ${job.customer?.name || 'job'} as complete`}
             >
               <Check className="w-6 h-6 text-success-foreground" strokeWidth={3} />
             </motion.button>

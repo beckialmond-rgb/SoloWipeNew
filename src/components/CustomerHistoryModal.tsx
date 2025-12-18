@@ -209,7 +209,7 @@ export function CustomerHistoryModal({ customer, isOpen, onClose }: CustomerHist
                         </div>
                         <div className="text-right">
                           <p className="font-semibold text-foreground">
-                            £{job.amount_collected ?? job.customer.price}
+                            £{job.amount_collected ?? job.customer?.price ?? 0}
                           </p>
                           {job.status === 'completed' && job.payment_status && (
                             <p className={cn(

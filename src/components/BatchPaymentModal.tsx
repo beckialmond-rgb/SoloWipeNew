@@ -23,7 +23,7 @@ export const BatchPaymentModal = ({
   if (!isOpen || selectedJobs.length === 0) return null;
 
   const totalAmount = selectedJobs.reduce(
-    (sum, job) => sum + (job.amount_collected || job.customer.price), 
+    (sum, job) => sum + (job.amount_collected || job.customer?.price || 0), 
     0
   );
 
@@ -72,9 +72,9 @@ export const BatchPaymentModal = ({
             <div className="max-h-32 overflow-y-auto space-y-1">
               {selectedJobs.map(job => (
                 <div key={job.id} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground truncate flex-1">{job.customer.name}</span>
+                  <span className="text-muted-foreground truncate flex-1">{job.customer?.name || 'Unknown Customer'}</span>
                   <span className="text-foreground font-medium">
-                    £{(job.amount_collected || job.customer.price).toFixed(2)}
+                    £{(job.amount_collected || job.customer?.price || 0).toFixed(2)}
                   </span>
                 </div>
               ))}
