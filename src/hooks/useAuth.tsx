@@ -89,24 +89,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // THEN check for existing session and validate it
       supabase.auth
         .getSession()
-        .then(async ({ data: { session: existingSession } }) => {
+        .then(async ({ data: { session: existingSession }, error: sessionError }) => {
           try {
-            if (existingSession?.user) {
-              // Validate that the user's profile still exists
-              const { error } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('id', existingSession.user.id)
-                .single();
-
-              if (error) {
-                // Profile doesn't exist - user was deleted, force sign out
-                console.warn('Session invalid: profile not found, signing out');
+            // Only sign out if session is missing (AuthSessionMissing)
+            if (sessionError) {
+              const errorCode = sessionError.code || '';
+              const errorMessage = sessionError.message?.toLowerCase() || '';
+              
+              // Only sign out on actual session missing errors
+              if (errorCode === 'AuthSessionMissing' || 
+                  errorMessage.includes('session missing') ||
+                  errorMessage.includes('no session')) {
+                console.warn('Session missing, signing out');
                 await supabase.auth.signOut();
                 setSession(null);
                 setUser(null);
                 setLoading(false);
                 return;
+              }
+              
+              // Other errors - don't sign out, just log and continue
+              console.error('[AuthProvider] Session error (non-critical):', sessionError);
+            }
+
+            if (existingSession?.user) {
+              // Try to load profile, but don't sign out on failure
+              // If profile fails to load, we'll just show generic "Welcome" instead
+              const { error: profileError } = await supabase
+                .from('profiles')
+                .select('id')
+                .eq('id', existingSession.user.id)
+                .single();
+
+              if (profileError) {
+                // Profile load failed - log but don't sign out
+                // The app will show generic "Welcome" instead of business name
+                console.warn('[AuthProvider] Profile load failed (non-critical):', profileError);
+                // Continue with session - user stays logged in
               }
             }
 
@@ -117,6 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const e = err instanceof Error ? err : new Error('Failed to load session');
             console.error('[AuthProvider] Failed to check session:', e);
             setSupabaseError(e);
+            // Don't sign out on errors - just set session to null and let user try again
             setSession(null);
             setUser(null);
             setLoading(false);
