@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Users, Plus, CreditCard, Send, CheckSquare, Square, Loader2, X } from 'lucide-react';
+import { Search, Users, Plus, CreditCard, Send, CheckSquare, Square, Loader2, X, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { downloadCustomersForXero } from '@/utils/exportCSV';
 
 type DDFilter = 'all' | 'with-dd' | 'without-dd' | 'pending';
 
@@ -153,6 +154,29 @@ const Customers = () => {
   const handleAddClick = () => {
     if (!requirePremium('add-customer')) return;
     setIsAddModalOpen(true);
+  };
+
+  const handleExportToXero = () => {
+    try {
+      // Export only active customers
+      const activeCustomers = filteredCustomers.filter(c => c.status === 'active');
+      
+      if (activeCustomers.length === 0) {
+        toast.error('No customers to export');
+        return;
+      }
+
+      downloadCustomersForXero(activeCustomers, businessName);
+      
+      toast.success(`Exported ${activeCustomers.length} customer${activeCustomers.length !== 1 ? 's' : ''} to Xero CSV`, {
+        description: 'File downloaded successfully',
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export customers', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   };
 
   return (
@@ -297,25 +321,40 @@ const Customers = () => {
               </motion.div>
             )}
 
-            {/* Customer count and bulk DD action */}
+            {/* Customer count and actions */}
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Users className="w-4 h-4" />
                 <span>{filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}</span>
               </div>
               
-              {/* Bulk DD Link action - only show if GoCardless connected and eligible customers exist */}
-              {isGoCardlessConnected && customersEligibleForDD.length > 0 && !selectMode && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectMode(true)}
-                  className="text-primary border-primary/20 hover:bg-primary/10"
-                >
-                  <Send className="w-4 h-4 mr-1.5" />
-                  Bulk DD Link
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {/* Export to Xero button */}
+                {!selectMode && filteredCustomers.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportToXero}
+                    className="text-primary border-primary/20 hover:bg-primary/10"
+                  >
+                    <Download className="w-4 h-4 mr-1.5" />
+                    Export for Xero
+                  </Button>
+                )}
+                
+                {/* Bulk DD Link action - only show if GoCardless connected and eligible customers exist */}
+                {isGoCardlessConnected && customersEligibleForDD.length > 0 && !selectMode && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectMode(true)}
+                    className="text-primary border-primary/20 hover:bg-primary/10"
+                  >
+                    <Send className="w-4 h-4 mr-1.5" />
+                    Bulk DD Link
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Select mode header */}
