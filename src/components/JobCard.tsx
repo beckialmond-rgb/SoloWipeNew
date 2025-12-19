@@ -225,26 +225,28 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
             </div>
           </div>
 
-          {/* Action buttons section */}
-          <div className="flex gap-2 items-center border-l border-border px-2">
-            {/* Text Customer Button - icon only, small */}
-            <div className="flex-shrink-0">
-              <TextCustomerButton
-                phoneNumber={job.customer?.mobile_phone}
-                customerName={job.customer?.name || 'Customer'}
-                iconOnly={true}
-              />
-            </div>
+          {/* Action buttons section - horizontal layout */}
+          <div className="flex items-center gap-2 border-l border-border px-2 relative z-10">
+            {/* Text Customer Button - LEFT side, only show if phone exists */}
+            {job.customer?.mobile_phone && (
+              <div className="flex-shrink-0">
+                <TextCustomerButton
+                  phoneNumber={job.customer.mobile_phone}
+                  customerName={job.customer?.name || 'Customer'}
+                  iconOnly={true}
+                />
+              </div>
+            )}
             
-            {/* Complete/Skip buttons column */}
-            <div className="flex flex-col">
+            {/* Complete/Skip buttons - RIGHT side, horizontal */}
+            <div className="flex items-center gap-1 flex-shrink-0">
               {/* Skip Button */}
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={handleSkip}
                 className={cn(
-                  "w-16 flex-1 flex items-center justify-center min-h-[52px]",
-                  "bg-muted/50 hover:bg-muted transition-colors border-b border-border",
+                  "w-12 h-12 flex items-center justify-center",
+                  "bg-muted/50 hover:bg-muted transition-colors rounded-lg",
                   "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-muted"
                 )}
                 aria-label={`Skip ${job.customer?.name || 'job'}`}
@@ -257,13 +259,13 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
                 whileTap={{ scale: 0.95 }}
                 onClick={handleComplete}
                 className={cn(
-                  "w-16 flex-1 flex items-center justify-center min-h-[52px]",
-                  "bg-success hover:bg-success/90 transition-colors",
+                  "w-12 h-12 flex items-center justify-center",
+                  "bg-success hover:bg-success/90 transition-colors rounded-lg",
                   "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-success"
                 )}
                 aria-label={`Mark ${job.customer?.name || 'job'} as complete`}
               >
-                <Check className="w-6 h-6 text-success-foreground" strokeWidth={3} />
+                <Check className="w-5 h-5 text-success-foreground" strokeWidth={3} />
               </motion.button>
             </div>
           </div>
