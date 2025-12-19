@@ -13,6 +13,34 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 async function validateSession(userId: string | undefined): Promise<void> {
   if (!userId) return;
   
+  // Check session first - only sign out if session is actually missing
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  
+  if (sessionError) {
+    const errorCode = sessionError.code || '';
+    const errorMessage = sessionError.message?.toLowerCase() || '';
+    
+    // Only sign out on actual session missing errors
+    if (errorCode === 'AuthSessionMissing' || 
+        errorMessage.includes('session missing') ||
+        errorMessage.includes('no session')) {
+      console.warn('Session missing during validation, signing out');
+      await supabase.auth.signOut();
+      throw new Error('Your session has expired. Please sign in again.');
+    }
+    
+    // Other session errors - don't sign out, just throw
+    console.error('Session check error (non-critical):', sessionError);
+    throw new Error('Failed to verify your session. Please try again.');
+  }
+  
+  if (!session) {
+    // No session - but don't sign out here, let the auth state handler deal with it
+    throw new Error('No active session. Please sign in again.');
+  }
+  
+  // Try to load profile, but don't sign out on failure
+  // If profile fails to load, the app will show generic "Welcome" instead
   const { data: profileCheck, error: profileError } = await supabase
     .from('profiles')
     .select('id')
@@ -20,39 +48,19 @@ async function validateSession(userId: string | undefined): Promise<void> {
     .maybeSingle();
 
   if (profileError) {
-    // Only sign out on authentication errors, not on network or other errors
-    const errorCode = profileError.code || '';
-    const errorMessage = profileError.message?.toLowerCase() || '';
-    
-    // Check for RLS policy errors first - don't sign out for these
-    if (errorMessage.includes('row-level security') || 
-        errorMessage.includes('policy') ||
-        (errorCode === '42501' && (errorMessage.includes('policy') || errorMessage.includes('row-level')))) {
-      console.error('RLS policy error during profile check:', profileError);
-      throw new Error('Permission denied. Please check your account permissions.');
-    }
-    
-    // Authentication errors - user session is invalid
-    if (errorCode === 'PGRST301' || // Not authenticated
-        (errorMessage.includes('jwt') && !errorMessage.includes('policy')) ||
-        (errorMessage.includes('authentication') && !errorMessage.includes('policy')) ||
-        (errorMessage.includes('unauthorized') && !errorMessage.includes('policy'))) {
-      console.warn('Authentication error during profile check, signing out');
-      await supabase.auth.signOut();
-      throw new Error('Your session has expired. Please sign in again.');
-    }
-    
-    // Network errors or other non-auth errors - don't sign out, just throw
-    // This allows the operation to retry or show a helpful error
-    console.error('Profile check error (non-auth):', profileError);
-    throw new Error('Failed to verify your profile. Please check your connection and try again.');
+    // Profile load failed - log but don't sign out
+    // The app will show generic "Welcome" instead of business name
+    console.warn('Profile check error (non-critical):', profileError);
+    // Don't throw - allow operation to continue with generic welcome
+    return;
   }
 
   if (!profileCheck) {
-    // Profile doesn't exist - this means the account was deleted
-    console.warn('Profile not found for user, signing out');
-    await supabase.auth.signOut();
-    throw new Error('Your account is no longer available. Please contact support.');
+    // Profile doesn't exist - log but don't sign out
+    // The app will show generic "Welcome" instead
+    console.warn('Profile not found for user (non-critical)');
+    // Don't throw - allow operation to continue with generic welcome
+    return;
   }
 }
 
@@ -1360,7 +1368,7 @@ export function useSupabaseData() {
     return updateGoogleReviewLinkMutation.mutateAsync(link);
   };
 
-  const businessName = profile?.business_name || 'My Window Cleaning';
+  const businessName = profile?.business_name || 'Welcome';
   const googleReviewLink = profile?.google_review_link;
   const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading || archivedLoading;
 
