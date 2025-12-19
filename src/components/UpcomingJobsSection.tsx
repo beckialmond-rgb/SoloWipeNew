@@ -4,6 +4,7 @@ import { Calendar, MapPin, ChevronDown, ChevronUp, SkipForward, Clock, CreditCar
 import { useState } from 'react';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { TextCustomerButton } from '@/components/TextCustomerButton';
 
 interface UpcomingJobsSectionProps {
   jobs: JobWithCustomer[];
@@ -183,18 +184,30 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
         </div>
       </button>
 
-      {/* Skip Button */}
-      <button
-        onClick={handleSkip}
-        className={cn(
-          "w-16 self-stretch min-h-[56px] flex items-center justify-center",
-          "bg-muted hover:bg-muted/80 transition-colors border-l border-border",
-          "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
-        )}
-        aria-label={`Skip ${job.customer.name}`}
-      >
-        <SkipForward className="w-5 h-5 text-muted-foreground" />
-      </button>
+      {/* Action Buttons */}
+      <div className="flex flex-col border-l border-border">
+        {/* Text Button */}
+        <div className="flex items-center justify-center p-2 border-b border-border">
+          <TextCustomerButton
+            phoneNumber={job.customer?.mobile_phone}
+            customerName={job.customer?.name || 'Customer'}
+            iconOnly={true}
+          />
+        </div>
+        
+        {/* Skip Button */}
+        <button
+          onClick={handleSkip}
+          className={cn(
+            "w-16 flex-1 min-h-[56px] flex items-center justify-center",
+            "bg-muted hover:bg-muted/80 transition-colors",
+            "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
+          )}
+          aria-label={`Skip ${job.customer.name}`}
+        >
+          <SkipForward className="w-5 h-5 text-muted-foreground" />
+        </button>
+      </div>
     </motion.div>
   );
 }

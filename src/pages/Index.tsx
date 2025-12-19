@@ -9,6 +9,7 @@ import { CompletedJobItem } from '@/components/CompletedJobItem';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
+import { TextCustomerButton } from '@/components/TextCustomerButton';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { JobNotesModal } from '@/components/JobNotesModal';
 import { OnMyWayButton } from '@/components/OnMyWayButton';
@@ -29,7 +30,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useJobReminders } from '@/hooks/useJobReminders';
 import { useHaptics } from '@/hooks/useHaptics';
 import { syncStatus } from '@/lib/offlineStorage';
-import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation, X, Gift, CreditCard, AlertTriangle, MessageSquare, MapPin } from 'lucide-react';
+import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation, X, Gift, CreditCard, AlertTriangle, MapPin } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import { ToastAction } from '@/components/ui/toast';
 import {
@@ -810,14 +811,6 @@ const Index = () => {
                 <div className="space-y-3">
                   {tomorrowJobs.map((job, index) => {
                     const customerName = job.customer?.name || 'Customer';
-                    const customerPhone = job.customer?.mobile_phone;
-                    const hasPhone = !!customerPhone;
-                    
-                    // Create SMS link with pre-filled message
-                    const smsMessage = encodeURIComponent(
-                      `Hi ${customerName}, just a quick reminder that SoloWipe will be round tomorrow to clean your windows. Thanks!`
-                    );
-                    const smsLink = hasPhone ? `sms:${customerPhone.replace(/\s/g, '')}?body=${smsMessage}` : '#';
                     
                     return (
                       <motion.div
@@ -846,30 +839,10 @@ const Index = () => {
                           </div>
                           
                           {/* SMS Button */}
-                          {hasPhone ? (
-                            <a
-                              href={smsLink}
-                              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors shadow-sm"
-                              onClick={(e) => {
-                                // Prevent navigation if link is disabled
-                                if (!hasPhone) {
-                                  e.preventDefault();
-                                }
-                              }}
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                              Send Text
-                            </a>
-                          ) : (
-                            <button
-                              disabled
-                              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground bg-muted rounded-lg cursor-not-allowed opacity-50"
-                              title="No phone number available"
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                              Send Text
-                            </button>
-                          )}
+                          <TextCustomerButton
+                            phoneNumber={job.customer?.mobile_phone}
+                            customerName={customerName}
+                          />
                         </div>
                       </motion.div>
                     );

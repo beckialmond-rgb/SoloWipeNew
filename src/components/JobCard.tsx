@@ -4,6 +4,7 @@ import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { CustomerNotesPreview } from './CustomerNotesPreview';
+import { TextCustomerButton } from './TextCustomerButton';
 import { Button } from './ui/button';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
@@ -217,6 +218,14 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
                   Call
                 </Button>
               )}
+              
+              {/* Text Customer Button */}
+              <TextCustomerButton
+                phoneNumber={job.customer?.mobile_phone}
+                customerName={job.customer?.name || 'Customer'}
+                iconOnly={false}
+                className="h-9"
+              />
               
               {job.customer?.notes && (
                 <CustomerNotesPreview notes={job.customer.notes} customerName={job.customer.name || 'Customer'} />
