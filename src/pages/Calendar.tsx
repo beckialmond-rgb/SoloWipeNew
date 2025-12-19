@@ -7,6 +7,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { LoadingState } from '@/components/LoadingState';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { CalendarAddCustomerModal } from '@/components/CalendarAddCustomerModal';
+import { TextCustomerButton } from '@/components/TextCustomerButton';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useHaptics } from '@/hooks/useHaptics';
 import { JobWithCustomer } from '@/types/database';
@@ -410,16 +411,26 @@ const Calendar = () => {
                             </p>
                           </div>
                           
-                          <div className="text-right shrink-0">
-                            <p className="font-semibold text-foreground">
-                              £{job.amount_collected ?? job.customer.price}
-                            </p>
-                            <p className={cn(
-                              "text-xs",
-                              job.status === 'completed' ? "text-green-500" : "text-primary"
-                            )}>
-                              {job.status === 'completed' ? 'Done' : 'Pending'}
-                            </p>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="text-right">
+                              <p className="font-semibold text-foreground">
+                                £{job.amount_collected ?? job.customer.price}
+                              </p>
+                              <p className={cn(
+                                "text-xs",
+                                job.status === 'completed' ? "text-green-500" : "text-primary"
+                              )}>
+                                {job.status === 'completed' ? 'Done' : 'Pending'}
+                              </p>
+                            </div>
+                            {/* Text Button - icon only for compact display */}
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <TextCustomerButton
+                                phoneNumber={job.customer?.mobile_phone}
+                                customerName={job.customer?.name || 'Customer'}
+                                iconOnly={true}
+                              />
+                            </div>
                           </div>
                         </motion.div>
                       ))}
