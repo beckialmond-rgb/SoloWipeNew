@@ -219,49 +219,53 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
                 </Button>
               )}
               
-              {/* Text Customer Button */}
-              <TextCustomerButton
-                phoneNumber={job.customer?.mobile_phone}
-                customerName={job.customer?.name || 'Customer'}
-                iconOnly={false}
-                className="h-9"
-              />
-              
               {job.customer?.notes && (
                 <CustomerNotesPreview notes={job.customer.notes} customerName={job.customer.name || 'Customer'} />
               )}
             </div>
           </div>
 
-          {/* Action buttons column */}
-          <div className="flex flex-col border-l border-border">
-            {/* Skip Button */}
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={handleSkip}
-              className={cn(
-                "w-16 flex-1 flex items-center justify-center min-h-[52px]",
-                "bg-muted/50 hover:bg-muted transition-colors border-b border-border",
-                "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-muted"
-              )}
-              aria-label={`Skip ${job.customer?.name || 'job'}`}
-            >
-              <SkipForward className="w-5 h-5 text-muted-foreground" />
-            </motion.button>
+          {/* Action buttons section */}
+          <div className="flex gap-2 items-center border-l border-border px-2">
+            {/* Text Customer Button - icon only, small */}
+            <div className="flex-shrink-0">
+              <TextCustomerButton
+                phoneNumber={job.customer?.mobile_phone}
+                customerName={job.customer?.name || 'Customer'}
+                iconOnly={true}
+              />
+            </div>
+            
+            {/* Complete/Skip buttons column */}
+            <div className="flex flex-col">
+              {/* Skip Button */}
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={handleSkip}
+                className={cn(
+                  "w-16 flex-1 flex items-center justify-center min-h-[52px]",
+                  "bg-muted/50 hover:bg-muted transition-colors border-b border-border",
+                  "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-muted"
+                )}
+                aria-label={`Skip ${job.customer?.name || 'job'}`}
+              >
+                <SkipForward className="w-5 h-5 text-muted-foreground" />
+              </motion.button>
 
-            {/* Complete Button */}
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={handleComplete}
-              className={cn(
-                "w-16 flex-1 flex items-center justify-center min-h-[52px]",
-                "bg-success hover:bg-success/90 transition-colors",
-                "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-success"
-              )}
-              aria-label={`Mark ${job.customer?.name || 'job'} as complete`}
-            >
-              <Check className="w-6 h-6 text-success-foreground" strokeWidth={3} />
-            </motion.button>
+              {/* Complete Button */}
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={handleComplete}
+                className={cn(
+                  "w-16 flex-1 flex items-center justify-center min-h-[52px]",
+                  "bg-success hover:bg-success/90 transition-colors",
+                  "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-success"
+                )}
+                aria-label={`Mark ${job.customer?.name || 'job'} as complete`}
+              >
+                <Check className="w-6 h-6 text-success-foreground" strokeWidth={3} />
+              </motion.button>
+            </div>
           </div>
         </div>
       </motion.div>
