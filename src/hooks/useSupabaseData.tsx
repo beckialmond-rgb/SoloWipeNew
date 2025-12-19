@@ -767,76 +767,44 @@ export function useSupabaseData() {
       // Validate session before critical operation
       await validateSession(user.id);
 
-      const { data: newCustomer, error: customerError } = await supabase
-        .from('customers')
-        .insert({
-          profile_id: user.id,
-          name: data.name,
-          address: data.address,
-          mobile_phone: data.mobile_phone || null,
-          price: data.price,
-          frequency_weeks: data.frequency_weeks,
-          status: 'active',
-          notes: data.notes || null,
-        })
-        .select()
-        .single();
+      try {
+        const { data: newCustomer, error: customerError } = await supabase
+          .from('customers')
+          .insert({
+            profile_id: user.id,
+            name: data.name,
+            address: data.address,
+            mobile_phone: data.mobile_phone || null,
+            price: data.price,
+            frequency_weeks: data.frequency_weeks,
+            status: 'active',
+            notes: data.notes || null,
+          })
+          .select()
+          .single();
 
-      if (customerError) {
-        const errorCode = customerError.code || '';
-        const errorMessage = customerError.message?.toLowerCase() || '';
-        
-        // Check for RLS policy errors FIRST (before auth errors)
-        // RLS errors mean user is authenticated but policy denies access - don't sign out
-        if (errorMessage.includes('row-level security') || 
-            errorMessage.includes('policy') ||
-            (errorCode === '42501' && (errorMessage.includes('policy') || errorMessage.includes('row-level')))) {
-          console.error('RLS policy error:', customerError);
-          throw new Error('Permission denied. Please ensure you have the correct permissions to create customers.');
+        if (customerError) {
+          throw customerError;
         }
-        
-        // Authentication errors - user session is invalid (only sign out on actual auth failures)
-        // PGRST301 = Not authenticated, JWT errors = invalid token
-        if (errorCode === 'PGRST301' || // Not authenticated
-            (errorMessage.includes('jwt') && !errorMessage.includes('policy')) ||
-            (errorMessage.includes('authentication') && !errorMessage.includes('policy')) ||
-            (errorMessage.includes('unauthorized') && !errorMessage.includes('policy'))) {
-          console.warn('Authentication error detected, signing out');
-          await supabase.auth.signOut();
-          throw new Error('Your session has expired. Please sign in again.');
+
+        const { error: jobError } = await supabase
+          .from('jobs')
+          .insert({
+            customer_id: newCustomer.id,
+            scheduled_date: data.first_clean_date,
+            status: 'pending',
+          });
+
+        if (jobError) {
+          throw jobError;
         }
-        
-        // Foreign key constraint error - profile doesn't exist (session invalid)
-        if (errorMessage.includes('foreign key constraint') && 
-            errorMessage.includes('profiles')) {
-          console.warn('Profile not found - session invalid, signing out');
-          await supabase.auth.signOut();
-          throw new Error('Your session has expired. Please sign in again.');
-        }
-        
-        // Generic 42501 without RLS context - could be auth or RLS, be conservative
-        // Don't sign out unless we're certain it's an auth error
-        if (errorCode === '42501') {
-          console.error('Permission error (42501):', customerError);
-          throw new Error('Permission denied. Please check your account permissions or try signing in again.');
-        }
-        
-        // Other errors - pass through with original message
-        console.error('Customer creation error:', customerError);
-        throw customerError;
+
+        return newCustomer;
+      } catch (error) {
+        console.error('Error adding customer:', error);
+        alert("Could not save customer");
+        throw error;
       }
-
-      const { error: jobError } = await supabase
-        .from('jobs')
-        .insert({
-          customer_id: newCustomer.id,
-          scheduled_date: data.first_clean_date,
-          status: 'pending',
-        });
-
-      if (jobError) throw jobError;
-
-      return newCustomer;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -848,16 +816,13 @@ export function useSupabaseData() {
       });
     },
     onError: (error) => {
-      // Don't show toast if user was signed out (error message already shown via signOut)
-      // The signOut will trigger auth state change and redirect to login
-      if (!error.message.includes('session has expired') && 
-          !error.message.includes('no longer available')) {
-        toast({
-          title: 'Error adding customer',
-          description: error.message,
-          variant: 'destructive',
-        });
-      }
+      // Error is already logged and alert shown in mutationFn catch block
+      // Show toast with error details
+      toast({
+        title: 'Error adding customer',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
 
