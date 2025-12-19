@@ -49,15 +49,15 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Mark as Paid</DialogTitle>
           <DialogDescription>
             How did {job.customer?.name || 'the customer'} pay for this job?
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 overflow-y-auto flex-1">
           <div className="bg-muted/50 rounded-lg p-4 text-center">
             <p className="text-3xl font-bold text-foreground">
               £{(job.amount_collected || 0).toFixed(2)}
@@ -108,22 +108,25 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            className="flex-1 h-12"
-            onClick={handleClose}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </Button>
-          <Button
-            className="flex-1 h-12 bg-green-600 hover:bg-green-700"
-            onClick={handleConfirm}
-            disabled={!selectedMethod || isSubmitting}
-          >
-            {isSubmitting ? 'Processing...' : 'Confirm Payment'}
-          </Button>
+        {/* Buttons - Sticky at bottom */}
+        <div className="sticky bottom-0 bg-background pt-4 -mx-6 px-6 border-t border-border flex-shrink-0">
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1 h-12"
+              onClick={handleClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 h-12 bg-green-600 hover:bg-green-700"
+              onClick={handleConfirm}
+              disabled={!selectedMethod || isSubmitting}
+            >
+              {isSubmitting ? 'Processing...' : 'Confirm Payment'}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

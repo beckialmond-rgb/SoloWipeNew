@@ -65,14 +65,14 @@ export function RescheduleJobModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[425px] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Reschedule Job</DialogTitle>
           <DialogDescription className="sr-only">Select a new date for this job</DialogDescription>
         </DialogHeader>
         
         {job && (
-          <div className="space-y-6 py-4">
+          <div className="space-y-6 py-4 overflow-y-auto flex-1">
             {/* Customer info */}
             <div className="space-y-1">
               <p className="font-medium text-foreground">{job.customer?.name || 'Unknown Customer'}</p>
@@ -110,22 +110,24 @@ export function RescheduleJobModal({
               </Popover>
             </div>
 
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <Button
-                variant="outline"
-                className="flex-1 min-h-[60px]"
-                onClick={() => onOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="flex-1 min-h-[60px]"
-                onClick={handleReschedule}
-                disabled={!selectedDate || isSubmitting}
-              >
-                {isSubmitting ? 'Saving...' : 'Save'}
-              </Button>
+            {/* Actions - Sticky at bottom */}
+            <div className="sticky bottom-0 bg-background pt-4 -mx-6 px-6 border-t border-border">
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 min-h-[60px]"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="flex-1 min-h-[60px]"
+                  onClick={handleReschedule}
+                  disabled={!selectedDate || isSubmitting}
+                >
+                  {isSubmitting ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
             </div>
           </div>
         )}
