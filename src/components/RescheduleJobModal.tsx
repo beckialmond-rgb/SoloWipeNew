@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { JobWithCustomer } from '@/types/database';
+import { useToast } from '@/hooks/use-toast';
 
 interface RescheduleJobModalProps {
   job: JobWithCustomer | null;
@@ -33,6 +34,16 @@ export function RescheduleJobModal({
 }: RescheduleJobModalProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+
+  // Reset selected date when job changes
+  useEffect(() => {
+    if (job && open) {
+      setSelectedDate(new Date(job.scheduled_date));
+    } else if (!open) {
+      setSelectedDate(undefined);
+    }
+  }, [job, open]);
 
   // Reset selected date when job changes or modal opens
   // Using useEffect instead of setState in render to prevent React warnings/infinite loops
@@ -58,6 +69,12 @@ export function RescheduleJobModal({
     try {
       await onReschedule(job.id, format(selectedDate, 'yyyy-MM-dd'));
       onOpenChange(false);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to reschedule job. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -110,24 +127,23 @@ export function RescheduleJobModal({
               </Popover>
             </div>
 
-            {/* Actions - Sticky at bottom */}
-            <div className="sticky bottom-0 bg-background pt-4 -mx-6 px-6 border-t border-border">
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1 min-h-[60px]"
-                  onClick={() => onOpenChange(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="flex-1 min-h-[60px]"
-                  onClick={handleReschedule}
-                  disabled={!selectedDate || isSubmitting}
-                >
-                  {isSubmitting ? 'Saving...' : 'Save'}
-                </Button>
-              </div>
+            {/* Actions */}
+            <div className="flex gap-3 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1 min-h-[60px]"
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 min-h-[60px]"
+                onClick={handleReschedule}
+                disabled={!selectedDate || isSubmitting}
+              >
+                {isSubmitting ? 'Saving...' : 'Save'}
+              </Button>
             </div>
           </div>
         )}

@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface MarkPaidModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface MarkPaidModalProps {
 export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModalProps) {
   const [selectedMethod, setSelectedMethod] = useState<'cash' | 'transfer' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   // Reset state when modal opens or closes
   useEffect(() => {
@@ -35,6 +37,13 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
     setIsSubmitting(true);
     try {
       await onConfirm(selectedMethod);
+      setSelectedMethod(null);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to mark job as paid. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -108,25 +117,22 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
           </div>
         </div>
 
-        {/* Buttons - Sticky at bottom */}
-        <div className="sticky bottom-0 bg-background pt-4 -mx-6 px-6 border-t border-border flex-shrink-0">
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex-1 h-12"
-              onClick={handleClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="flex-1 h-12 bg-green-600 hover:bg-green-700"
-              onClick={handleConfirm}
-              disabled={!selectedMethod || isSubmitting}
-            >
-              {isSubmitting ? 'Processing...' : 'Confirm Payment'}
-            </Button>
-          </div>
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            className="flex-1 h-12"
+            onClick={handleClose}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="flex-1 h-12 bg-green-600 hover:bg-green-700"
+            onClick={handleConfirm}
+            disabled={!selectedMethod || isSubmitting}
+          >
+            {isSubmitting ? 'Processing...' : 'Confirm Payment'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -317,8 +317,8 @@ const Index = () => {
         ) : undefined,
       });
     } catch (error) {
-      // Rollback on error - restore previous state including any reordering
-      setLocalJobs(previousJobs);
+      // Rollback on error - refetch to get current state
+      await refetchAll();
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to complete job. Please try again.',
@@ -429,8 +429,8 @@ const Index = () => {
         ),
       });
     } catch (error) {
-      // Rollback on error - restore previous state including any reordering
-      setLocalJobs(previousJobs);
+      // Rollback on error - refetch to get current state
+      await refetchAll();
       toast({
         title: 'Error',
         description: error instanceof Error ? error.message : 'Failed to skip job. Please try again.',
@@ -490,11 +490,11 @@ const Index = () => {
         });
       }
     } catch (error) {
-      // Rollback on error - restore all jobs
-      setLocalJobs(previousJobs);
+      // Rollback on error - refetch to get current state
+      await refetchAll();
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to skip jobs. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to skip some jobs. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -508,12 +508,22 @@ const Index = () => {
   };
 
   const handleReschedule = async (jobId: string, newDate: string) => {
-    await rescheduleJob(jobId, newDate);
-    setSelectedJob(null);
+    try {
+      await rescheduleJob(jobId, newDate);
+      setSelectedJob(null);
+    } catch (error) {
+      // Error is already handled by the modal component
+      // Just keep modal open so user can retry
+    }
   };
 
   const handleSaveNotes = async (jobId: string, notes: string | null) => {
-    await updateJobNotes(jobId, notes);
+    try {
+      await updateJobNotes(jobId, notes);
+    } catch (error) {
+      // Error is already handled by the mutation
+      // No need to show additional toast here
+    }
   };
 
   const nextJob = localJobs[0];

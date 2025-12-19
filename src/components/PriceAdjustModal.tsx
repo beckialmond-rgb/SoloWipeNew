@@ -4,12 +4,13 @@ import { X, Plus, Minus, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { JobWithCustomer } from '@/types/database';
+import { useToast } from '@/hooks/use-toast';
 
 interface PriceAdjustModalProps {
   isOpen: boolean;
   job: JobWithCustomer | null;
   onClose: () => void;
-  onConfirm: (amount: number, photoUrl?: string) => void;
+  onConfirm: (amount: number, photoUrl?: string) => Promise<void> | void;
   onCapturePhoto?: () => void;
   capturedPhotoUrl?: string | null;
 }
@@ -24,6 +25,7 @@ export const PriceAdjustModal = ({
 }: PriceAdjustModalProps) => {
   const [amount, setAmount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (job && isOpen) {
@@ -44,12 +46,19 @@ export const PriceAdjustModal = ({
   };
 
   const handleConfirm = async () => {
-    if (isSubmitting) return; // Prevent double-clicks
     setIsSubmitting(true);
     try {
       await onConfirm(amount, capturedPhotoUrl || undefined);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to complete job. Please try again.',
+        variant: 'destructive',
+      });
+      // Don't close modal on error so user can retry
+      return;
     } finally {
-      // State will be reset when modal closes via useEffect
+      setIsSubmitting(false);
     }
   };
 
@@ -178,16 +187,14 @@ export const PriceAdjustModal = ({
             </div>
           )}
 
-          {/* Confirm button - Sticky at bottom */}
-          <div className="sticky bottom-0 bg-card pt-4 -mx-6 px-6 border-t border-border mt-auto">
-            <Button
-              className="w-full h-14 text-lg font-semibold bg-green-600 hover:bg-green-700 disabled:opacity-70"
-              onClick={handleConfirm}
-              disabled={isSubmitting || amount < 0}
-            >
-              {isSubmitting ? 'Completing...' : `Mark Complete · £${amount.toFixed(2)}`}
-            </Button>
-          </div>
+          {/* Confirm button */}
+          <Button
+            className="w-full h-14 text-lg font-semibold bg-green-600 hover:bg-green-700"
+            onClick={handleConfirm}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Processing...' : `Mark Complete · £${amount.toFixed(2)}`}
+          </Button>
         </motion.div>
       </motion.div>
       )}

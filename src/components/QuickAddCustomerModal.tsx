@@ -73,6 +73,12 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
       setPrice('20');
       setErrors({});
       onClose();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to add customer. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }

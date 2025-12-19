@@ -440,10 +440,16 @@ const Auth = () => {
                   if (error) {
                     toast({
                       title: 'Sign in failed',
-                      description: error.message,
+                      description: error.message || 'Failed to sign in with Google',
                       variant: 'destructive',
                     });
                   }
+                } catch (err) {
+                  toast({
+                    title: 'Sign in failed',
+                    description: err instanceof Error ? err.message : 'Failed to sign in with Google',
+                    variant: 'destructive',
+                  });
                 } finally {
                   setOauthLoading(null);
                 }

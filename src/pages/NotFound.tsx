@@ -1,10 +1,10 @@
-import { Link, useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Home } from "lucide-react";
 
 const NotFound = () => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Avoid noisy console errors in production for normal navigation typos/bookmarks.
@@ -14,20 +14,12 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="text-center max-w-md">
-        <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-muted flex items-center justify-center">
-          <span className="text-4xl font-bold text-muted-foreground">404</span>
-        </div>
-        <h1 className="mb-2 text-2xl font-bold text-foreground">Page not found</h1>
-        <p className="mb-6 text-muted-foreground">
-          The page you're looking for doesn't exist or has been moved.
-        </p>
-        <Button asChild className="gap-2">
-          <Link to="/">
-            <Home className="w-4 h-4" />
-            Return to Home
-          </Link>
+    <div className="flex min-h-screen items-center justify-center bg-muted">
+      <div className="text-center">
+        <h1 className="mb-4 text-4xl font-bold">404</h1>
+        <p className="mb-4 text-xl text-muted-foreground">Oops! Page not found</p>
+        <Button onClick={() => navigate('/')} className="mt-4">
+          Return to Home
         </Button>
       </div>
     </div>
