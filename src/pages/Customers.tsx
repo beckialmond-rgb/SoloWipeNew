@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Users, Plus, CreditCard, Send, CheckSquare, Square, Loader2, X, Download } from 'lucide-react';
+import { Search, Users, Plus, CreditCard, Send, CheckSquare, Square, Loader2, X, Download, Upload, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -440,6 +440,37 @@ const Customers = () => {
                 );
               })}
             </div>
+
+            {/* Import Help CTA - only show when there are customers */}
+            {!selectMode && filteredCustomers.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mt-6 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                    <Upload className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                      Moving from another app?
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300/80 mb-3">
+                      Don't type them in manually! We can import your customers for you.
+                    </p>
+                    <a
+                      href="mailto:support@solowipe.co.uk?subject=Help me import my customers"
+                      className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-200 dark:hover:bg-blue-900/60 rounded-lg transition-colors"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      Get Import Help
+                    </a>
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
             {/* Empty search state */}
             {filteredCustomers.length === 0 && searchQuery && (
