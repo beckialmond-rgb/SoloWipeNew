@@ -11,7 +11,10 @@
   
   const frontendVars = [
     'VITE_SUPABASE_URL',
+    // Prefer anon key (legacy JWT), but allow publishable key (new format)
+    'VITE_SUPABASE_ANON_KEY',
     'VITE_SUPABASE_PUBLISHABLE_KEY',
+    // Optional (used only for docs/debugging)
     'VITE_SUPABASE_PROJECT_ID'
   ];
   
@@ -34,7 +37,8 @@
   console.log('\n🔌 Supabase Connection Test:');
   console.log('-'.repeat(50));
   
-  if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  if (import.meta.env.VITE_SUPABASE_URL && key) {
     try {
       // Try to create a Supabase client (if available)
       if (window.supabase) {
@@ -52,7 +56,6 @@
       }
       
       // Check key format
-      const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       if (key && key.length > 20) {
         console.log('✅ Supabase key format looks correct');
       } else {

@@ -191,9 +191,8 @@ export class ErrorBoundary extends Component<Props, State> {
                   <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
                     <p className="text-sm text-blue-900 dark:text-blue-100">
                       <strong>How to fix:</strong> Go to Netlify Dashboard → Site settings → Environment variables and add:
-                      <br />• VITE_SUPABASE_URL = https://owqjyaiptexqwafzmcwy.supabase.co
-                      <br />• VITE_SUPABASE_PUBLISHABLE_KEY = sb_publishable_DikafC7lHxXB2lySytgEFQ_mHNZTSkF
-                      <br />• VITE_SUPABASE_PROJECT_ID = owqjyaiptexqwafzmcwy
+                      <br />• VITE_SUPABASE_URL = https://&lt;your-project&gt;.supabase.co
+                      <br />• VITE_SUPABASE_ANON_KEY = eyJ... (or VITE_SUPABASE_PUBLISHABLE_KEY = sb_publishable_...)
                     </p>
                   </div>
                 )}

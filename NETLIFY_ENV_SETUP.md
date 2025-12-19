@@ -9,16 +9,18 @@ If you're seeing a white screen on Netlify, it's likely because the environment 
 Add these in **Netlify Dashboard** → **Site settings** → **Environment variables**:
 
 ### 1. VITE_SUPABASE_URL
-- **Value**: `https://owqjyaiptexqwafzmcwy.supabase.co`
+- **Value**: `https://<your-project>.supabase.co`
 - **Description**: Your Supabase project URL
 
-### 2. VITE_SUPABASE_PUBLISHABLE_KEY
-- **Value**: `sb_publishable_DikafC7lHxXB2lySytgEFQ_mHNZTSkF`
-- **Description**: Your Supabase publishable (anon) key
+### 2. VITE_SUPABASE_ANON_KEY (recommended)
+- **Value**: `eyJ...`
+- **Description**: Your Supabase anonymous key (public). Found in Supabase Dashboard → Settings → API.
 
-### 3. VITE_SUPABASE_PROJECT_ID
-- **Value**: `owqjyaiptexqwafzmcwy`
-- **Description**: Your Supabase project ID
+### 3. VITE_SUPABASE_PUBLISHABLE_KEY (alternative)
+- **Value**: `sb_publishable_...`
+- **Description**: New-format publishable key (public). Use this if you’re on the Publishable Keys tab.
+
+> Note: `VITE_SUPABASE_PROJECT_ID` is optional (used only for docs/debugging).
 
 ## Steps to Add:
 
