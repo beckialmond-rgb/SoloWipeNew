@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, addDays } from 'date-fns';
 import { AnimatePresence, motion, Reorder } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -29,7 +29,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useJobReminders } from '@/hooks/useJobReminders';
 import { useHaptics } from '@/hooks/useHaptics';
 import { syncStatus } from '@/lib/offlineStorage';
-import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation, X, Gift, CreditCard, AlertTriangle } from 'lucide-react';
+import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation, X, Gift, CreditCard, AlertTriangle, MessageSquare, MapPin } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import { ToastAction } from '@/components/ui/toast';
 import {
@@ -75,6 +75,15 @@ const Index = () => {
   // Enable job reminders for upcoming jobs
   const allUpcomingJobs = [...pendingJobs, ...upcomingJobs];
   useJobReminders(allUpcomingJobs);
+  
+  // Filter jobs for tomorrow
+  const tomorrowDate = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+  const tomorrowJobs = useMemo(() => {
+    return [...pendingJobs, ...upcomingJobs].filter(job => 
+      job.scheduled_date === tomorrowDate
+    );
+  }, [pendingJobs, upcomingJobs, tomorrowDate]);
+  
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
@@ -782,6 +791,91 @@ const Index = () => {
                   Add Your First Customer
                 </Button>
               </div>
+            )}
+
+            {/* Tomorrow's Jobs Section */}
+            {tomorrowJobs.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mt-8"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Tomorrow's Jobs ({tomorrowJobs.length})
+                  </h2>
+                </div>
+                
+                <div className="space-y-3">
+                  {tomorrowJobs.map((job, index) => {
+                    const customerName = job.customer?.name || 'Customer';
+                    const customerPhone = job.customer?.mobile_phone;
+                    const hasPhone = !!customerPhone;
+                    
+                    // Create SMS link with pre-filled message
+                    const smsMessage = encodeURIComponent(
+                      `Hi ${customerName}, just a quick reminder that SoloWipe will be round tomorrow to clean your windows. Thanks!`
+                    );
+                    const smsLink = hasPhone ? `sms:${customerPhone.replace(/\s/g, '')}?body=${smsMessage}` : '#';
+                    
+                    return (
+                      <motion.div
+                        key={job.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="bg-card rounded-xl border border-border p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start gap-2 mb-1">
+                              <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                              <h3 className="font-semibold text-foreground text-base leading-tight truncate min-w-0">
+                                {job.customer?.address || 'No address'}
+                              </h3>
+                            </div>
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className="text-xl font-bold text-foreground">
+                                £{job.customer?.price || 0}
+                              </span>
+                              <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
+                                {customerName}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* SMS Button */}
+                          {hasPhone ? (
+                            <a
+                              href={smsLink}
+                              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors shadow-sm"
+                              onClick={(e) => {
+                                // Prevent navigation if link is disabled
+                                if (!hasPhone) {
+                                  e.preventDefault();
+                                }
+                              }}
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              Send Text
+                            </a>
+                          ) : (
+                            <button
+                              disabled
+                              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-muted-foreground bg-muted rounded-lg cursor-not-allowed opacity-50"
+                              title="No phone number available"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              Send Text
+                            </button>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.div>
             )}
 
             {/* Completed Today Section */}
