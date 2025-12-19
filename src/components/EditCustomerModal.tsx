@@ -130,7 +130,9 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
           <form onSubmit={handleSubmit} className="px-6 pb-8 pt-2 flex-1 overflow-y-auto">
             <h2 className="text-2xl font-bold text-foreground mb-6">Edit Customer</h2>
 
-            <div className="space-y-4">
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <div className="space-y-4">
               {/* Name */}
               <FormField 
                 label="Name" 
