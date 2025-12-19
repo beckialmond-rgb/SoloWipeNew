@@ -110,7 +110,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[90vh] overflow-y-auto safe-bottom"
+          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85vh] safe-bottom flex flex-col overflow-hidden"
         >
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-2">
@@ -127,10 +127,15 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          <form onSubmit={handleSubmit} className="px-6 pb-8 pt-2">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Edit Customer</h2>
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            {/* Header */}
+            <div className="px-6 pt-2 pb-2">
+              <h2 className="text-2xl font-bold text-foreground">Edit Customer</h2>
+            </div>
 
-            <div className="space-y-4">
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <div className="space-y-4">
               {/* Name */}
               <FormField 
                 label="Name" 
@@ -251,19 +256,34 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
               </FormField>
             </div>
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              disabled={isSubmitting || !name.trim() || !address.trim()}
-              className={cn(
-                "w-full mt-6 fat-button rounded-xl",
-                "bg-primary hover:bg-primary/90 text-primary-foreground",
-                "font-semibold text-base",
-                "disabled:opacity-50"
-              )}
-            >
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </Button>
+            </div>
+
+            {/* Sticky footer */}
+            <div className="border-t p-4 bg-background shrink-0">
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isSubmitting}
+                  onClick={handleBackdropClick}
+                  className="flex-1 rounded-xl"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting || !name.trim() || !address.trim()}
+                  className={cn(
+                    "flex-1 fat-button rounded-xl",
+                    "bg-primary hover:bg-primary/90 text-primary-foreground",
+                    "font-semibold text-base",
+                    "disabled:opacity-50"
+                  )}
+                >
+                  {isSubmitting ? 'Saving...' : 'Save'}
+                </Button>
+              </div>
+            </div>
           </form>
         </motion.div>
       </motion.div>
