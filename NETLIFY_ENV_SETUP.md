@@ -12,13 +12,17 @@ Add these in **Netlify Dashboard** → **Site settings** → **Environment varia
 - **Value**: `https://owqjyaiptexqwafzmcwy.supabase.co`
 - **Description**: Your Supabase project URL
 
-### 2. VITE_SUPABASE_PUBLISHABLE_KEY
-- **Value**: `sb_publishable_DikafC7lHxXB2lySytgEFQ_mHNZTSkF`
-- **Description**: Your Supabase publishable (anon) key
+### 2. VITE_SUPABASE_ANON_KEY (recommended)
+- **Value**: `eyJ...`
+- **Description**: Your Supabase anonymous key (public). Found in Supabase Dashboard → Settings → API.
 
-### 3. VITE_SUPABASE_PROJECT_ID
+### 3. VITE_SUPABASE_PUBLISHABLE_KEY (alternative)
+- **Value**: `sb_publishable_DikafC7lHxXB2lySytgEFQ_mHNZTSkF`
+- **Description**: New-format publishable key (public). Use this if you’re on the Publishable Keys tab.
+
+### 4. VITE_SUPABASE_PROJECT_ID (optional)
 - **Value**: `owqjyaiptexqwafzmcwy`
-- **Description**: Your Supabase project ID
+- **Description**: Used only for docs/debugging.
 
 ## Steps to Add:
 

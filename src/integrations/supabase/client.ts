@@ -7,8 +7,9 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  */
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-  import.meta.env.VITE_SUPABASE_ANON_KEY) as string | undefined;
+// Prefer anon key (legacy JWT) but allow publishable key (new format) for compatibility.
+const SUPABASE_KEY = (import.meta.env.VITE_SUPABASE_ANON_KEY ??
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) as string | undefined;
 
 let cachedClient: SupabaseClient | null = null;
 let cachedInitError: Error | null = null;
@@ -16,7 +17,7 @@ let cachedInitError: Error | null = null;
 function validateSupabaseConfig(url?: string, key?: string): Error | null {
   if (!url || !key) {
     return new Error(
-      'Supabase env vars missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).'
+      'Supabase env vars missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY).'
     );
   }
 
@@ -27,10 +28,13 @@ function validateSupabaseConfig(url?: string, key?: string): Error | null {
     );
   }
 
-  // Publishable keys typically start with sb_publishable_. Older anon JWTs start with eyJ.
-  if (!(key.startsWith('sb_publishable_') || key.startsWith('eyJ'))) {
+  // Accept:
+  // - Legacy anon JWTs: eyJ...
+  // - New publishable keys: sb_publishable_...
+  // (We intentionally do NOT accept service role / secret keys here.)
+  if (!(key.startsWith('eyJ') || key.startsWith('sb_publishable_'))) {
     return new Error(
-      'Invalid Supabase key. Expected a publishable key (sb_publishable_...) or anon JWT (eyJ...).'
+      'Invalid Supabase key. Expected an anon JWT (eyJ...) or a publishable key (sb_publishable_...).'
     );
   }
 

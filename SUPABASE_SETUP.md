@@ -47,8 +47,8 @@ After you provide the new credentials, I'll update:
 1. Go to Netlify Dashboard → Your Site → **Site settings** → **Environment variables**
 2. Add/Update:
    - `VITE_SUPABASE_URL` = Your project URL
-   - `VITE_SUPABASE_PUBLISHABLE_KEY` = Your publishable key
-   - `VITE_SUPABASE_PROJECT_ID` = Your project ID (from URL)
+   - `VITE_SUPABASE_ANON_KEY` = Your anon key (legacy JWT: `eyJ...`) **or** `VITE_SUPABASE_PUBLISHABLE_KEY` = publishable key (`sb_publishable_...`)
+   - `VITE_SUPABASE_PROJECT_ID` = (optional) your project ID (from URL)
 
 ## Step 6: Run Database Migrations
 
