@@ -93,15 +93,15 @@ export function ExportEarningsModal({ isOpen, onClose, businessName }: ExportEar
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Export for Xero</DialogTitle>
           <DialogDescription>
             Download a Xero-compatible CSV file of your completed jobs.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 overflow-y-auto flex-1">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">
               Date Range
@@ -131,22 +131,25 @@ export function ExportEarningsModal({ isOpen, onClose, businessName }: ExportEar
           </div>
         </div>
 
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            className="flex-1 h-12"
-            onClick={onClose}
-          >
-            Cancel
-          </Button>
-          <Button
-            className="flex-1 h-12"
-            onClick={handleExport}
-            disabled={isExporting}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            {isExporting ? 'Exporting...' : 'Download CSV'}
-          </Button>
+        {/* Buttons - Sticky at bottom */}
+        <div className="sticky bottom-0 bg-background pt-4 -mx-6 px-6 border-t border-border flex-shrink-0">
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1 h-12"
+              onClick={onClose}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 h-12"
+              onClick={handleExport}
+              disabled={isExporting}
+            >
+              <Download className="w-4 h-4 mr-2" />
+              {isExporting ? 'Exporting...' : 'Download CSV'}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

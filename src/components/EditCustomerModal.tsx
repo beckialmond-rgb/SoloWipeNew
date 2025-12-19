@@ -87,24 +87,30 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
     }
   };
 
-  if (!isOpen || !customer) return null;
+  const handleBackdropClick = () => {
+    if (!isSubmitting) {
+      onClose();
+    }
+  };
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm"
-        onClick={onClose}
-      >
+      {isOpen && customer && (
+        <motion.div
+          key="edit-customer-backdrop"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm"
+          onClick={handleBackdropClick}
+        >
         <motion.div
           initial={{ y: '100%' }}
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[90vh] overflow-y-auto safe-bottom"
+          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[90vh] overflow-y-auto safe-bottom flex flex-col"
         >
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-2">
@@ -113,17 +119,20 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
 
           {/* Close button */}
           <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors"
+            onClick={handleBackdropClick}
+            disabled={isSubmitting}
+            className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Close"
           >
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          <form onSubmit={handleSubmit} className="px-6 pb-8 pt-2">
+          <form onSubmit={handleSubmit} className="px-6 pb-8 pt-2 flex-1 overflow-y-auto">
             <h2 className="text-2xl font-bold text-foreground mb-6">Edit Customer</h2>
 
-            <div className="space-y-4">
+            {/* Scrollable content */}
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <div className="space-y-4">
               {/* Name */}
               <FormField 
                 label="Name" 
@@ -244,22 +253,25 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
               </FormField>
             </div>
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              disabled={isSubmitting || !name.trim() || !address.trim()}
-              className={cn(
-                "w-full mt-6 fat-button rounded-xl",
-                "bg-primary hover:bg-primary/90 text-primary-foreground",
-                "font-semibold text-base",
-                "disabled:opacity-50"
-              )}
-            >
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </Button>
+            {/* Submit Button - Sticky at bottom */}
+            <div className="sticky bottom-0 bg-card pt-4 -mx-6 px-6 border-t border-border mt-6">
+              <Button
+                type="submit"
+                disabled={isSubmitting || !name.trim() || !address.trim()}
+                className={cn(
+                  "w-full fat-button rounded-xl",
+                  "bg-primary hover:bg-primary/90 text-primary-foreground",
+                  "font-semibold text-base",
+                  "disabled:opacity-50"
+                )}
+              >
+                {isSubmitting ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
           </form>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 }

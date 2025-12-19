@@ -1,10 +1,10 @@
 import { Home, Users, Wallet, CalendarDays, Settings } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { cn } from '@/lib/utils';
+import { useOffline } from '@/contexts/OfflineContext';
+import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { useOffline } from '@/contexts/OfflineContext';
 import { format } from 'date-fns';
 
 export function BottomNav() {
@@ -25,14 +25,19 @@ export function BottomNav() {
         .eq('payment_status', 'unpaid')
         .eq('customer.status', 'active');
       
-      if (error) return 0;
+      if (error) {
+        console.error('Failed to fetch unpaid count:', error);
+        return 0;
+      }
       return count || 0;
     },
     enabled: !!user,
     refetchInterval: 30000,
+    retry: 2,
+    staleTime: 20000, // Keep data fresh for 20 seconds
   });
 
-  // Count today's pending jobs
+  // Count today's pending jobs with better error handling
   const { data: pendingTodayCount = 0 } = useQuery({
     queryKey: ['pendingTodayCount', user?.id, today],
     queryFn: async () => {
@@ -44,11 +49,16 @@ export function BottomNav() {
         .eq('status', 'pending')
         .lte('scheduled_date', today);
       
-      if (error) return 0;
+      if (error) {
+        console.error('Failed to fetch pending today count:', error);
+        return 0;
+      }
       return count || 0;
     },
     enabled: !!user,
     refetchInterval: 30000,
+    retry: 2,
+    staleTime: 20000, // Keep data fresh for 20 seconds
   });
 
   const navItems = [

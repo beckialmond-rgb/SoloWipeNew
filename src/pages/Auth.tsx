@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, forwardRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Building, Loader2 } from 'lucide-react';
@@ -13,7 +13,7 @@ import { PasswordInput } from '@/components/PasswordInput';
 import { EmailInput } from '@/components/EmailInput';
 import { cn } from '@/lib/utils';
 
-const Auth = forwardRef<HTMLDivElement>((_, ref) => {
+const Auth = () => {
   const [searchParams] = useSearchParams();
   const initialMode = searchParams.get('mode') === 'signup' ? false : true;
   const [isLogin, setIsLogin] = useState(initialMode);
@@ -32,7 +32,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   const [failedAttempts, setFailedAttempts] = useState(0);
   
   const passwordsMatch = password === confirmPassword;
-  const { user, loading: authLoading, signIn, signUp, signInWithOAuth, resendVerificationEmail } = useAuth();
+  const { user, loading: authLoading, supabaseError, signIn, signUp, signInWithOAuth, resendVerificationEmail } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -50,12 +50,15 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   }, [user, authLoading, navigate]);
 
   // Auto-focus first input when form loads or mode changes
+  // Also reset email verification state when switching modes to avoid stale state
   useEffect(() => {
     if (!authLoading && !user) {
       if (isLogin) {
         emailRef.current?.focus();
       } else {
         businessNameRef.current?.focus();
+        // Clear verification resend when switching to signup
+        setShowVerificationResend(false);
       }
     }
   }, [isLogin, authLoading, user]);
@@ -111,8 +114,11 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
             variant: 'destructive',
           });
         } else {
-          // Reset failed attempts on success
+          // Reset failed attempts and rate limiting on successful login
           setFailedAttempts(0);
+          setRateLimitedUntil(null);
+          setShowVerificationResend(false);
+          
           // Store remember me preference
           if (!rememberMe) {
             sessionStorage.setItem('clearSessionOnClose', 'true');
@@ -207,7 +213,7 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
   }
 
   return (
-    <div ref={ref} className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
         <motion.div
@@ -231,6 +237,26 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
                 : 'Start managing your window cleaning business'}
             </p>
           </div>
+
+          {/* Supabase configuration error */}
+          {supabaseError && (
+            <div className="mb-6 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-left">
+              <p className="text-sm font-semibold text-destructive">Configuration required</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                SoloWipe can’t connect to Supabase yet. Add the required environment variables and redeploy.
+              </p>
+              <p className="mt-3 text-xs font-mono text-destructive break-all">
+                {supabaseError.message}
+              </p>
+              <div className="mt-3 text-sm text-muted-foreground">
+                <div className="font-medium text-foreground">Expected variables:</div>
+                <div className="mt-1 font-mono text-xs">
+                  VITE_SUPABASE_URL<br />
+                  VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY)
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -506,8 +532,6 @@ const Auth = forwardRef<HTMLDivElement>((_, ref) => {
       </div>
     </div>
   );
-});
-
-Auth.displayName = 'Auth';
+};
 
 export default Auth;

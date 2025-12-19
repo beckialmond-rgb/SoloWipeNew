@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Banknote, CreditCard } from 'lucide-react';
 import {
   Dialog,
@@ -24,8 +24,16 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
+  // Reset state when modal opens or closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedMethod(null);
+      setIsSubmitting(false);
+    }
+  }, [isOpen]);
+
   const handleConfirm = async () => {
-    if (!selectedMethod) return;
+    if (!selectedMethod || isSubmitting) return;
     setIsSubmitting(true);
     try {
       await onConfirm(selectedMethod);
@@ -42,29 +50,29 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
   };
 
   const handleClose = () => {
-    setSelectedMethod(null);
+    if (isSubmitting) return; // Prevent closing while submitting
     onClose();
   };
 
   if (!job) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent className="sm:max-w-md flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Mark as Paid</DialogTitle>
           <DialogDescription>
-            How did {job.customer.name} pay for this job?
+            How did {job.customer?.name || 'the customer'} pay for this job?
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-4 overflow-y-auto flex-1">
           <div className="bg-muted/50 rounded-lg p-4 text-center">
             <p className="text-3xl font-bold text-foreground">
               £{(job.amount_collected || 0).toFixed(2)}
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              {job.customer.address}
+              {job.customer?.address || 'No address'}
             </p>
           </div>
 
@@ -72,9 +80,11 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
             <button
               type="button"
               onClick={() => setSelectedMethod('cash')}
+              disabled={isSubmitting}
               className={cn(
                 "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
                 "hover:border-primary hover:bg-primary/5",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
                 selectedMethod === 'cash'
                   ? "border-primary bg-primary/10"
                   : "border-border"
@@ -89,9 +99,11 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
             <button
               type="button"
               onClick={() => setSelectedMethod('transfer')}
+              disabled={isSubmitting}
               className={cn(
                 "flex flex-col items-center gap-3 p-4 rounded-xl border-2 transition-all",
                 "hover:border-primary hover:bg-primary/5",
+                "disabled:opacity-50 disabled:cursor-not-allowed",
                 selectedMethod === 'transfer'
                   ? "border-primary bg-primary/10"
                   : "border-border"

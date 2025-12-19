@@ -4,6 +4,7 @@ import { Calendar, MapPin, ChevronDown, ChevronUp, SkipForward, Clock, CreditCar
 import { useState } from 'react';
 import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
+import { TextCustomerButton } from '@/components/TextCustomerButton';
 
 interface UpcomingJobsSectionProps {
   jobs: JobWithCustomer[];
@@ -156,12 +157,12 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
         <div className="flex-1 min-w-0 overflow-hidden">
           <div className="flex items-center gap-2 min-w-0">
             <p className="font-medium text-foreground truncate max-w-[60%]">
-              {job.customer.name}
+              {job.customer?.name || 'Unknown Customer'}
             </p>
             {/* Mandate Status Indicator */}
-            {job.customer.gocardless_mandate_status === 'pending' ? (
+            {job.customer?.gocardless_mandate_status === 'pending' ? (
               <span title="DD Pending"><Clock className="w-4 h-4 text-warning flex-shrink-0" /></span>
-            ) : job.customer.gocardless_id ? (
+            ) : job.customer?.gocardless_id ? (
               <span title="DD Active"><CreditCard className="w-4 h-4 text-success flex-shrink-0" /></span>
             ) : null}
           </div>
@@ -183,18 +184,30 @@ function UpcomingJobCard({ job, onClick, onSkip }: UpcomingJobCardProps) {
         </div>
       </button>
 
-      {/* Skip Button */}
-      <button
-        onClick={handleSkip}
-        className={cn(
-          "w-16 self-stretch min-h-[56px] flex items-center justify-center",
-          "bg-muted hover:bg-muted/80 transition-colors border-l border-border",
-          "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
-        )}
-        aria-label={`Skip ${job.customer.name}`}
-      >
-        <SkipForward className="w-5 h-5 text-muted-foreground" />
-      </button>
+      {/* Action Buttons */}
+      <div className="flex flex-col border-l border-border">
+        {/* Text Button */}
+        <div className="flex items-center justify-center p-2 border-b border-border">
+          <TextCustomerButton
+            phoneNumber={job.customer?.mobile_phone}
+            customerName={job.customer?.name || 'Customer'}
+            iconOnly={true}
+          />
+        </div>
+        
+        {/* Skip Button */}
+        <button
+          onClick={handleSkip}
+          className={cn(
+            "w-16 flex-1 min-h-[56px] flex items-center justify-center",
+            "bg-muted hover:bg-muted/80 transition-colors",
+            "focus:outline-none focus:ring-2 focus:ring-muted focus:ring-offset-2"
+          )}
+          aria-label={`Skip ${job.customer.name}`}
+        >
+          <SkipForward className="w-5 h-5 text-muted-foreground" />
+        </button>
+      </div>
     </motion.div>
   );
 }

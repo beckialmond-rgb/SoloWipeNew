@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Customer, JobWithCustomer } from '@/types/database';
@@ -11,16 +13,54 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 async function validateSession(userId: string | undefined): Promise<void> {
   if (!userId) return;
   
+  // Check session first - only sign out if session is actually missing
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  
+  if (sessionError) {
+    const errorCode = sessionError.code || '';
+    const errorMessage = sessionError.message?.toLowerCase() || '';
+    
+    // Only sign out on actual session missing errors
+    if (errorCode === 'AuthSessionMissing' || 
+        errorMessage.includes('session missing') ||
+        errorMessage.includes('no session')) {
+      console.warn('Session missing during validation, signing out');
+      await supabase.auth.signOut();
+      throw new Error('Your session has expired. Please sign in again.');
+    }
+    
+    // Other session errors - don't sign out, just throw
+    console.error('Session check error (non-critical):', sessionError);
+    throw new Error('Failed to verify your session. Please try again.');
+  }
+  
+  if (!session) {
+    // No session - but don't sign out here, let the auth state handler deal with it
+    throw new Error('No active session. Please sign in again.');
+  }
+  
+  // Try to load profile, but don't sign out on failure
+  // If profile fails to load, the app will show generic "Welcome" instead
   const { data: profileCheck, error: profileError } = await supabase
     .from('profiles')
     .select('id')
     .eq('id', userId)
     .maybeSingle();
 
-  if (profileError || !profileCheck) {
-    console.warn('Profile not found for user, signing out');
-    await supabase.auth.signOut();
-    throw new Error('Your session has expired. Please sign in again.');
+  if (profileError) {
+    // Profile load failed - log but don't sign out
+    // The app will show generic "Welcome" instead of business name
+    console.warn('Profile check error (non-critical):', profileError);
+    // Don't throw - allow operation to continue with generic welcome
+    return;
+  }
+
+  if (!profileCheck) {
+    // Profile doesn't exist - log but don't sign out
+    // The app will show generic "Welcome" instead
+    console.warn('Profile not found for user (non-critical)');
+    // Don't throw - allow operation to continue with generic welcome
+    return;
   }
 }
 
@@ -299,14 +339,18 @@ export function useSupabaseData() {
   });
 
   // Complete job mutation with OFFLINE SUPPORT
-  const completingJobIds = new Set<string>();
+  // Use React state for tracking to ensure proper re-renders and prevent race conditions
+  const [completingJobIds, setCompletingJobIds] = useState<Set<string>>(new Set());
 
   const completeJobMutation = useMutation({
     mutationFn: async ({ jobId, customAmount, photoUrl }: { jobId: string; customAmount?: number; photoUrl?: string }) => {
+      // Check if already completing - use current state snapshot
       if (completingJobIds.has(jobId)) {
         throw new Error('Job completion already in progress');
       }
-      completingJobIds.add(jobId);
+      
+      // Mark as completing
+      setCompletingJobIds(prev => new Set(prev).add(jobId));
 
       try {
         // Validate session before critical operation
@@ -438,7 +482,12 @@ export function useSupabaseData() {
           ddRequiresReconnect,
         };
       } finally {
-        completingJobIds.delete(jobId);
+        // Clean up completion tracking
+        setCompletingJobIds(prev => {
+          const next = new Set(prev);
+          next.delete(jobId);
+          return next;
+        });
       }
     },
     onMutate: async ({ jobId, customAmount }) => {
@@ -505,14 +554,18 @@ export function useSupabaseData() {
   });
 
   // Mark job as paid with OFFLINE SUPPORT
-  const payingJobIds = new Set<string>();
+  // Use React state for tracking to ensure proper re-renders and prevent race conditions
+  const [payingJobIds, setPayingJobIds] = useState<Set<string>>(new Set());
 
   const markJobPaidMutation = useMutation({
     mutationFn: async ({ jobId, method }: { jobId: string; method: 'cash' | 'transfer' }) => {
+      // Check if already paying - use current state snapshot
       if (payingJobIds.has(jobId)) {
         throw new Error('Payment already in progress');
       }
-      payingJobIds.add(jobId);
+      
+      // Mark as paying
+      setPayingJobIds(prev => new Set(prev).add(jobId));
 
       try {
         // Validate session before critical operation
@@ -536,7 +589,7 @@ export function useSupabaseData() {
           return { jobId, method, offline: true };
         }
 
-        const { error, count } = await supabase
+        const { data: updatedRows, error } = await supabase
           .from('jobs')
           .update({
             payment_status: 'paid',
@@ -544,14 +597,20 @@ export function useSupabaseData() {
             payment_date: now,
           })
           .eq('id', jobId)
-          .eq('payment_status', 'unpaid');
+          .eq('payment_status', 'unpaid')
+          .select('id');
 
         if (error) throw error;
-        if (count === 0) throw new Error('Job already paid');
+        if (!updatedRows || updatedRows.length === 0) throw new Error('Job already paid');
         
         return { jobId, method };
       } finally {
-        payingJobIds.delete(jobId);
+        // Clean up payment tracking
+        setPayingJobIds(prev => {
+          const next = new Set(prev);
+          next.delete(jobId);
+          return next;
+        });
       }
     },
     onMutate: async ({ jobId, method }) => {
@@ -561,7 +620,7 @@ export function useSupabaseData() {
 
       const previousUnpaid = queryClient.getQueryData(['unpaidJobs', user?.id]);
       const previousPaid = queryClient.getQueryData(['paidThisWeek', user?.id]);
-      const previousCompletedToday = queryClient.getQueryData(['completedToday', user?.id]);
+      const previousCompletedToday = queryClient.getQueryData(['completedToday', user?.id, today]);
 
       const job = unpaidJobs.find(j => j.id === jobId);
       if (job) {
@@ -582,7 +641,7 @@ export function useSupabaseData() {
         );
 
         // Update completedToday cache to reflect paid status immediately
-        queryClient.setQueryData(['completedToday', user?.id], (old: JobWithCustomer[] | undefined) =>
+        queryClient.setQueryData(['completedToday', user?.id, today], (old: JobWithCustomer[] | undefined) =>
           (old || []).map(j => j.id === jobId ? paidJob : j)
         );
       }
@@ -597,7 +656,7 @@ export function useSupabaseData() {
         queryClient.setQueryData(['paidThisWeek', user?.id], context.previousPaid);
       }
       if (context?.previousCompletedToday) {
-        queryClient.setQueryData(['completedToday', user?.id], context.previousCompletedToday);
+        queryClient.setQueryData(['completedToday', user?.id, today], context.previousCompletedToday);
       }
       toast({
         title: 'Error',
@@ -616,14 +675,15 @@ export function useSupabaseData() {
   });
 
   // Batch mark jobs as paid with OFFLINE SUPPORT
-  const batchPaymentInProgress = { current: false };
+  // Use React state instead of ref for proper tracking
+  const [batchPaymentInProgress, setBatchPaymentInProgress] = useState(false);
 
   const batchMarkPaidMutation = useMutation({
     mutationFn: async ({ jobIds, method }: { jobIds: string[]; method: 'cash' | 'transfer' }) => {
-      if (batchPaymentInProgress.current) {
+      if (batchPaymentInProgress) {
         throw new Error('Batch payment already in progress');
       }
-      batchPaymentInProgress.current = true;
+      setBatchPaymentInProgress(true);
 
       try {
         // Validate session before critical operation
@@ -662,7 +722,7 @@ export function useSupabaseData() {
         
         return { count: jobIds.length, method };
       } finally {
-        batchPaymentInProgress.current = false;
+        setBatchPaymentInProgress(false);
       }
     },
     onMutate: async ({ jobIds, method }) => {
@@ -715,41 +775,44 @@ export function useSupabaseData() {
       // Validate session before critical operation
       await validateSession(user.id);
 
-      const { data: newCustomer, error: customerError } = await supabase
-        .from('customers')
-        .insert({
-          profile_id: user.id,
-          name: data.name,
-          address: data.address,
-          mobile_phone: data.mobile_phone || null,
-          price: data.price,
-          frequency_weeks: data.frequency_weeks,
-          status: 'active',
-          notes: data.notes || null,
-        })
-        .select()
-        .single();
+      try {
+        const { data: newCustomer, error: customerError } = await supabase
+          .from('customers')
+          .insert({
+            profile_id: user.id,
+            name: data.name,
+            address: data.address,
+            mobile_phone: data.mobile_phone || null,
+            price: data.price,
+            frequency_weeks: data.frequency_weeks,
+            status: 'active',
+            notes: data.notes || null,
+          })
+          .select()
+          .single();
 
-      if (customerError) {
-        // Check for foreign key constraint error specifically
-        if (customerError.message?.includes('foreign key constraint')) {
-          await supabase.auth.signOut();
-          throw new Error('Your session has expired. Please sign in again.');
+        if (customerError) {
+          throw customerError;
         }
-        throw customerError;
+
+        const { error: jobError } = await supabase
+          .from('jobs')
+          .insert({
+            customer_id: newCustomer.id,
+            scheduled_date: data.first_clean_date,
+            status: 'pending',
+          });
+
+        if (jobError) {
+          throw jobError;
+        }
+
+        return newCustomer;
+      } catch (error) {
+        console.error('Error adding customer:', error);
+        alert("Could not save customer");
+        throw error;
       }
-
-      const { error: jobError } = await supabase
-        .from('jobs')
-        .insert({
-          customer_id: newCustomer.id,
-          scheduled_date: data.first_clean_date,
-          status: 'pending',
-        });
-
-      if (jobError) throw jobError;
-
-      return newCustomer;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
@@ -761,8 +824,10 @@ export function useSupabaseData() {
       });
     },
     onError: (error) => {
+      // Error is already logged and alert shown in mutationFn catch block
+      // Show toast with error details
       toast({
-        title: 'Error',
+        title: 'Error adding customer',
         description: error.message,
         variant: 'destructive',
       });
@@ -1303,7 +1368,7 @@ export function useSupabaseData() {
     return updateGoogleReviewLinkMutation.mutateAsync(link);
   };
 
-  const businessName = profile?.business_name || 'My Window Cleaning';
+  const businessName = profile?.business_name || 'Welcome';
   const googleReviewLink = profile?.google_review_link;
   const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading || archivedLoading;
 

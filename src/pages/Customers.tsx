@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Users, Plus, CreditCard, Send, CheckSquare, Square, Loader2, X } from 'lucide-react';
+import { Search, Users, Plus, CreditCard, Send, CheckSquare, Square, Loader2, X, Download, Upload, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { downloadCustomersForXero } from '@/utils/exportCSV';
 
 type DDFilter = 'all' | 'with-dd' | 'without-dd' | 'pending';
 
@@ -155,13 +156,36 @@ const Customers = () => {
     setIsAddModalOpen(true);
   };
 
+  const handleExportToXero = () => {
+    try {
+      // Export only active customers
+      const activeCustomers = filteredCustomers.filter(c => c.status === 'active');
+      
+      if (activeCustomers.length === 0) {
+        toast.error('No customers to export');
+        return;
+      }
+
+      downloadCustomersForXero(activeCustomers, businessName);
+      
+      toast.success(`Exported ${activeCustomers.length} customer${activeCustomers.length !== 1 ? 's' : ''} to Xero CSV`, {
+        description: 'File downloaded successfully',
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export customers', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <Header showLogo={false} title="Customers" />
 
       <main className="px-4 py-6 max-w-lg mx-auto">
         {isLoading ? (
-          <LoadingState message="Loading customers..." />
+          <LoadingState type="skeleton" skeletonType="customer-card" skeletonCount={5} />
         ) : customers.length === 0 ? (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -297,25 +321,40 @@ const Customers = () => {
               </motion.div>
             )}
 
-            {/* Customer count and bulk DD action */}
+            {/* Customer count and actions */}
             <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Users className="w-4 h-4" />
                 <span>{filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}</span>
               </div>
               
-              {/* Bulk DD Link action - only show if GoCardless connected and eligible customers exist */}
-              {isGoCardlessConnected && customersEligibleForDD.length > 0 && !selectMode && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSelectMode(true)}
-                  className="text-primary border-primary/20 hover:bg-primary/10"
-                >
-                  <Send className="w-4 h-4 mr-1.5" />
-                  Bulk DD Link
-                </Button>
-              )}
+              <div className="flex items-center gap-2">
+                {/* Export to Xero button */}
+                {!selectMode && filteredCustomers.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleExportToXero}
+                    className="text-primary border-primary/20 hover:bg-primary/10"
+                  >
+                    <Download className="w-4 h-4 mr-1.5" />
+                    Export for Xero
+                  </Button>
+                )}
+                
+                {/* Bulk DD Link action - only show if GoCardless connected and eligible customers exist */}
+                {isGoCardlessConnected && customersEligibleForDD.length > 0 && !selectMode && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectMode(true)}
+                    className="text-primary border-primary/20 hover:bg-primary/10"
+                  >
+                    <Send className="w-4 h-4 mr-1.5" />
+                    Bulk DD Link
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Select mode header */}
@@ -402,6 +441,37 @@ const Customers = () => {
               })}
             </div>
 
+            {/* Import Help CTA - only show when there are customers */}
+            {!selectMode && filteredCustomers.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mt-6 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                    <Upload className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                      Moving from another app?
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300/80 mb-3">
+                      Don't type them in manually! We can import your customers for you.
+                    </p>
+                    <a
+                      href="mailto:support@solowipe.co.uk?subject=Help me import my customers"
+                      className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-200 dark:hover:bg-blue-900/60 rounded-lg transition-colors"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      Get Import Help
+                    </a>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
             {/* Empty search state */}
             {filteredCustomers.length === 0 && searchQuery && (
               <EmptyState
@@ -433,8 +503,6 @@ const Customers = () => {
           <Plus className="w-6 h-6" />
         </motion.button>
       )}
-
-      <BottomNav />
 
       {/* Customer Detail Modal */}
       {selectedCustomer && (

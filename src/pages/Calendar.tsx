@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks, isWithinInterval } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, Clock, Plus, Grid3X3, List } from 'lucide-react';
 import { Header } from '@/components/Header';
@@ -7,6 +7,7 @@ import { BottomNav } from '@/components/BottomNav';
 import { LoadingState } from '@/components/LoadingState';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { CalendarAddCustomerModal } from '@/components/CalendarAddCustomerModal';
+import { TextCustomerButton } from '@/components/TextCustomerButton';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useHaptics } from '@/hooks/useHaptics';
 import { JobWithCustomer } from '@/types/database';
@@ -87,8 +88,13 @@ const Calendar = () => {
   };
 
   const handleReschedule = async (jobId: string, newDate: string) => {
-    await rescheduleJob(jobId, newDate);
-    setSelectedJob(null);
+    try {
+      await rescheduleJob(jobId, newDate);
+      setSelectedJob(null);
+    } catch (error) {
+      // Error is already handled by the mutation, but we need to keep the modal open
+      console.error('Failed to reschedule job:', error);
+    }
   };
 
   const toggleViewMode = () => {
@@ -166,7 +172,14 @@ const Calendar = () => {
                 <h2 className="text-lg font-semibold text-foreground text-center">
                   {getHeaderText()}
                 </h2>
-                {!isToday(currentDate) && (
+                {/* Show "Today" button only when today is not visible in current view */}
+                {(() => {
+                  const today = new Date();
+                  const isTodayVisible = viewMode === 'month' 
+                    ? isSameMonth(today, currentDate)
+                    : isWithinInterval(today, { start: weekStart, end: weekEnd });
+                  return !isTodayVisible;
+                })() && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -398,16 +411,26 @@ const Calendar = () => {
                             </p>
                           </div>
                           
-                          <div className="text-right shrink-0">
-                            <p className="font-semibold text-foreground">
-                              £{job.amount_collected ?? job.customer.price}
-                            </p>
-                            <p className={cn(
-                              "text-xs",
-                              job.status === 'completed' ? "text-green-500" : "text-primary"
-                            )}>
-                              {job.status === 'completed' ? 'Done' : 'Pending'}
-                            </p>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <div className="text-right">
+                              <p className="font-semibold text-foreground">
+                                £{job.amount_collected ?? job.customer.price}
+                              </p>
+                              <p className={cn(
+                                "text-xs",
+                                job.status === 'completed' ? "text-green-500" : "text-primary"
+                              )}>
+                                {job.status === 'completed' ? 'Done' : 'Pending'}
+                              </p>
+                            </div>
+                            {/* Text Button - icon only for compact display */}
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <TextCustomerButton
+                                phoneNumber={job.customer?.mobile_phone}
+                                customerName={job.customer?.name || 'Customer'}
+                                iconOnly={true}
+                              />
+                            </div>
                           </div>
                         </motion.div>
                       ))}
@@ -443,7 +466,6 @@ const Calendar = () => {
         />
       )}
 
-      <BottomNav />
     </div>
   );
 };

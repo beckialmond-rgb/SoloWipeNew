@@ -133,14 +133,23 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
   const handleCopyLink = async () => {
     if (!authorisationUrl) return;
     
-    await navigator.clipboard.writeText(authorisationUrl);
-    setCopied(true);
-    addDebugLog('Link Copied', 'Copied to clipboard', 'success');
-    toast({
-      title: 'Link copied',
-      description: 'Direct Debit setup link copied to clipboard.',
-    });
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(authorisationUrl);
+      setCopied(true);
+      addDebugLog('Link Copied', 'Copied to clipboard', 'success');
+      toast({
+        title: 'Link copied',
+        description: 'Direct Debit setup link copied to clipboard.',
+      });
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      addDebugLog('Copy Failed', error instanceof Error ? error.message : 'Unknown error', 'error');
+      toast({
+        title: 'Copy failed',
+        description: 'Could not copy link. Please try manually selecting it.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleSendSms = () => {
@@ -185,8 +194,8 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
 
   return (
     <Drawer open={isOpen} onOpenChange={handleClose}>
-      <DrawerContent>
-        <DrawerHeader className="text-left">
+      <DrawerContent className="max-h-[85vh] flex flex-col">
+        <DrawerHeader className="text-left flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <DrawerTitle>Set Up Direct Debit</DrawerTitle>
@@ -208,7 +217,7 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
           </div>
         </DrawerHeader>
 
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 overflow-y-auto flex-1">
           {/* Debug Panel */}
           {showDebug && (
             <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border text-xs font-mono">
@@ -350,7 +359,7 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
           )}
         </div>
 
-        <DrawerFooter className="pt-2">
+        <DrawerFooter className="pt-2 flex-shrink-0 border-t border-border bg-background">
           <DrawerClose asChild>
             <Button variant="outline" className="min-h-[50px]">
               {authorisationUrl ? 'Done' : 'Cancel'}

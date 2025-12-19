@@ -84,8 +84,13 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
     }
   };
 
+  const handleClose = () => {
+    if (isSubmitting) return; // Prevent closing during submission
+    onClose();
+  };
+
   return (
-    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Drawer open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DrawerContent className="max-h-[85vh] flex flex-col">
         <DrawerHeader className="text-left flex-shrink-0">
           <div className="flex items-center gap-2">
@@ -99,7 +104,7 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
           </div>
         </DrawerHeader>
 
-        <form onSubmit={handleSubmit} autoComplete="off" className="px-6 pb-10 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} autoComplete="off" className="px-6 pb-4 overflow-y-auto flex-1">
           <div className="space-y-3">
             {/* Name */}
             <FormField 
@@ -174,19 +179,21 @@ export function QuickAddCustomerModal({ isOpen, onClose, onSubmit }: QuickAddCus
             Defaults: 4 week frequency • Add phone/notes later in Customers
           </p>
 
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            disabled={isSubmitting || !name.trim() || !address.trim()}
-            className={cn(
-              "w-full mt-4 fat-button rounded-xl",
-              "bg-accent hover:bg-accent/90 text-accent-foreground",
-              "font-semibold text-base",
-              "disabled:opacity-50"
-            )}
-          >
-            {isSubmitting ? 'Adding...' : 'Add & Schedule Today'}
-          </Button>
+          {/* Submit Button - Sticky at bottom */}
+          <div className="sticky bottom-0 bg-background pt-4 pb-2 -mx-6 px-6 border-t border-border mt-4">
+            <Button
+              type="submit"
+              disabled={isSubmitting || !name.trim() || !address.trim()}
+              className={cn(
+                "w-full fat-button rounded-xl",
+                "bg-accent hover:bg-accent/90 text-accent-foreground",
+                "font-semibold text-base",
+                "disabled:opacity-50"
+              )}
+            >
+              {isSubmitting ? 'Adding...' : 'Add & Schedule Today'}
+            </Button>
+          </div>
         </form>
       </DrawerContent>
     </Drawer>

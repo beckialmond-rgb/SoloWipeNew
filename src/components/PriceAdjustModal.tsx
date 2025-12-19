@@ -37,10 +37,9 @@ export const PriceAdjustModal = ({
   useEffect(() => {
     if (!isOpen) {
       setAmount(0);
+      setIsSubmitting(false);
     }
   }, [isOpen]);
-
-  if (!isOpen || !job) return null;
 
   const quickAdjust = (adjustment: number) => {
     setAmount(prev => Math.max(0, prev + adjustment));
@@ -65,19 +64,20 @@ export const PriceAdjustModal = ({
 
   return (
     <AnimatePresence>
+      {isOpen && job && (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/50 z-50 flex items-end justify-center"
-        onClick={onClose}
+        onClick={isSubmitting ? undefined : onClose}
       >
         <motion.div
           initial={{ y: '100%' }}
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-card w-full max-w-lg rounded-t-3xl p-6 pb-24 max-h-[85vh] overflow-y-auto"
+          className="bg-card w-full max-w-lg rounded-t-3xl p-6 pb-6 max-h-[85vh] overflow-y-auto flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-6">
@@ -197,6 +197,7 @@ export const PriceAdjustModal = ({
           </Button>
         </motion.div>
       </motion.div>
+      )}
     </AnimatePresence>
   );
 };

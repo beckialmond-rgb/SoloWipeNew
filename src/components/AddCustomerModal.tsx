@@ -90,14 +90,19 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
     }
   };
 
+  const handleClose = () => {
+    if (isSubmitting) return; // Prevent closing during submission
+    onClose();
+  };
+
   return (
-    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent className="max-h-[90vh]">
-        <DrawerHeader className="text-left">
+    <Drawer open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <DrawerContent className="max-h-[90vh] flex flex-col">
+        <DrawerHeader className="text-left flex-shrink-0">
           <DrawerTitle>Add Customer</DrawerTitle>
         </DrawerHeader>
 
-        <form onSubmit={handleSubmit} autoComplete="off" className="px-6 pb-8 overflow-y-auto">
+        <form onSubmit={handleSubmit} autoComplete="off" className="px-6 pb-8 overflow-y-auto flex-1">
           <div className="space-y-4">
             {/* Name */}
             <FormField 
@@ -252,19 +257,21 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
             </FormField>
           </div>
 
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            disabled={isSubmitting || !name.trim() || !address.trim()}
-            className={cn(
-              "w-full mt-6 fat-button rounded-xl",
-              "bg-primary hover:bg-primary/90 text-primary-foreground",
-              "font-semibold text-base",
-              "disabled:opacity-50"
-            )}
-          >
-            {isSubmitting ? 'Adding...' : 'Add Customer'}
-          </Button>
+          {/* Submit Button - Sticky at bottom */}
+          <div className="sticky bottom-0 bg-card pt-4 pb-2 -mx-6 px-6 border-t border-border mt-6">
+            <Button
+              type="submit"
+              disabled={isSubmitting || !name.trim() || !address.trim()}
+              className={cn(
+                "w-full fat-button rounded-xl",
+                "bg-primary hover:bg-primary/90 text-primary-foreground",
+                "font-semibold text-base",
+                "disabled:opacity-50"
+              )}
+            >
+              {isSubmitting ? 'Adding...' : 'Add Customer'}
+            </Button>
+          </div>
         </form>
       </DrawerContent>
     </Drawer>

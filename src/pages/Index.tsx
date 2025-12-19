@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { format, differenceInDays } from 'date-fns';
+import { format, differenceInDays, addDays } from 'date-fns';
 import { AnimatePresence, motion, Reorder } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -9,6 +9,7 @@ import { CompletedJobItem } from '@/components/CompletedJobItem';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
+import { TextCustomerButton } from '@/components/TextCustomerButton';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { JobNotesModal } from '@/components/JobNotesModal';
 import { OnMyWayButton } from '@/components/OnMyWayButton';
@@ -20,6 +21,7 @@ import { PriceAdjustModal } from '@/components/PriceAdjustModal';
 import { PhotoCaptureModal } from '@/components/PhotoCaptureModal';
 import { OptimizeRouteButton } from '@/components/OptimizeRouteButton';
 import { MarkPaidModal } from '@/components/MarkPaidModal';
+import { BusinessNameModal } from '@/components/BusinessNameModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
@@ -28,7 +30,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useJobReminders } from '@/hooks/useJobReminders';
 import { useHaptics } from '@/hooks/useHaptics';
 import { syncStatus } from '@/lib/offlineStorage';
-import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation, X, Gift, CreditCard, AlertTriangle } from 'lucide-react';
+import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation, X, Gift, CreditCard, AlertTriangle, MapPin } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
 import { ToastAction } from '@/components/ui/toast';
 import {
@@ -74,6 +76,15 @@ const Index = () => {
   // Enable job reminders for upcoming jobs
   const allUpcomingJobs = [...pendingJobs, ...upcomingJobs];
   useJobReminders(allUpcomingJobs);
+  
+  // Filter jobs for tomorrow
+  const tomorrowDate = format(addDays(new Date(), 1), 'yyyy-MM-dd');
+  const tomorrowJobs = useMemo(() => {
+    return [...pendingJobs, ...upcomingJobs].filter(job => 
+      job.scheduled_date === tomorrowDate
+    );
+  }, [pendingJobs, upcomingJobs, tomorrowDate]);
+  
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
@@ -96,6 +107,33 @@ const Index = () => {
   const [welcomeDismissed, setWelcomeDismissed] = useState(() => {
     return localStorage.getItem('solowipe_welcome_dismissed') === 'true';
   });
+  const [showBusinessNameModal, setShowBusinessNameModal] = useState(false);
+  
+  // Check if user needs to provide business name after OAuth sign-up
+  useEffect(() => {
+    const checkBusinessName = () => {
+      if (user && !isLoading && profile) {
+        const needsBusinessName = sessionStorage.getItem('needs_business_name') === 'true';
+        if (needsBusinessName && profile.business_name === 'My Window Cleaning') {
+          setShowBusinessNameModal(true);
+        }
+      }
+    };
+
+    checkBusinessName();
+    
+    // Listen for custom event from auth state change
+    window.addEventListener('needs-business-name', checkBusinessName);
+    
+    return () => {
+      window.removeEventListener('needs-business-name', checkBusinessName);
+    };
+  }, [user, isLoading, profile]);
+  
+  const handleBusinessNameComplete = () => {
+    setShowBusinessNameModal(false);
+    refetchAll();
+  };
   
   const handleDismissTrialBanner = () => {
     setTrialBannerDismissed(true);
@@ -119,8 +157,11 @@ const Index = () => {
   // Get today's date key for localStorage
   const todayKey = `solowipe_job_order_${format(new Date(), 'yyyy-MM-dd')}`;
 
-  // Track if order was restored (to show toast only once)
-  const [orderRestored, setOrderRestored] = useState(false);
+  // Track if order was restored (to show toast only once per day)
+  const [orderRestored, setOrderRestored] = useState(() => {
+    const restoredKey = `solowipe_order_restored_${format(new Date(), 'yyyy-MM-dd')}`;
+    return localStorage.getItem(restoredKey) === 'true';
+  });
 
   // Apply saved order to jobs
   const applyPersistedOrder = useCallback((jobs: JobWithCustomer[]): { jobs: JobWithCustomer[], wasRestored: boolean } => {
@@ -179,15 +220,19 @@ const Index = () => {
     setLocalJobs(orderedJobs);
     
     // Show toast only once when order is restored
+    // Use a more stable check to prevent duplicate toasts
     if (wasRestored && !orderRestored && pendingJobs.length > 0) {
       setOrderRestored(true);
+      const restoredKey = `solowipe_order_restored_${format(new Date(), 'yyyy-MM-dd')}`;
+      localStorage.setItem(restoredKey, 'true');
       toast({
         title: 'Order restored',
         description: 'Your custom job order has been applied',
         duration: 2000,
       });
     }
-  }, [pendingJobs, applyPersistedOrder, orderRestored, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingJobs, applyPersistedOrder]); // toast and orderRestored intentionally omitted to prevent infinite loops
 
   // Show welcome flow for new users
   useEffect(() => {
@@ -221,6 +266,9 @@ const Index = () => {
     const jobId = jobToComplete.id;
     setPriceAdjustOpen(false);
     setCompletingJobId(jobId);
+
+    // Save current state for rollback
+    const previousJobs = [...localJobs];
 
     // Fire confetti (loaded on-demand to keep the initial bundle smaller).
     try {
@@ -303,7 +351,7 @@ const Index = () => {
       await markJobPaid(jobToMarkPaid.id, method);
       toast({
         title: 'Payment recorded',
-        description: `${jobToMarkPaid.customer.name} marked as paid via ${method}`,
+        description: `${jobToMarkPaid.customer?.name || 'Customer'} marked as paid via ${method}`,
       });
     } catch (error) {
       toast({
@@ -326,6 +374,13 @@ const Index = () => {
     const job = localJobs.find(j => j.id === jobId);
     if (job) {
       handleSkipRequest(job);
+    } else {
+      // Job not found - might have been completed or removed
+      toast({
+        title: 'Job not found',
+        description: 'This job may have already been completed or removed.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -333,8 +388,11 @@ const Index = () => {
     if (!jobToSkip) return;
     
     const jobId = jobToSkip.id;
-    const customerName = jobToSkip.customer.name;
+    const customerName = jobToSkip.customer?.name || 'Customer';
     setSkipConfirmOpen(false);
+    
+    // Save current state for rollback
+    const previousJobs = [...localJobs];
     
     // Optimistically remove from local state
     setLocalJobs(prev => prev.filter(job => job.id !== jobId));
@@ -396,20 +454,41 @@ const Index = () => {
     setIsSkippingAll(true);
     
     const jobsToSkip = [...localJobs];
+    const previousJobs = [...localJobs];
     
     // Optimistically clear local state
     setLocalJobs([]);
     
     try {
       // Skip all jobs in sequence
+      const skippedJobs: string[] = [];
+      const failedJobs: string[] = [];
+      
       for (const job of jobsToSkip) {
-        await skipJob(job.id);
+        try {
+          await skipJob(job.id);
+          skippedJobs.push(job.id);
+        } catch (error) {
+          failedJobs.push(job.id);
+          console.error(`Failed to skip job ${job.id}:`, error);
+        }
       }
       
-      toast({
-        title: 'All jobs skipped',
-        description: `${jobsToSkip.length} jobs rescheduled to their next intervals.`,
-      });
+      if (failedJobs.length > 0) {
+        // Partial failure - restore failed jobs
+        const remainingJobs = previousJobs.filter(job => failedJobs.includes(job.id));
+        setLocalJobs(remainingJobs);
+        toast({
+          title: 'Some jobs skipped',
+          description: `${skippedJobs.length} jobs skipped, ${failedJobs.length} failed. Please try again.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'All jobs skipped',
+          description: `${jobsToSkip.length} jobs rescheduled to their next intervals.`,
+        });
+      }
     } catch (error) {
       // Rollback on error - refetch to get current state
       await refetchAll();
@@ -479,7 +558,7 @@ const Index = () => {
 
       <main className="px-4 py-6 max-w-lg mx-auto">
         {isLoading ? (
-          <LoadingState message="Loading your jobs..." />
+          <LoadingState type="skeleton" skeletonType="job-card" skeletonCount={3} />
         ) : showWelcome ? (
           <WelcomeFlow 
             businessName={businessName}
@@ -625,7 +704,7 @@ const Index = () => {
             </motion.div>
 
             {/* On My Way Button - shows only if there's a next job with phone */}
-            {nextJob && nextJob.customer.mobile_phone && (
+            {nextJob && nextJob.customer?.mobile_phone && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -660,6 +739,7 @@ const Index = () => {
                     variant="outline"
                     size="default"
                     onClick={() => setQuickAddOpen(true)}
+                    disabled={completingJobId !== null || isSkippingAll}
                     className="gap-2"
                   >
                     <UserPlus className="w-4 h-4" />
@@ -669,11 +749,11 @@ const Index = () => {
                     variant="outline"
                     size="default"
                     onClick={handleSkipAllRequest}
-                    disabled={isSkippingAll}
+                    disabled={isSkippingAll || completingJobId !== null}
                     className="gap-2"
                   >
                     <SkipForward className="w-4 h-4" />
-                    Skip All
+                    {isSkippingAll ? 'Skipping...' : 'Skip All'}
                   </Button>
                 </div>
               </motion.div>
@@ -724,6 +804,63 @@ const Index = () => {
               </div>
             )}
 
+            {/* Tomorrow's Jobs Section */}
+            {tomorrowJobs.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="mt-8"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Tomorrow's Jobs ({tomorrowJobs.length})
+                  </h2>
+                </div>
+                
+                <div className="space-y-3">
+                  {tomorrowJobs.map((job, index) => {
+                    const customerName = job.customer?.name || 'Customer';
+                    
+                    return (
+                      <motion.div
+                        key={job.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="bg-card rounded-xl border border-border p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start gap-2 mb-1">
+                              <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                              <h3 className="font-semibold text-foreground text-base leading-tight truncate min-w-0">
+                                {job.customer?.address || 'No address'}
+                              </h3>
+                            </div>
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className="text-xl font-bold text-foreground">
+                                £{job.customer?.price || 0}
+                              </span>
+                              <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
+                                {customerName}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* SMS Button */}
+                          <TextCustomerButton
+                            phoneNumber={job.customer?.mobile_phone}
+                            customerName={customerName}
+                          />
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </motion.div>
+            )}
+
             {/* Completed Today Section */}
             {completedToday.length > 0 && (
               <Collapsible open={completedOpen} onOpenChange={setCompletedOpen} className="mt-8">
@@ -744,10 +881,10 @@ const Index = () => {
                         isProcessing={isMarkingPaid}
                       />
                       {/* Ask for Review button after completion - only if google review link is configured */}
-                      {job.customer.mobile_phone && profile?.google_review_link && (
+                      {job.customer?.mobile_phone && profile?.google_review_link && (
                         <div className="mt-2 flex justify-end">
                           <AskForReviewButton
-                            customerName={job.customer.name}
+                            customerName={job.customer.name || 'Customer'}
                             customerPhone={job.customer.mobile_phone}
                             businessName={businessName}
                             googleReviewLink={profile.google_review_link}
@@ -793,9 +930,9 @@ const Index = () => {
             <AlertDialogDescription>
               {jobToSkip && (
                 <>
-                  This will reschedule <strong>{jobToSkip.customer.name}</strong> at{' '}
-                  <strong>{jobToSkip.customer.address}</strong> to the next scheduled interval 
-                  ({jobToSkip.customer.frequency_weeks} weeks from today).
+                  This will reschedule <strong>{jobToSkip.customer?.name || 'Customer'}</strong> at{' '}
+                  <strong>{jobToSkip.customer?.address || 'this address'}</strong> to the next scheduled interval 
+                  ({jobToSkip.customer?.frequency_weeks || 0} weeks from today).
                 </>
               )}
             </AlertDialogDescription>
@@ -855,10 +992,14 @@ const Index = () => {
         onConfirm={handleConfirmMarkPaid}
       />
 
-      <BottomNav />
-
       {/* Welcome Tour for first-time users */}
       {showTour && <WelcomeTour onComplete={completeTour} />}
+
+      {/* Business Name Modal for OAuth sign-ups */}
+      <BusinessNameModal
+        isOpen={showBusinessNameModal}
+        onComplete={handleBusinessNameComplete}
+      />
     </div>
   );
 };

@@ -4,9 +4,11 @@ import { JobWithCustomer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { CustomerNotesPreview } from './CustomerNotesPreview';
+import { TextCustomerButton } from './TextCustomerButton';
 import { Button } from './ui/button';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
+import { useSubscription } from '@/hooks/useSubscription';
 
 interface JobCardProps {
   job: JobWithCustomer;
@@ -25,6 +27,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
   const dragControls = useDragControls();
   const { lightTap, success } = useHaptics();
   const { requirePremium } = useSoftPaywall();
+  const { subscribed, status } = useSubscription();
   
   // Background colors based on swipe direction
   const backgroundColor = useTransform(
@@ -41,12 +44,18 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
 
   const handleDragEnd = (_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     setIsDragging(false);
+    
+    // Check if user has premium access (subscribed or trialing)
+    const hasPremium = subscribed || status === 'trialing';
+    
     if (info.offset.x < -SWIPE_THRESHOLD) {
-      if (!requirePremium('complete')) return;
+      // Show paywall modal if not premium, otherwise complete
+      if (!hasPremium && !requirePremium('complete')) return;
       triggerHaptic('medium');
       onComplete(job);
     } else if (info.offset.x > SWIPE_THRESHOLD) {
-      if (!requirePremium('skip')) return;
+      // Show paywall modal if not premium, otherwise skip
+      if (!hasPremium && !requirePremium('skip')) return;
       triggerHaptic('light');
       onSkip(job.id);
     }
@@ -64,6 +73,9 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
 
   const handleNavigate = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!job.customer?.address) {
+      return;
+    }
     const encodedAddress = encodeURIComponent(job.customer.address);
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     
@@ -76,7 +88,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
 
   const handleCall = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (job.customer.mobile_phone) {
+    if (job.customer?.mobile_phone) {
       window.open(`tel:${job.customer.mobile_phone.replace(/\s/g, '')}`, '_self');
     }
   };
@@ -154,26 +166,34 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
           
           {/* Content */}
           <div className="flex-1 min-w-0 p-4 flex flex-col justify-center">
-            <div className="flex items-start gap-2 mb-1">
-              <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <h3 className="font-semibold text-foreground text-base leading-tight truncate min-w-0">
-                {job.customer.address}
-              </h3>
-            </div>
-            <div className="flex items-center gap-3 mt-2">
-              <span className="text-xl font-bold text-foreground">
-                £{job.customer.price}
-              </span>
-              <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
-                {job.customer.name}
-              </span>
-              {/* Mandate Status Indicator */}
-              {job.customer.gocardless_mandate_status === 'pending' ? (
-                <span title="DD Pending"><Clock className="w-4 h-4 text-warning" /></span>
-              ) : job.customer.gocardless_id ? (
-                <span title="DD Active"><CreditCard className="w-4 h-4 text-success" /></span>
-              ) : null}
-            </div>
+            {job.customer ? (
+              <>
+                <div className="flex items-start gap-2 mb-1">
+                  <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                  <h3 className="font-semibold text-foreground text-base leading-tight truncate min-w-0">
+                    {job.customer.address || 'No address'}
+                  </h3>
+                </div>
+                <div className="flex items-center gap-3 mt-2">
+                  <span className="text-xl font-bold text-foreground">
+                    £{job.customer.price || 0}
+                  </span>
+                  <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
+                    {job.customer.name || 'Unknown Customer'}
+                  </span>
+                  {/* Mandate Status Indicator */}
+                  {job.customer.gocardless_mandate_status === 'pending' ? (
+                    <span title="DD Pending"><Clock className="w-4 h-4 text-warning" /></span>
+                  ) : job.customer.gocardless_id ? (
+                    <span title="DD Active"><CreditCard className="w-4 h-4 text-success" /></span>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Customer data unavailable
+              </div>
+            )}
 
             {/* Quick action buttons */}
             <div className="flex items-center gap-2 mt-3">
@@ -187,7 +207,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
                 Navigate
               </Button>
               
-              {job.customer.mobile_phone && (
+              {job.customer?.mobile_phone && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -199,41 +219,53 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
                 </Button>
               )}
               
-              {job.customer.notes && (
-                <CustomerNotesPreview notes={job.customer.notes} customerName={job.customer.name} />
+              {job.customer?.notes && (
+                <CustomerNotesPreview notes={job.customer.notes} customerName={job.customer.name || 'Customer'} />
               )}
             </div>
           </div>
 
-          {/* Action buttons column */}
-          <div className="flex flex-col border-l border-border">
-            {/* Skip Button */}
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={handleSkip}
-              className={cn(
-                "w-16 flex-1 flex items-center justify-center min-h-[52px]",
-                "bg-muted/50 hover:bg-muted transition-colors border-b border-border",
-                "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-muted"
-              )}
-              aria-label={`Skip ${job.customer.name}`}
-            >
-              <SkipForward className="w-5 h-5 text-muted-foreground" />
-            </motion.button>
+          {/* Action buttons section - horizontal layout: [Text] [Gap] [Skip] [Complete] */}
+          <div className="flex items-center gap-2 border-l border-border px-2 py-2 relative z-10">
+            {/* Text Customer Button - LEFT side, only renders if phone exists */}
+            <div className="flex-shrink-0">
+              <TextCustomerButton
+                phoneNumber={job.customer?.mobile_phone}
+                customerName={job.customer?.name || 'Customer'}
+                iconOnly={true}
+              />
+            </div>
+            
+            {/* Complete/Skip buttons - RIGHT side, always visible */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {/* Skip Button */}
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={handleSkip}
+                className={cn(
+                  "w-12 h-12 flex items-center justify-center flex-shrink-0",
+                  "bg-muted/50 hover:bg-muted transition-colors rounded-lg",
+                  "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-muted"
+                )}
+                aria-label={`Skip ${job.customer?.name || 'job'}`}
+              >
+                <SkipForward className="w-5 h-5 text-muted-foreground" />
+              </motion.button>
 
-            {/* Complete Button */}
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={handleComplete}
-              className={cn(
-                "w-16 flex-1 flex items-center justify-center min-h-[52px]",
-                "bg-success hover:bg-success/90 transition-colors",
-                "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-success"
-              )}
-              aria-label={`Mark ${job.customer.name} as complete`}
-            >
-              <Check className="w-6 h-6 text-success-foreground" strokeWidth={3} />
-            </motion.button>
+              {/* Complete Button */}
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={handleComplete}
+                className={cn(
+                  "w-12 h-12 flex items-center justify-center flex-shrink-0",
+                  "bg-success hover:bg-success/90 transition-colors rounded-lg",
+                  "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-success"
+                )}
+                aria-label={`Mark ${job.customer?.name || 'job'} as complete`}
+              >
+                <Check className="w-5 h-5 text-success-foreground" strokeWidth={3} />
+              </motion.button>
+            </div>
           </div>
         </div>
       </motion.div>

@@ -109,7 +109,7 @@ export function CalendarAddCustomerModal({
           </div>
         </DrawerHeader>
 
-        <form onSubmit={handleSubmit} autoComplete="off" className="px-6 pb-10 overflow-y-auto flex-1">
+        <form onSubmit={handleSubmit} autoComplete="off" className="px-6 pb-4 overflow-y-auto flex-1">
           <div className="space-y-3">
             {/* Name */}
             <FormField 
@@ -184,19 +184,21 @@ export function CalendarAddCustomerModal({
             Defaults: 4 week frequency • Add phone/notes later in Customers
           </p>
 
-          {/* Submit Button */}
-          <Button
-            type="submit"
-            disabled={isSubmitting || !name.trim() || !address.trim()}
-            className={cn(
-              "w-full mt-4 fat-button rounded-xl",
-              "bg-primary hover:bg-primary/90 text-primary-foreground",
-              "font-semibold text-base",
-              "disabled:opacity-50"
-            )}
-          >
-            {isSubmitting ? 'Adding...' : `Add & Schedule for ${format(selectedDate, 'd MMM')}`}
-          </Button>
+          {/* Submit Button - Sticky at bottom */}
+          <div className="sticky bottom-0 bg-background pt-4 pb-2 -mx-6 px-6 border-t border-border mt-4">
+            <Button
+              type="submit"
+              disabled={isSubmitting || !name.trim() || !address.trim()}
+              className={cn(
+                "w-full fat-button rounded-xl",
+                "bg-primary hover:bg-primary/90 text-primary-foreground",
+                "font-semibold text-base",
+                "disabled:opacity-50"
+              )}
+            >
+              {isSubmitting ? 'Adding...' : `Add & Schedule for ${format(selectedDate, 'd MMM')}`}
+            </Button>
+          </div>
         </form>
       </DrawerContent>
     </Drawer>

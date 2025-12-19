@@ -45,6 +45,23 @@ export function RescheduleJobModal({
     }
   }, [job, open]);
 
+  // Reset selected date when job changes or modal opens
+  // Using useEffect instead of setState in render to prevent React warnings/infinite loops
+  useEffect(() => {
+    if (job && open) {
+      setSelectedDate(new Date(job.scheduled_date));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [job?.id, open]); // Only reset when job.id changes or modal opens (job object reference may change)
+
+  // Clean up state when modal closes
+  useEffect(() => {
+    if (!open) {
+      setSelectedDate(undefined);
+      setIsSubmitting(false);
+    }
+  }, [open]);
+
   const handleReschedule = async () => {
     if (!job || !selectedDate) return;
     
@@ -65,18 +82,18 @@ export function RescheduleJobModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[425px] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Reschedule Job</DialogTitle>
           <DialogDescription className="sr-only">Select a new date for this job</DialogDescription>
         </DialogHeader>
         
         {job && (
-          <div className="space-y-6 py-4">
+          <div className="space-y-6 py-4 overflow-y-auto flex-1">
             {/* Customer info */}
             <div className="space-y-1">
-              <p className="font-medium text-foreground">{job.customer.name}</p>
-              <p className="text-sm text-muted-foreground">{job.customer.address}</p>
+              <p className="font-medium text-foreground">{job.customer?.name || 'Unknown Customer'}</p>
+              <p className="text-sm text-muted-foreground">{job.customer?.address || 'No address'}</p>
             </div>
 
             {/* Date picker */}
