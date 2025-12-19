@@ -225,27 +225,25 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
             </div>
           </div>
 
-          {/* Action buttons section - horizontal layout */}
-          <div className="flex items-center gap-2 border-l border-border px-2 relative z-10">
-            {/* Text Customer Button - LEFT side, only show if phone exists */}
-            {job.customer?.mobile_phone && (
-              <div className="flex-shrink-0">
-                <TextCustomerButton
-                  phoneNumber={job.customer.mobile_phone}
-                  customerName={job.customer?.name || 'Customer'}
-                  iconOnly={true}
-                />
-              </div>
-            )}
+          {/* Action buttons section - horizontal layout: [Text] [Gap] [Skip] [Complete] */}
+          <div className="flex items-center gap-2 border-l border-border px-2 py-2 relative z-10">
+            {/* Text Customer Button - LEFT side, only renders if phone exists */}
+            <div className="flex-shrink-0">
+              <TextCustomerButton
+                phoneNumber={job.customer?.mobile_phone}
+                customerName={job.customer?.name || 'Customer'}
+                iconOnly={true}
+              />
+            </div>
             
-            {/* Complete/Skip buttons - RIGHT side, horizontal */}
+            {/* Complete/Skip buttons - RIGHT side, always visible */}
             <div className="flex items-center gap-1 flex-shrink-0">
               {/* Skip Button */}
               <motion.button
                 whileTap={{ scale: 0.95 }}
                 onClick={handleSkip}
                 className={cn(
-                  "w-12 h-12 flex items-center justify-center",
+                  "w-12 h-12 flex items-center justify-center flex-shrink-0",
                   "bg-muted/50 hover:bg-muted transition-colors rounded-lg",
                   "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-muted"
                 )}
@@ -259,7 +257,7 @@ export function JobCard({ job, onComplete, onSkip, index, isNextUp = false }: Jo
                 whileTap={{ scale: 0.95 }}
                 onClick={handleComplete}
                 className={cn(
-                  "w-12 h-12 flex items-center justify-center",
+                  "w-12 h-12 flex items-center justify-center flex-shrink-0",
                   "bg-success hover:bg-success/90 transition-colors rounded-lg",
                   "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-success"
                 )}
