@@ -43,8 +43,12 @@ export function generateXeroCSV(jobs: ExportJob[], businessName: string): string
       : invoiceDate;
     
     const amount = job.amount_collected || 0;
-    const platformFee = calculatePlatformFee(amount);
-    const processingFee = calculateProcessingFee(amount);
+    
+    // Application fees ONLY apply to GoCardless transactions
+    // Cash and Bank Transfer payments have NO fees
+    const isGoCardless = job.payment_method === 'gocardless';
+    const platformFee = isGoCardless ? calculatePlatformFee(amount) : 0;
+    const processingFee = isGoCardless ? calculateProcessingFee(amount) : 0;
     const netPayout = amount - platformFee - processingFee;
     
     return [
@@ -57,9 +61,9 @@ export function generateXeroCSV(jobs: ExportJob[], businessName: string): string
       'Window Cleaning Service',                            // Description
       '1',                                                  // Quantity
       amount.toFixed(2),                                    // UnitAmount
-      platformFee.toFixed(2),                               // PlatformFee
-      processingFee.toFixed(2),                             // ProcessingFee
-      netPayout.toFixed(2),                                 // NetPayout
+      platformFee.toFixed(2),                               // PlatformFee (0 for cash/transfer)
+      processingFee.toFixed(2),                             // ProcessingFee (0 for cash/transfer)
+      netPayout.toFixed(2),                                 // NetPayout (equals amount for cash/transfer)
       '200',                                                // AccountCode (Sales)
       'No VAT',                                             // TaxType
       'GBP',                                                // Currency
