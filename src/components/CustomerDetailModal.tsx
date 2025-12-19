@@ -118,7 +118,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             onClick={(e) => e.stopPropagation()}
-            className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto safe-bottom"
+            className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto safe-bottom flex flex-col"
           >
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-2">
@@ -145,7 +145,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
               </button>
             </div>
 
-            <div className="px-6 pb-8 pt-2">
+            <div className="px-6 pb-8 pt-2 flex-1 overflow-y-auto">
               {/* Customer Name */}
               <h2 className="text-2xl font-bold text-foreground mb-6">
                 {customer.name}

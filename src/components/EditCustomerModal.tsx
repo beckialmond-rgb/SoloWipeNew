@@ -110,7 +110,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[90vh] overflow-y-auto safe-bottom"
+          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[90vh] overflow-y-auto safe-bottom flex flex-col"
         >
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-2">
@@ -127,7 +127,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          <form onSubmit={handleSubmit} className="px-6 pb-8 pt-2">
+          <form onSubmit={handleSubmit} className="px-6 pb-8 pt-2 flex-1 overflow-y-auto">
             <h2 className="text-2xl font-bold text-foreground mb-6">Edit Customer</h2>
 
             <div className="space-y-4">
@@ -251,19 +251,21 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
               </FormField>
             </div>
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              disabled={isSubmitting || !name.trim() || !address.trim()}
-              className={cn(
-                "w-full mt-6 fat-button rounded-xl",
-                "bg-primary hover:bg-primary/90 text-primary-foreground",
-                "font-semibold text-base",
-                "disabled:opacity-50"
-              )}
-            >
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </Button>
+            {/* Submit Button - Sticky at bottom */}
+            <div className="sticky bottom-0 bg-card pt-4 -mx-6 px-6 border-t border-border mt-6">
+              <Button
+                type="submit"
+                disabled={isSubmitting || !name.trim() || !address.trim()}
+                className={cn(
+                  "w-full fat-button rounded-xl",
+                  "bg-primary hover:bg-primary/90 text-primary-foreground",
+                  "font-semibold text-base",
+                  "disabled:opacity-50"
+                )}
+              >
+                {isSubmitting ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
           </form>
         </motion.div>
       </motion.div>

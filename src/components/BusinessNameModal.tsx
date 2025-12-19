@@ -77,15 +77,15 @@ export function BusinessNameModal({ isOpen, onComplete }: BusinessNameModalProps
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md flex flex-col" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-2xl">Welcome to SoloWipe!</DialogTitle>
           <DialogDescription>
             We need your business name to get started. You can change this later in Settings.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1">
           <div className="relative">
             <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <input
@@ -104,18 +104,21 @@ export function BusinessNameModal({ isOpen, onComplete }: BusinessNameModalProps
             />
           </div>
 
-          <Button
-            type="submit"
-            disabled={isSubmitting || !businessName.trim()}
-            className={cn(
-              "w-full h-14 rounded-xl",
-              "bg-primary hover:bg-primary/90 text-primary-foreground",
-              "font-semibold text-base",
-              "disabled:opacity-50"
-            )}
-          >
-            {isSubmitting ? 'Saving...' : 'Continue'}
-          </Button>
+          {/* Submit Button - Sticky at bottom */}
+          <div className="sticky bottom-0 bg-background pt-4 -mx-6 px-6 border-t border-border">
+            <Button
+              type="submit"
+              disabled={isSubmitting || !businessName.trim()}
+              className={cn(
+                "w-full h-14 rounded-xl",
+                "bg-primary hover:bg-primary/90 text-primary-foreground",
+                "font-semibold text-base",
+                "disabled:opacity-50"
+              )}
+            >
+              {isSubmitting ? 'Saving...' : 'Continue'}
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

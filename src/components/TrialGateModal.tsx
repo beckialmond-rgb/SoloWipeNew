@@ -99,12 +99,12 @@ export function TrialGateModal() {
 
   return (
     <Dialog open={isModalOpen} onOpenChange={(open) => !open && closePaywall()}>
-      <DialogContent className="sm:max-w-[420px] p-0 overflow-hidden border-0 shadow-2xl">
+      <DialogContent className="sm:max-w-[420px] p-0 border-0 shadow-2xl max-h-[85vh] overflow-y-auto flex flex-col">
         {/* Animated gradient header */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className={`relative p-8 text-primary-foreground overflow-hidden ${
+          className={`relative p-8 text-primary-foreground flex-shrink-0 ${
             isTrialExpired 
               ? 'bg-gradient-to-br from-warning via-warning to-warning/70' 
               : 'bg-gradient-to-br from-primary via-primary to-primary/70'
@@ -154,7 +154,7 @@ export function TrialGateModal() {
         </motion.div>
 
         {/* Content */}
-        <div className="p-6 space-y-6 bg-background">
+        <div className="p-6 space-y-6 bg-background flex-1">
           {/* Value props with highlights */}
           <div className="space-y-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

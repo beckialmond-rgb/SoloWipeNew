@@ -71,7 +71,7 @@ export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalPro
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto"
+          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[85vh] overflow-y-auto flex flex-col"
         >
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-2">
@@ -88,7 +88,7 @@ export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalPro
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          <div className="px-6 pb-24 pt-2">
+          <div className="px-6 pb-6 pt-2 flex-1 overflow-y-auto">
             <div className="flex items-center gap-2 mb-2">
               <StickyNote className="w-5 h-5 text-amber-500" />
               <h2 className="text-xl font-bold text-foreground">Job Notes</h2>
@@ -124,25 +124,28 @@ export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalPro
               />
             </FormField>
 
-            <div className="flex gap-3 mt-4">
-              <Button
-                variant="outline"
-                onClick={handleClose}
-                disabled={isSaving}
-                className="flex-1 h-12 rounded-xl"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={isSaving}
-                className={cn(
-                  "flex-1 h-12 rounded-xl",
-                  "bg-primary hover:bg-primary/90 text-primary-foreground"
-                )}
-              >
-                {isSaving ? 'Saving...' : 'Save Notes'}
-              </Button>
+            {/* Buttons - Sticky at bottom */}
+            <div className="sticky bottom-0 bg-card pt-4 -mx-6 px-6 border-t border-border mt-4">
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleClose}
+                  disabled={isSaving}
+                  className="flex-1 h-12 rounded-xl"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className={cn(
+                    "flex-1 h-12 rounded-xl",
+                    "bg-primary hover:bg-primary/90 text-primary-foreground"
+                  )}
+                >
+                  {isSaving ? 'Saving...' : 'Save Notes'}
+                </Button>
+              </div>
             </div>
           </div>
         </motion.div>

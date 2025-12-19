@@ -68,7 +68,7 @@ export const BatchPaymentModal = ({
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="bg-card w-full max-w-lg rounded-t-3xl p-6 pb-24 max-h-[85vh] overflow-y-auto"
+          className="bg-card w-full max-w-lg rounded-t-3xl p-6 pb-6 max-h-[85vh] overflow-y-auto flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between mb-6">
@@ -123,21 +123,23 @@ export const BatchPaymentModal = ({
             </Button>
           </div>
 
-          {/* Confirm button */}
-          <Button
-            className="w-full h-14 text-lg font-semibold bg-green-600 hover:bg-green-700"
-            onClick={handleConfirm}
-            disabled={!selectedMethod || isProcessing}
-          >
-            {isProcessing ? (
-              'Processing...'
-            ) : (
-              <>
-                <CheckCircle className="w-5 h-5 mr-2" />
-                Confirm Payment
-              </>
-            )}
-          </Button>
+          {/* Confirm button - Sticky at bottom */}
+          <div className="sticky bottom-0 bg-card pt-4 -mx-6 px-6 border-t border-border mt-auto">
+            <Button
+              className="w-full h-14 text-lg font-semibold bg-green-600 hover:bg-green-700"
+              onClick={handleConfirm}
+              disabled={!selectedMethod || isProcessing}
+            >
+              {isProcessing ? (
+                'Processing...'
+              ) : (
+                <>
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                  Confirm Payment
+                </>
+              )}
+            </Button>
+          </div>
         </motion.div>
       </motion.div>
       )}
