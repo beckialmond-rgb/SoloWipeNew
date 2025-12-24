@@ -251,6 +251,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
                   )}
                 />
               </FormField>
+              </div>
             </div>
 
             {/* Submit Button - Sticky at bottom */}
