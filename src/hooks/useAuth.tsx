@@ -1,7 +1,6 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { getSupabaseInitError, supabase } from '@/integrations/supabase/client';
-import { DEFAULT_BUSINESS_NAME } from '@/constants/app';
 
 import { Provider } from '@supabase/supabase-js';
 
@@ -20,7 +19,6 @@ interface AuthContextType {
   signInWithOAuth: (provider: Provider) => Promise<{ error: Error | null }>;
   resendVerificationEmail: (email: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  deleteAccount: () => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,15 +49,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const {
         data: { subscription: sub },
       } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
-        // Log auth state changes for debugging
-        console.log('[Auth State Change]', {
-          event,
-          hasSession: !!nextSession,
-          hasUser: !!nextSession?.user,
-          userId: nextSession?.user?.id,
-          provider: nextSession?.user?.app_metadata?.provider,
-        });
-        
         // Handle OAuth sign-up - ensure profile exists and has business_name
         if (event === 'SIGNED_IN' && nextSession?.user) {
           // Check if this is a Google OAuth user
@@ -77,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   .maybeSingle();
 
                 // If profile exists but business_name is default, mark for update
-                if (!error && profile && profile.business_name === DEFAULT_BUSINESS_NAME) {
+                if (!error && profile && profile.business_name === 'My Window Cleaning') {
                   // Store flag to show business name collection modal
                   sessionStorage.setItem('needs_business_name', 'true');
                   // Trigger a custom event to notify components
@@ -208,7 +197,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const redirectUrl = `${window.location.origin}/`;
     
     try {
-      console.log('[SignUp] Attempting signup for:', email);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -219,52 +207,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           },
         },
       });
-      
-      if (error) {
-        console.error('[SignUp] Supabase signup error:', {
-          message: error.message,
-          status: error.status,
-          name: error.name,
-        });
-        return { error: new Error(error.message), needsEmailConfirmation: false };
-      }
-      
-      console.log('[SignUp] Signup successful:', {
-        hasSession: !!data.session,
-        hasUser: !!data.user,
-        userId: data.user?.id,
-      });
-      
       // If email confirmations are enabled, Supabase returns no session.
       // Treat that as a successful signup that still needs verification.
       const needsEmailConfirmation = !data.session;
-      
-      // If we have a session, verify profile was created (with a small delay for trigger)
-      if (data.session && data.user) {
-        setTimeout(async () => {
-          try {
-            const { data: profile, error: profileError } = await supabase
-              .from('profiles')
-              .select('id, business_name')
-              .eq('id', data.user.id)
-              .maybeSingle();
-            
-            if (profileError) {
-              console.error('[SignUp] Profile check error:', profileError);
-            } else if (!profile) {
-              console.warn('[SignUp] Profile not found after signup - trigger may have failed');
-            } else {
-              console.log('[SignUp] Profile created successfully:', profile.business_name);
-            }
-          } catch (err) {
-            console.error('[SignUp] Error checking profile:', err);
-          }
-        }, 1000);
-      }
-      
-      return { error: null, needsEmailConfirmation };
+      return { error: error ? new Error(error.message) : null, needsEmailConfirmation };
     } catch (err) {
-      console.error('[SignUp] Unexpected error during signup:', err);
       return {
         error: err instanceof Error ? err : new Error('Sign up failed'),
         needsEmailConfirmation: false,
@@ -275,47 +222,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithOAuth = async (provider: Provider) => {
     if (supabaseError) return { error: supabaseError };
     try {
-      // Construct redirect URL - redirect authenticated users directly to dashboard
-      const origin = window.location.origin;
-      const redirectTo = `${origin}/dashboard`;
-      
-      console.log('[OAuth] Initiating sign-in with provider:', provider);
-      console.log('[OAuth] Current origin:', origin);
-      console.log('[OAuth] Redirect URL:', redirectTo);
-      console.log('[OAuth] ⚠️ Make sure this redirect URL is registered in Supabase Dashboard → Authentication → URL Configuration');
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo,
-          // Google OAuth query parameters for optimal UX
-          // - prompt: 'select_account' shows account selection without forcing consent screen
-          // - This provides better UX for returning users while still allowing account switching
-          ...(provider === 'google' ? {
-            queryParams: {
-              prompt: 'select_account',
-              // access_type: 'offline' only needed if we use refresh tokens
-              // Supabase handles token management, so we don't need to explicitly request offline access
-            },
-          } : {}),
+          redirectTo: `${window.location.origin}/`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
-      
-      if (error) {
-        console.error('[OAuth] Sign-in error:', error);
-        return { error: new Error(error.message) };
-      }
-      
-      // If we get a URL back, Supabase will redirect automatically
-      // The session will be handled by the auth state listener
-      if (data?.url) {
-        console.log('[OAuth] Redirecting to OAuth provider...');
-        // Supabase will handle the redirect automatically
-      }
-      
-      return { error: null };
+      return { error: error ? new Error(error.message) : null };
     } catch (err) {
-      console.error('[OAuth] Unexpected error:', err);
       return { error: err instanceof Error ? err : new Error('OAuth sign-in failed') };
     }
   };
@@ -339,60 +257,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     if (supabaseError) return;
     try {
-      // Await Supabase sign-out
       await supabase.auth.signOut();
-      
-      // Manually clear localStorage to ensure session is gone
-      window.localStorage.clear();
-      
-      // Force a hard page refresh to the login screen
-      window.location.assign('/auth');
     } catch (err) {
       console.error('Sign out failed:', err);
-      // Even if signOut fails, clear storage and redirect
-      window.localStorage.clear();
-      window.location.assign('/auth');
-    }
-  };
-
-  const deleteAccount = async () => {
-    if (supabaseError) return { error: supabaseError };
-    if (!user?.id) return { error: new Error('No user logged in') };
-
-    try {
-      console.log('[deleteAccount] Starting account deletion process...');
-
-      // Call edge function to handle all cleanup and deletion
-      // The edge function will:
-      // 1. Cancel Stripe subscription (if active)
-      // 2. Disconnect GoCardless (if connected)
-      // 3. Delete storage files (job photos)
-      // 4. Delete the auth user (cascades to profiles, customers, jobs)
-      const { data: functionData, error: functionError } = await supabase.functions.invoke('delete-account');
-
-      if (functionError) {
-        console.error('[deleteAccount] Failed to delete account:', functionError);
-        return { error: new Error(functionError.message || 'Failed to delete account. Please contact support.') };
-      }
-
-      if (functionData?.error) {
-        console.error('[deleteAccount] Edge function returned error:', functionData.error);
-        return { error: new Error(functionData.error || 'Failed to delete account') };
-      }
-
-      console.log('[deleteAccount] Account deleted successfully');
-
-      // Clear all local storage
-      window.localStorage.clear();
-      window.sessionStorage.clear();
-
-      // Redirect to auth page
-      window.location.assign('/auth?deleted=true');
-
-      return { error: null };
-    } catch (err) {
-      console.error('[deleteAccount] Unexpected error:', err);
-      return { error: err instanceof Error ? err : new Error('Failed to delete account') };
     }
   };
 
@@ -408,7 +275,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signInWithOAuth,
       resendVerificationEmail,
       signOut,
-      deleteAccount,
     }}>
       {children}
     </AuthContext.Provider>

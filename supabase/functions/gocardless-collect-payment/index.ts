@@ -1,38 +1,106 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.87.1";
-import {
-  getCorsHeaders,
-  decryptToken,
-  isValidUUID,
-  isValidAmount,
-  sanitizeString,
-  makeGoCardlessRequest,
-  validateGoCardlessToken,
-  logError,
-  logInfo,
-  createErrorResponse,
-} from "../_shared/gocardless-utils.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Encryption key derived from a secret - matches gocardless-callback
+async function getEncryptionKey(): Promise<CryptoKey> {
+  const secret = Deno.env.get('SERVICE_ROLE_KEY') || 'fallback-secret-key';
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret.slice(0, 32).padEnd(32, '0')),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveKey']
+  );
+  
+  return crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: encoder.encode('gocardless-token-salt'),
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function decryptToken(encrypted: string): Promise<string> {
+  try {
+    const key = await getEncryptionKey();
+    const decoder = new TextDecoder();
+    
+    // Decode base64
+    const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+    
+    // Extract IV (first 12 bytes) and encrypted data
+    const iv = combined.slice(0, 12);
+    const encryptedData = combined.slice(12);
+    
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      encryptedData
+    );
+    
+    return decoder.decode(decrypted);
+  } catch (error) {
+    // Fallback for legacy Base64 encoded tokens (migration support)
+    console.log('[GC-COLLECT] Attempting legacy token decryption');
+    try {
+      const decoded = atob(encrypted);
+      if (decoded.startsWith('gc_token_')) {
+        return decoded.replace('gc_token_', '');
+      }
+    } catch {
+      // Not a legacy token either
+    }
+    throw new Error('Failed to decrypt token');
+  }
+}
+
+// Input validation helpers
+function isValidUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+function isValidAmount(amount: unknown): amount is number {
+  return typeof amount === 'number' && 
+         !isNaN(amount) && 
+         isFinite(amount) && 
+         amount > 0 && 
+         amount <= 100000; // Max £100,000 per payment
+}
+
+function sanitizeDescription(description: unknown): string {
+  if (typeof description !== 'string') return '';
+  // Remove any potentially harmful characters, limit length
+  return description
+    .replace(/[<>"'&]/g, '')
+    .slice(0, 200)
+    .trim();
+}
 
 serve(async (req) => {
-  const requestId = crypto.randomUUID().slice(0, 8);
-  const origin = req.headers.get('Origin');
-  const corsHeaders = getCorsHeaders(origin);
-
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Access-Control-Max-Age': '86400',
-      },
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      logError('COLLECT_PAYMENT', new Error('No authorization header'), { requestId });
-      return createErrorResponse('No authorization header', 401);
+      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const supabaseClient = createClient(
@@ -43,40 +111,45 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
-      logError('COLLECT_PAYMENT', userError || new Error('Unauthorized'), { requestId });
-      return createErrorResponse('Unauthorized', 401);
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    logInfo('COLLECT_PAYMENT', `Starting payment collection for user ${user.id}`, { requestId, userId: user.id });
+    console.log(`💰 Starting GoCardless flow for user ${user.id}...`);
 
     const body = await req.json();
     const { jobId, customerId, amount, description } = body;
 
     // Validate inputs
     if (!jobId || !isValidUUID(jobId)) {
-      logError('COLLECT_PAYMENT', new Error('Invalid job ID format'), { requestId, jobId });
-      return createErrorResponse('Invalid job ID format', 400);
+      return new Response(JSON.stringify({ error: 'Invalid job ID format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (!customerId || !isValidUUID(customerId)) {
-      logError('COLLECT_PAYMENT', new Error('Invalid customer ID format'), { requestId, customerId });
-      return createErrorResponse('Invalid customer ID format', 400);
+      return new Response(JSON.stringify({ error: 'Invalid customer ID format' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (!isValidAmount(amount)) {
-      logError('COLLECT_PAYMENT', new Error('Invalid amount'), { requestId, amount });
-      return createErrorResponse('Invalid amount. Must be between £0.01 and £100,000', 400);
+      return new Response(JSON.stringify({ error: 'Invalid amount. Must be between £0.01 and £100,000' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    const sanitizedDescription = sanitizeString(description, 200);
+    const sanitizedDescription = sanitizeDescription(description);
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY');
-    if (!supabaseUrl || !serviceRoleKey) {
-      logError('COLLECT_PAYMENT', new Error('Server configuration error'), { requestId });
-      return createErrorResponse('Server configuration error', 500);
-    }
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+    );
 
     // Get user's GoCardless credentials and customer's mandate
     const { data: profile, error: profileError } = await adminClient
@@ -86,86 +159,69 @@ serve(async (req) => {
       .single();
 
     if (profileError || !profile?.gocardless_access_token_encrypted) {
-      logError('COLLECT_PAYMENT', profileError || new Error('GoCardless not connected'), {
-        requestId,
-        userId: user.id,
-        hasToken: !!profile?.gocardless_access_token_encrypted,
+      return new Response(JSON.stringify({ error: 'GoCardless not connected' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
-      return createErrorResponse('GoCardless not connected', 400, { requiresReconnect: false });
     }
 
-    // SECURITY: Validate customer belongs to authenticated user
     const { data: customer, error: customerError } = await adminClient
       .from('customers')
-      .select('gocardless_id, name, gocardless_mandate_status')
+      .select('gocardless_id, name')
       .eq('id', customerId)
-      .eq('profile_id', user.id) // CRITICAL: Ensure customer belongs to user
       .single();
 
     if (customerError || !customer?.gocardless_id) {
-      logError('COLLECT_PAYMENT', customerError || new Error('No active mandate'), {
-        requestId,
-        customerId,
-        hasMandate: !!customer?.gocardless_id,
-      });
-      return createErrorResponse('Customer does not have an active Direct Debit mandate', 400);
-    }
-
-    // CRITICAL: Validate mandate status before attempting payment
-    // This prevents payment failures due to cancelled/expired mandates
-    const mandateStatus = customer.gocardless_mandate_status;
-    if (mandateStatus !== 'active') {
-      logError('COLLECT_PAYMENT', new Error(`Mandate not active: ${mandateStatus}`), {
-        requestId,
-        customerId,
-        customerName: customer.name,
-        mandateId: customer.gocardless_id,
-        mandateStatus,
-      });
-      
-      let errorMessage = 'Direct Debit mandate is not active. ';
-      if (mandateStatus === 'pending') {
-        errorMessage += 'The mandate is still pending customer authorization. Please wait for the customer to complete setup.';
-      } else if (mandateStatus === 'cancelled') {
-        errorMessage += 'The customer has cancelled their Direct Debit. Please set up a new mandate.';
-      } else if (mandateStatus === 'expired') {
-        errorMessage += 'The mandate has expired. Please set up a new mandate.';
-      } else if (mandateStatus === 'failed') {
-        errorMessage += 'The mandate setup failed. Please set up a new mandate.';
-      } else {
-        errorMessage += `Current status: ${mandateStatus || 'unknown'}. Please check the customer's mandate status.`;
-      }
-      
-      return createErrorResponse(errorMessage, 400, {
-        mandateStatus,
-        requiresNewMandate: ['cancelled', 'expired', 'failed'].includes(mandateStatus || ''),
+      return new Response(JSON.stringify({ error: 'Customer does not have an active Direct Debit mandate' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const accessToken = await decryptToken(profile.gocardless_access_token_encrypted);
-    
-    logInfo('COLLECT_PAYMENT', 'Payment collection started', {
-      requestId,
-      userId: user.id,
-      customerId,
-      customerName: customer.name,
-      mandateId: customer.gocardless_id,
-      amount,
-      jobId,
+    const environment = Deno.env.get('GOCARDLESS_ENVIRONMENT') || 'sandbox';
+    const apiUrl = environment === 'live'
+      ? 'https://api.gocardless.com'
+      : 'https://api-sandbox.gocardless.com';
+
+    console.log('[GC-COLLECT] ====================================');
+    console.log('[GC-COLLECT] PAYMENT COLLECTION STARTED');
+    console.log('[GC-COLLECT] ====================================');
+    console.log('[GC-COLLECT] Environment:', environment);
+    console.log('[GC-COLLECT] API URL:', apiUrl);
+    console.log('[GC-COLLECT] Customer:', customer.name);
+    console.log('[GC-COLLECT] Customer GC ID (Mandate):', customer.gocardless_id);
+    console.log('[GC-COLLECT] Amount:', amount, 'GBP');
+    console.log('[GC-COLLECT] Job ID:', jobId);
+    console.log('[GC-COLLECT] Token (masked):', accessToken ? `${accessToken.substring(0, 8)}...${accessToken.substring(accessToken.length - 4)}` : 'MISSING');
+
+    // Validate token with a test API call
+    console.log('[GC-COLLECT] Step 1: Validating access token...');
+    const testResponse = await fetch(`${apiUrl}/creditors`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'GoCardless-Version': '2015-07-06',
+      },
     });
 
-    // Validate token with retry logic
-    logInfo('COLLECT_PAYMENT', 'Validating access token', { requestId });
-    const isTokenValid = await validateGoCardlessToken(accessToken);
-    
-    if (!isTokenValid) {
-      logError('COLLECT_PAYMENT', new Error('Token validation failed'), { requestId });
-      return createErrorResponse('GoCardless connection expired. Please reconnect in Settings.', 401, {
-        requiresReconnect: true,
+    if (!testResponse.ok) {
+      const testError = await testResponse.text();
+      console.error('[GC-COLLECT] ❌ Token validation FAILED');
+      console.error('[GC-COLLECT] Status:', testResponse.status);
+      console.error('[GC-COLLECT] Error:', testError);
+      return new Response(JSON.stringify({ 
+        error: 'GoCardless connection expired. Please reconnect in Settings.',
+        requiresReconnect: true 
+      }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    logInfo('COLLECT_PAYMENT', 'Token validated successfully', { requestId });
+    const creditorData = await testResponse.json();
+    console.log('[GC-COLLECT] ✅ Token validated successfully');
+    console.log('[GC-COLLECT] Creditor:', creditorData?.creditors?.[0]?.name || 'Unknown');
 
     // Create payment with sanitized description
     const paymentDescription = sanitizedDescription || `Window cleaning - ${customer.name.slice(0, 50)}`;
@@ -173,258 +229,94 @@ serve(async (req) => {
     // Calculate amounts
     const amountInPence = Math.round(amount * 100);
     
-    // Calculate SoloWipe Service Fee: (amount in pence × 0.75%) + 30p, rounded to nearest integer
-    // This is the platform commission on top of GoCardless fees
-    const appFee = Math.round((amountInPence * 0.0075) + 30);
+    // Calculate app fee: (amount in pence × 0.75%) + 20p, rounded to nearest integer
+    const appFee = Math.round((amountInPence * 0.0075) + 20);
     
-    logInfo('COLLECT_PAYMENT', 'Creating payment', {
-      requestId,
-      amountInPence,
-      appFee,
-      description: paymentDescription,
-    });
+    console.log('[GC-COLLECT] Amount in pence:', amountInPence);
+    console.log('[GC-COLLECT] App fee (pence):', appFee);
     
-    // CRITICAL: Verify mandate is still active in GoCardless before creating payment
-    // This prevents race conditions where mandate is cancelled between job completion and payment
-    logInfo('COLLECT_PAYMENT', 'Verifying mandate status in GoCardless', {
-      requestId,
-      mandateId: customer.gocardless_id,
-    });
-    
-    try {
-      const mandateResponse = await makeGoCardlessRequest(
-        `/mandates/${customer.gocardless_id}`,
-        {
-          method: 'GET',
+    const paymentResponse = await fetch(`${apiUrl}/payments`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'GoCardless-Version': '2015-07-06',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        payments: {
+          amount: amountInPence,
+          currency: 'GBP',
+          description: paymentDescription,
+          app_fee: appFee,
+          links: {
+            mandate: customer.gocardless_id,
+          },
+          metadata: {
+            job_id: jobId,
+            customer_id: customerId,
+          },
         },
-        accessToken,
-        {
-          maxRetries: 2,
-          initialDelay: 500,
-          timeout: 10000, // 10 second timeout for mandate check
-        }
-      );
+      }),
+    });
+
+    console.log('[GC-COLLECT] Step 2: Payment API Response Status:', paymentResponse.status);
+
+    if (!paymentResponse.ok) {
+      const errorText = await paymentResponse.text();
+      console.error('[GC-COLLECT] ❌ Payment creation FAILED');
+      console.error('[GC-COLLECT] Status:', paymentResponse.status);
+      console.error('[GC-COLLECT] Error:', errorText);
       
-      const mandateData = await mandateResponse.json();
-      const mandateStatus = mandateData?.mandates?.status;
-      
-      if (mandateStatus !== 'active') {
-        logError('COLLECT_PAYMENT', new Error(`Mandate status in GoCardless is ${mandateStatus}, not active`), {
-          requestId,
-          mandateId: customer.gocardless_id,
-          mandateStatus,
-          customerId,
-        });
-        
-        // Update customer record to reflect actual status
-        // SECURITY: Validate ownership before update
-        await adminClient
-          .from('customers')
-          .update({
-            gocardless_mandate_status: mandateStatus,
-            ...(mandateStatus !== 'active' ? { gocardless_id: null } : {}),
-          })
-          .eq('id', customerId)
-          .eq('profile_id', user.id); // CRITICAL: Ensure customer belongs to user
-        
-        let errorMessage = 'Direct Debit mandate is not active in GoCardless. ';
-        if (mandateStatus === 'pending') {
-          errorMessage += 'The mandate is still pending. Please wait for the customer to complete setup.';
-        } else if (mandateStatus === 'cancelled') {
-          errorMessage += 'The customer has cancelled their Direct Debit. Please set up a new mandate.';
-        } else if (mandateStatus === 'expired') {
-          errorMessage += 'The mandate has expired. Please set up a new mandate.';
-        } else if (mandateStatus === 'failed') {
-          errorMessage += 'The mandate setup failed. Please set up a new mandate.';
-        } else {
-          errorMessage += `Current status: ${mandateStatus || 'unknown'}.`;
-        }
-        
-        return createErrorResponse(errorMessage, 400, {
-          mandateStatus,
-          requiresNewMandate: ['cancelled', 'expired', 'failed'].includes(mandateStatus || ''),
-        });
+      // Parse error for more details
+      try {
+        const errorJson = JSON.parse(errorText);
+        console.error('[GC-COLLECT] Error type:', errorJson?.error?.type);
+        console.error('[GC-COLLECT] Error message:', errorJson?.error?.message);
+        console.error('[GC-COLLECT] Error errors:', JSON.stringify(errorJson?.error?.errors));
+      } catch {
+        // Not JSON, already logged raw text
       }
       
-      logInfo('COLLECT_PAYMENT', 'Mandate verified as active in GoCardless', {
-        requestId,
-        mandateId: customer.gocardless_id,
-      });
-    } catch (mandateError) {
-      // If mandate check fails, log but continue - payment creation will fail if mandate is invalid
-      logError('COLLECT_PAYMENT', mandateError, {
-        requestId,
-        mandateId: customer.gocardless_id,
-        action: 'mandate_verification',
-        note: 'Continuing with payment creation - GoCardless will reject if mandate invalid',
+      return new Response(JSON.stringify({ error: 'Failed to collect payment' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    // Create payment with retry logic and timeout protection
-    const paymentResponse = await makeGoCardlessRequest(
-      '/payments',
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          payments: {
-            amount: amountInPence,
-            currency: 'GBP',
-            description: paymentDescription,
-            app_fee: appFee,
-            links: {
-              mandate: customer.gocardless_id,
-            },
-            metadata: {
-              job_id: jobId,
-              customer_id: customerId,
-            },
-          },
-        }),
-      },
-      accessToken,
-      {
-        maxRetries: 3,
-        initialDelay: 1000,
-        retryableStatuses: [429, 500, 502, 503, 504],
-        timeout: 30000, // 30 second timeout
-      }
-    );
 
     const paymentData = await paymentResponse.json();
-    
-    // Validate response data
-    if (!paymentData?.payments) {
-      logError('COLLECT_PAYMENT', new Error('Invalid payment response structure'), {
-        requestId,
-        responseData: JSON.stringify(paymentData),
-      });
-      return createErrorResponse('Invalid response from GoCardless', 500, { requestId });
-    }
-
     const paymentId = paymentData.payments.id;
     const paymentStatus = paymentData.payments.status;
     const chargeDate = paymentData.payments.charge_date;
 
-    // Validate required fields
-    if (!paymentId) {
-      logError('COLLECT_PAYMENT', new Error('Payment ID missing from response'), {
-        requestId,
-        responseData: JSON.stringify(paymentData),
-      });
-      return createErrorResponse('Payment creation failed: missing payment ID', 500, { requestId });
-    }
+    console.log(`✅ Payment confirmed: ${paymentId}`);
+    console.log('[GC-COLLECT] ✅ Payment created successfully');
+    console.log('[GC-COLLECT] Payment ID:', paymentId);
+    console.log('[GC-COLLECT] Status:', paymentStatus);
+    console.log('[GC-COLLECT] Charge Date:', chargeDate);
+    console.log('[GC-COLLECT] Amount:', paymentData.payments.amount, 'pence');
+    console.log('[GC-COLLECT] App Fee:', appFee, 'pence');
 
-    if (!paymentStatus) {
-      logError('COLLECT_PAYMENT', new Error('Payment status missing from response'), {
-        requestId,
-        paymentId,
-      });
-      // Continue anyway as status can be checked later via webhook
-    }
-
-    logInfo('COLLECT_PAYMENT', 'Payment created successfully', {
-      requestId,
-      paymentId,
-      paymentStatus,
-      chargeDate,
-      amount: paymentData.payments.amount,
-      appFee,
-    });
-
-    // Calculate fee breakdown for financial reporting
-    const amountPounds = amount;
-    const platformFeePounds = appFee / 100; // Convert pence to pounds
-    // GoCardless fee: 1% + 20p, capped at £4
-    const gocardlessFeePounds = Math.min((amountPounds * 0.01) + 0.20, 4.00);
-    const netAmount = amountPounds - platformFeePounds - gocardlessFeePounds;
-
-    logInfo('COLLECT_PAYMENT', 'Fee breakdown calculated', {
-      requestId,
-      grossAmount: amountPounds.toFixed(2),
-      platformFee: platformFeePounds.toFixed(2),
-      gocardlessFee: gocardlessFeePounds.toFixed(2),
-      netAmount: netAmount.toFixed(2),
-    });
-
-    // Update job with payment info and fee breakdown
-    // CRITICAL: Use transaction-like approach - if job update fails, we still have payment ID
-    // This allows recovery via webhook or manual sync
-    logInfo('COLLECT_PAYMENT', 'Updating job record', { requestId, jobId });
-    
-    // SECURITY: Validate job belongs to authenticated user via customer relationship
-    // First, check if job already has a payment (prevent duplicate payments)
-    const { data: existingJob, error: checkError } = await adminClient
+    // Update job with payment info
+    console.log('[GC-COLLECT] Step 3: Updating job record...');
+    const { error: updateError } = await adminClient
       .from('jobs')
-      .select('gocardless_payment_id, payment_status, customer:customers!inner(profile_id)')
-      .eq('id', jobId)
-      .eq('customers.profile_id', user.id) // CRITICAL: Ensure job belongs to user's customer
-      .single();
-    
-    if (checkError) {
-      logError('COLLECT_PAYMENT', checkError, {
-        requestId,
-        jobId,
-        paymentId,
-        action: 'check_existing',
-      });
-      // Continue anyway - webhook will sync status
-    } else if (existingJob?.gocardless_payment_id && existingJob.gocardless_payment_id !== paymentId) {
-      logError('COLLECT_PAYMENT', new Error('Job already has a different payment ID'), {
-        requestId,
-        jobId,
-        existingPaymentId: existingJob.gocardless_payment_id,
-        newPaymentId: paymentId,
-      });
-      // Don't overwrite existing payment - return success but log warning
-      logInfo('COLLECT_PAYMENT', 'Payment created but job already has payment - webhook will sync', {
-        requestId,
-        jobId,
-        existingPaymentId: existingJob.gocardless_payment_id,
-        newPaymentId: paymentId,
-      });
-    } else {
-      // SECURITY: Ownership already validated in existingJob query above
-      // Safe to update (existingJob query ensures job belongs to user's customer)
-      const { error: updateError } = await adminClient
-        .from('jobs')
-        .update({
-          gocardless_payment_id: paymentId,
-          gocardless_payment_status: paymentStatus,
-          payment_method: 'gocardless',
-          payment_status: 'processing', // Mark as processing until paid_out (via webhook)
-          payment_date: null, // Only set when paid_out (via webhook)
-          amount_collected: amountPounds, // Store gross amount
-          platform_fee: Math.round(platformFeePounds * 100) / 100, // Round to 2 decimals
-          gocardless_fee: Math.round(gocardlessFeePounds * 100) / 100, // Round to 2 decimals
-          net_amount: Math.round(netAmount * 100) / 100, // Round to 2 decimals
-        })
-        .eq('id', jobId); // Ownership already validated above
+      .update({
+        gocardless_payment_id: paymentId,
+        gocardless_payment_status: paymentStatus,
+        payment_method: 'gocardless',
+        payment_status: 'paid', // Mark as paid immediately for DD
+      })
+      .eq('id', jobId);
 
-      if (updateError) {
-        logError('COLLECT_PAYMENT', updateError, {
-          requestId,
-          jobId,
-          paymentId,
-          action: 'update_job',
-          // Payment was created successfully, but job update failed
-          // Webhook will sync status when payment updates
-          recovery: 'webhook_will_sync',
-        });
-        // Don't fail - payment exists in GoCardless, webhook will update job
-      } else {
-        logInfo('COLLECT_PAYMENT', 'Job updated successfully', {
-          requestId,
-          jobId,
-          paymentId,
-        });
-      }
+    if (updateError) {
+      console.error('[GC-COLLECT] ⚠️ Job update failed:', updateError);
+    } else {
+      console.log('[GC-COLLECT] ✅ Job updated successfully');
     }
 
-    logInfo('COLLECT_PAYMENT', 'Payment collection complete', {
-      requestId,
-      paymentId,
-      paymentStatus,
-    });
+    console.log('[GC-COLLECT] ====================================');
+    console.log('[GC-COLLECT] PAYMENT COLLECTION COMPLETE');
+    console.log('[GC-COLLECT] ====================================');
 
     return new Response(JSON.stringify({ 
       success: true,
@@ -435,13 +327,11 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
-    logError('COLLECT_PAYMENT_CRITICAL', error, {
-      requestId,
-      method: req.method,
-      url: req.url,
-    });
-    
+    console.error('❌ CRITICAL GOCARDLESS ERROR:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return createErrorResponse(message, 500, { requestId });
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

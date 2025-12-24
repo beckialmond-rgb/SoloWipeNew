@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { businessNameSchema, validateForm, sanitizeString } from '@/lib/validations';
 import { FormField, getInputClassName } from '@/components/ui/form-field';
-import { DEFAULT_BUSINESS_NAME } from '@/constants/app';
 
 interface EditBusinessNameModalProps {
   isOpen: boolean;
@@ -57,7 +56,7 @@ export function EditBusinessNameModal({ isOpen, currentName, onClose, onSubmit }
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[60] bg-foreground/50 backdrop-blur-sm"
+        className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
@@ -98,14 +97,14 @@ export function EditBusinessNameModal({ isOpen, currentName, onClose, onSubmit }
                   setName(e.target.value);
                   if (error) setError(undefined);
                 }}
-                placeholder={DEFAULT_BUSINESS_NAME}
+                placeholder="My Window Cleaning"
                 autoFocus
                 className={getInputClassName(!!error)}
               />
             </FormField>
 
             {/* Submit Button - Sticky at bottom */}
-            <div className="sticky bottom-0 z-10 bg-card pt-4 pb-6 -mx-6 px-6 border-t border-border mt-6">
+            <div className="sticky bottom-0 bg-card pt-4 -mx-6 px-6 border-t border-border mt-6">
               <Button
                 type="submit"
                 disabled={isSubmitting || !name.trim()}

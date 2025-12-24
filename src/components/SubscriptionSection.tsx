@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Crown, Check, Loader2, ExternalLink, Sparkles, Clock, Zap, Tag } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Crown, Check, Loader2, ExternalLink, Sparkles, Clock } from 'lucide-react';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useUsageCounters } from '@/hooks/useUsageCounters';
+import { useAuth } from '@/hooks/useAuth';
 import { SUBSCRIPTION_TIERS } from '@/constants/subscription';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -12,25 +11,21 @@ import { format, differenceInDays } from 'date-fns';
 
 export function SubscriptionSection() {
   const { subscribed, tier, subscriptionEnd, status, trialEnd, loading, createCheckout, openCustomerPortal, checkSubscription } = useSubscription();
-  const { data: usageCounters } = useUsageCounters();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [checkoutLoading, setCheckoutLoading] = useState<'monthly' | 'annual' | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [couponCode, setCouponCode] = useState('');
-  const [showCouponInput, setShowCouponInput] = useState(false);
 
   const isTrialing = status === 'trialing';
   const trialDaysRemaining = trialEnd ? differenceInDays(new Date(trialEnd), new Date()) : 0;
   
-  // Check if user has free usage remaining (usage-based trial)
-  const jobsCompleted = usageCounters?.jobs_completed_count || 0;
-  const jobsRemaining = usageCounters?.jobsRemaining || 0;
-  const smsRemaining = usageCounters?.smsRemaining || 0;
-  const hasFreeUsage = jobsRemaining > 0 || smsRemaining > 0;
-  
-  // Grace period is for payment failures, not trial (handled separately)
+  // Calculate grace period (7-day trial from signup)
+  const gracePeriodDaysRemaining = user?.created_at 
+    ? Math.max(0, 7 - differenceInDays(new Date(), new Date(user.created_at)))
+    : 0;
+  const isInGracePeriod = !subscribed && gracePeriodDaysRemaining > 0;
 
-  const handleSubscribe = async (priceType: 'monthly' | 'annual', couponCode?: string | null) => {
+  const handleSubscribe = async (priceType: 'monthly' | 'annual') => {
     // Prevent double-clicks
     if (checkoutLoading !== null) {
       console.warn('⚠️ Checkout already in progress, ignoring duplicate click');
@@ -39,15 +34,8 @@ export function SubscriptionSection() {
     
     setCheckoutLoading(priceType);
     try {
-      // Clean coupon code: trim whitespace and convert to uppercase
-      const cleanCouponCode = couponCode?.trim().toUpperCase() || null;
-      const finalCouponCode = cleanCouponCode && cleanCouponCode.length > 0 ? cleanCouponCode : null;
-      
-      console.log(`💰 Starting Stripe checkout flow for ${priceType} plan...`, { 
-        originalCoupon: couponCode,
-        cleanedCoupon: finalCouponCode 
-      });
-      const url = await createCheckout(priceType, finalCouponCode);
+      console.log(`💰 Starting Stripe checkout flow for ${priceType} plan...`);
+      const url = await createCheckout(priceType);
       if (url) {
         console.log(`➡️ Redirecting to Stripe checkout: ${url}`);
         window.location.href = url;
@@ -184,58 +172,32 @@ export function SubscriptionSection() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4"
     >
-      {/* Free Trial Status Card - Show if user has free usage remaining */}
-      {hasFreeUsage && !subscribed && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-card rounded-xl border-2 border-emerald-500 p-6 space-y-4"
-        >
+      {/* Grace Period Status Card */}
+      {isInGracePeriod && (
+        <div className="bg-card rounded-xl border-2 border-emerald-500 p-6 space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <Zap className="w-6 h-6 text-emerald-500" />
+              <Clock className="w-6 h-6 text-emerald-500" />
             </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-foreground">Your Free Trial</h3>
-                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                  {jobsCompleted} of 10 jobs used
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-foreground">Free Trial Active</h3>
+                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-500/10 text-emerald-600">
+                  {gracePeriodDaysRemaining} day{gracePeriodDaysRemaining !== 1 ? 's' : ''} left
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {jobsRemaining > 0 
-                  ? `${jobsRemaining} free job${jobsRemaining !== 1 ? 's' : ''} remaining before upgrade`
-                  : `${smsRemaining} free SMS${smsRemaining !== 1 ? 'es' : ''} remaining`
-                }
+              <p className="text-sm text-muted-foreground">
+                Explore all Pro features free
               </p>
             </div>
           </div>
-          
-          {/* Progress Bar */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Progress</span>
-              <span className="font-medium">{Math.round((jobsCompleted / 10) * 100)}%</span>
-            </div>
-            <div className="w-full bg-emerald-500/10 rounded-full h-2.5 overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${Math.min(100, (jobsCompleted / 10) * 100)}%` }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-                className="h-full bg-emerald-500 rounded-full"
-              />
-            </div>
-          </div>
-
-          <div className="bg-emerald-500/10 rounded-lg p-3 border border-emerald-500/20">
-            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-              {jobsRemaining > 0 
-                ? `✨ Keep going! Complete ${jobsRemaining} more job${jobsRemaining !== 1 ? 's' : ''} for free, then subscribe to unlock unlimited access.`
-                : '✨ Subscribe now to continue with unlimited jobs & SMS receipts.'
-              }
+          <div className="bg-emerald-500/10 rounded-lg p-3">
+            <p className="text-sm text-emerald-700 dark:text-emerald-400">
+              Your trial ends on {format(new Date(new Date(user?.created_at || '').getTime() + 7 * 24 * 60 * 60 * 1000), 'd MMMM yyyy')}. 
+              Subscribe anytime to keep access.
             </p>
           </div>
-        </motion.div>
+        </div>
       )}
 
       <div className="bg-card rounded-xl border border-border p-6 space-y-4">
@@ -245,69 +207,23 @@ export function SubscriptionSection() {
           </div>
           <div>
             <h3 className="font-semibold text-foreground">
-              {hasFreeUsage ? 'Subscribe to SoloWipe Pro' : 'Upgrade to Pro'}
+              {isInGracePeriod ? 'Subscribe to SoloWipe Pro' : 'Upgrade to Pro'}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {hasFreeUsage 
-                ? 'Subscribe now to unlock unlimited access' 
-                : jobsCompleted >= 10 
-                  ? 'You\'ve used your free jobs - upgrade to continue'
-                  : 'Get your first 10 jobs free, then £15/month'
-              }
+              {isInGracePeriod ? 'Lock in your access before trial ends' : 'Start your 7-day free trial'}
             </p>
           </div>
         </div>
 
-        {/* Free Trial Banner - show if user hasn't used free jobs yet */}
-        {jobsCompleted === 0 && (
+        {/* Free Trial Banner - only show if not in grace period */}
+        {!isInGracePeriod && (
           <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
             <p className="text-sm text-foreground">
-              <span className="font-medium">First 10 jobs free</span> — no payment until you've automated 10 cleans
+              <span className="font-medium">7 days free</span> — no payment until trial ends
             </p>
           </div>
         )}
-
-        {/* Coupon Code Input */}
-        <div className="space-y-2">
-          {!showCouponInput ? (
-            <button
-              onClick={() => setShowCouponInput(true)}
-              className="w-full text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-2 transition-colors py-2 px-3 rounded-lg hover:bg-muted/50"
-            >
-              <Tag className="w-4 h-4" />
-              Have a coupon or promo code?
-            </button>
-          ) : (
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <Input
-                  type="text"
-                  placeholder="Enter coupon code (e.g. SAVE20)"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  className="flex-1 uppercase"
-                  autoFocus
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setShowCouponInput(false);
-                    setCouponCode('');
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-              {couponCode && (
-                <p className="text-xs text-muted-foreground">
-                  Your discount will be applied when you click Subscribe
-                </p>
-              )}
-            </div>
-          )}
-        </div>
 
         {/* Monthly Plan */}
         <div className="bg-muted/50 rounded-lg p-4 space-y-3">
@@ -323,7 +239,7 @@ export function SubscriptionSection() {
           <Button
             className="w-full min-h-[44px]"
             variant="outline"
-            onClick={() => handleSubscribe('monthly', couponCode || null)}
+            onClick={() => handleSubscribe('monthly')}
             disabled={checkoutLoading !== null}
           >
             {checkoutLoading === 'monthly' ? (
@@ -355,7 +271,7 @@ export function SubscriptionSection() {
           </div>
           <Button
             className="w-full min-h-[44px]"
-            onClick={() => handleSubscribe('annual', couponCode || null)}
+            onClick={() => handleSubscribe('annual')}
             disabled={checkoutLoading !== null}
           >
             {checkoutLoading === 'annual' ? (
@@ -375,7 +291,6 @@ export function SubscriptionSection() {
           <ul className="space-y-1.5">
             {[
               'Unlimited customers & jobs',
-              'SMS receipts included (covers SMS & GoCardless costs)',
               'Route optimization',
               'Photo evidence storage',
               'Business insights & reports',

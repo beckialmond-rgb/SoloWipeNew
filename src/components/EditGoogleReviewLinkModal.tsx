@@ -64,7 +64,7 @@ export function EditGoogleReviewLinkModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[60] bg-foreground/50 backdrop-blur-sm"
+        className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
@@ -73,11 +73,7 @@ export function EditGoogleReviewLinkModal({
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute left-0 right-0 bg-card rounded-t-3xl overflow-y-auto safe-bottom"
-          style={{ 
-            bottom: '80px',
-            maxHeight: '70vh'
-          }}
+          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[70vh] overflow-y-auto safe-bottom"
         >
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-2">
@@ -93,7 +89,7 @@ export function EditGoogleReviewLinkModal({
             <X className="w-5 h-5 text-muted-foreground" />
           </button>
 
-          <form onSubmit={handleSubmit} className="px-6 pb-32 pt-2">
+          <form onSubmit={handleSubmit} className="px-6 pb-8 pt-2">
             <div className="flex items-center gap-2 mb-4">
               <LinkIcon className="w-5 h-5 text-primary" />
               <h2 className="text-xl font-bold text-foreground">Google Review Link</h2>

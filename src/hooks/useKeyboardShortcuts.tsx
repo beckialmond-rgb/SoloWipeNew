@@ -36,7 +36,7 @@ export function useKeyboardShortcuts() {
       
       switch (key) {
         case 'h':
-          navigate('/dashboard');
+          navigate('/');
           break;
         case 'c':
           navigate('/calendar');

@@ -12,12 +12,8 @@ export default defineConfig(({ mode }) => ({
     __BUILD_DATE__: JSON.stringify(new Date().toISOString().split('T')[0]),
   },
   server: {
-    host: "0.0.0.0", // Listen on all network interfaces (accessible from mobile)
+    host: "::",
     port: 8080,
-    strictPort: false, // Allow using different port if 8080 is taken
-    hmr: {
-      clientPort: 8080, // HMR port for mobile devices
-    },
   },
   plugins: [
     react(),
@@ -31,7 +27,7 @@ export default defineConfig(({ mode }) => ({
       }),
     VitePWA({
       registerType: "prompt",
-      includeAssets: ["favicon.ico", "SoloLogo.jpg", "app-icon.png"],
+      includeAssets: ["favicon.ico", "logo.png", "app-icon.png"],
       manifest: {
         name: "SoloWipe",
         short_name: "SoloWipe",

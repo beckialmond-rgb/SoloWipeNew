@@ -5,7 +5,6 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { TrendingUp } from 'lucide-react';
-import { cn } from '@/lib/utils';
 
 export function MonthlyEarningsChart() {
   const { user } = useAuth();

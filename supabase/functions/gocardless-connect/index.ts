@@ -1,6 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.87.1";
-import { getCorsHeaders } from "../_shared/cors.ts";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 // Validate redirect URL against trusted domains with proper matching
 function isValidRedirectUrl(urlString: string, environment: string): { valid: boolean; error?: string } {
@@ -32,7 +36,7 @@ function isValidRedirectUrl(urlString: string, environment: string): { valid: bo
       hostname === domain || hostname.endsWith('.' + domain)
     );
 
-    // Also allow localhost for development (any port)
+    // Also allow localhost for development
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
 
     if (!isTrusted && !isLocalhost) {
@@ -46,17 +50,8 @@ function isValidRedirectUrl(urlString: string, environment: string): { valid: bo
 }
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
-  
-  console.log(`[${new Date().toISOString()}] Request received: ${req.method} ${req.url}`);
-  
-  // Handle CORS preflight requests - MUST be first, before any other code
   if (req.method === 'OPTIONS') {
-    console.log('[CORS] OPTIONS preflight request received');
-    return new Response('ok', {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -84,18 +79,7 @@ serve(async (req) => {
 
     console.log(`💰 Starting GoCardless flow for user ${user.id}...`);
 
-    let body;
-    try {
-      body = await req.json();
-    } catch (error) {
-      console.error('[GC-CONNECT] Failed to parse request body:', error);
-      return new Response(JSON.stringify({ error: 'Invalid request body' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const { redirectUrl: clientRedirectUrl } = body || {};
+    const { redirectUrl: clientRedirectUrl } = await req.json();
     
     const clientId = Deno.env.get('GOCARDLESS_CLIENT_ID');
     const environment = Deno.env.get('GOCARDLESS_ENVIRONMENT') || 'sandbox';
@@ -139,20 +123,7 @@ serve(async (req) => {
       ? 'https://connect.gocardless.com'
       : 'https://connect-sandbox.gocardless.com';
     
-    console.log('=== URI EXACTNESS CHECK ===');
     console.log('OAuth base URL:', baseUrl);
-    console.log('Environment:', environment);
-    console.log('Client ID (first 8 chars):', clientId?.substring(0, 8) + '...');
-    console.log('Redirect URI being sent:', redirectUrl);
-    console.log('Redirect URI length:', redirectUrl.length);
-    console.log('Redirect URI has trailing slash:', redirectUrl.endsWith('/'));
-    console.log('Redirect URI protocol:', new URL(redirectUrl).protocol);
-    console.log('Redirect URI hostname:', new URL(redirectUrl).hostname);
-    console.log('Redirect URI pathname:', new URL(redirectUrl).pathname);
-    console.log('Redirect URI search:', new URL(redirectUrl).search);
-    console.log('⚠️ VERIFY: This redirect_uri MUST exactly match what is registered in GoCardless Dashboard');
-    console.log('⚠️ VERIFY: No trailing slash differences, http vs https, www vs non-www');
-    console.log('=== END URI CHECK ===');
     
     const state = btoa(JSON.stringify({ userId: user.id, timestamp: Date.now() }));
     
@@ -164,12 +135,9 @@ serve(async (req) => {
     authUrl.searchParams.set('state', state);
     authUrl.searchParams.set('initial_view', 'login');
 
-    console.log('=== FULL OAUTH URL GENERATED ===');
     console.log('Full OAuth URL:', authUrl.toString());
-    console.log('This is the URL that will redirect to GoCardless');
-    console.log('After user authorizes, GoCardless will redirect back to:', redirectUrl);
-    console.log('GoCardless will append: ?code=XXX&state=YYY to the redirect URL');
-    console.log('=== END OAuth URL Debug ===');
+    console.log(`➡️ Generated Redirect URL: ${redirectUrl}`);
+    console.log('=== End Debug ===');
 
     return new Response(JSON.stringify({ url: authUrl.toString(), state }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

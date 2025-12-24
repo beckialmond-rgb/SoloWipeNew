@@ -16,8 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { exportEarningsToXero, ExportJob } from '@/utils/exportCSV';
 import { Customer, JobWithCustomer } from '@/types/database';
@@ -39,7 +37,6 @@ const dateRangeOptions = [
 export function ExportEarningsModal({ isOpen, onClose, businessName }: ExportEarningsModalProps) {
   const [selectedRange, setSelectedRange] = useState('3');
   const [isExporting, setIsExporting] = useState(false);
-  const [includeArchived, setIncludeArchived] = useState(true);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -48,7 +45,7 @@ export function ExportEarningsModal({ isOpen, onClose, businessName }: ExportEar
       const startDate = format(startOfMonth(subMonths(new Date(), months)), 'yyyy-MM-dd');
       const endDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('jobs')
         .select(`
           *,
@@ -56,14 +53,8 @@ export function ExportEarningsModal({ isOpen, onClose, businessName }: ExportEar
         `)
         .eq('status', 'completed')
         .gte('completed_at', `${startDate}T00:00:00`)
-        .lte('completed_at', `${endDate}T23:59:59`);
-      
-      // Filter out archived customers if toggle is off
-      if (!includeArchived) {
-        query = query.eq('customer.is_archived', false);
-      }
-      
-      const { data, error } = await query.order('completed_at', { ascending: true });
+        .lte('completed_at', `${endDate}T23:59:59`)
+        .order('completed_at', { ascending: true });
 
       if (error) throw error;
 
@@ -130,34 +121,13 @@ export function ExportEarningsModal({ isOpen, onClose, businessName }: ExportEar
             </Select>
           </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-              <div className="flex-1">
-                <Label htmlFor="include-archived" className="text-sm font-medium text-foreground cursor-pointer">
-                  Include Archived Customers
-                </Label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Include jobs from archived customers for complete financial reporting
-                </p>
-              </div>
-              <Switch
-                id="include-archived"
-                checked={includeArchived}
-                onCheckedChange={setIncludeArchived}
-              />
-            </div>
-
-            <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">
-              <p>The export will include:</p>
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>Customer name and address</li>
-                <li>Invoice number and date</li>
-                <li>Amount and payment status</li>
-                {includeArchived && (
-                  <li className="font-medium text-foreground">Jobs from archived customers</li>
-                )}
-              </ul>
-            </div>
+          <div className="bg-muted/50 rounded-lg p-4 text-sm text-muted-foreground">
+            <p>The export will include:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Customer name and address</li>
+              <li>Invoice number and date</li>
+              <li>Amount and payment status</li>
+            </ul>
           </div>
         </div>
 

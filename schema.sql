@@ -92,11 +92,6 @@ CREATE TABLE IF NOT EXISTS public.jobs (
   gocardless_payment_id TEXT,
   gocardless_payment_status TEXT,
 
-  -- Fee tracking for financial reporting (GoCardless payments only)
-  platform_fee NUMERIC,
-  gocardless_fee NUMERIC,
-  net_amount NUMERIC,
-
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

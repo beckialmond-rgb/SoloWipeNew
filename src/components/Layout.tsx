@@ -4,8 +4,8 @@ import { BottomNav } from '@/components/BottomNav';
 export const Layout = () => {
   const location = useLocation();
   
-  // Hide bottom nav on specific routes if needed (e.g., auth, welcome, callbacks)
-  const hideNavRoutes = ['/auth', '/forgot-password', '/reset-password', '/install', '/terms', '/privacy', '/legal', '/showcase', '/gocardless-callback'];
+  // Hide bottom nav on specific routes if needed (e.g., auth, welcome)
+  const hideNavRoutes = ['/auth', '/forgot-password', '/reset-password', '/install', '/terms', '/privacy'];
   const shouldShowNav = !hideNavRoutes.includes(location.pathname);
 
   return (

@@ -12,8 +12,6 @@ import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicato
 import { PasswordInput } from '@/components/PasswordInput';
 import { EmailInput } from '@/components/EmailInput';
 import { cn } from '@/lib/utils';
-import { RATE_LIMIT_COOLDOWN_MS } from '@/constants/app';
-import { analytics } from '@/lib/analytics';
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
@@ -47,86 +45,9 @@ const Auth = () => {
   // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && user) {
-      navigate('/dashboard');
+      navigate('/');
     }
   }, [user, authLoading, navigate]);
-
-  // Check for account deletion confirmation
-  useEffect(() => {
-    const deleted = searchParams.get('deleted');
-    if (deleted === 'true' && !authLoading) {
-      toast({
-        title: 'Account deleted',
-        description: 'Your account and all associated data have been permanently deleted.',
-      });
-      // Clean up URL parameters
-      navigate('/auth', { replace: true });
-    }
-  }, [searchParams, authLoading, toast, navigate]);
-
-  // Check for OAuth errors in URL parameters (e.g., from Google OAuth callback)
-  useEffect(() => {
-    const error = searchParams.get('error');
-    const errorDescription = searchParams.get('error_description');
-    
-    // Log OAuth callback for debugging
-    if (error || searchParams.get('code')) {
-      console.log('[OAuth Callback] URL params:', {
-        error,
-        errorDescription,
-        hasCode: !!searchParams.get('code'),
-        currentOrigin: window.location.origin,
-        currentPath: window.location.pathname,
-        fullURL: window.location.href,
-      });
-    }
-    
-    if (error && !authLoading) {
-      let errorMessage = 'Authentication failed';
-      let errorTitle = 'Sign in failed';
-      
-      // Handle specific OAuth error codes with user-friendly messages
-      if (error === 'access_denied') {
-        errorTitle = 'Sign in cancelled';
-        errorMessage = 'You cancelled the Google sign-in. Please try again if you want to continue.';
-      } else if (error === 'configuration_error') {
-        errorTitle = 'Configuration error';
-        errorMessage = 'Google sign-in is not properly configured. Please contact support if this issue persists.';
-      } else if (error === 'redirect_uri_mismatch') {
-        errorTitle = 'Configuration error';
-        errorMessage = 'The redirect URL is not properly configured. Please contact support.';
-      } else if (error === 'invalid_request') {
-        errorTitle = 'Invalid request';
-        errorMessage = errorDescription || 'The sign-in request was invalid. Please try again.';
-      } else if (error === 'server_error') {
-        errorTitle = 'Server error';
-        errorMessage = 'Google sign-in is temporarily unavailable. Please try again in a moment.';
-      } else if (error === 'temporarily_unavailable') {
-        errorTitle = 'Service unavailable';
-        errorMessage = 'Google sign-in is temporarily unavailable. Please try again in a moment.';
-      } else if (errorDescription) {
-        errorMessage = errorDescription;
-      }
-      
-      // Track OAuth error
-      analytics.track('oauth_signin_failed', {
-        provider: 'google',
-        error_code: error,
-        error_description: errorDescription || errorMessage,
-      });
-      
-      toast({
-        title: errorTitle,
-        description: errorMessage,
-        variant: 'destructive',
-      });
-      
-      // Clean up URL parameters after a short delay to allow toast to be seen
-      setTimeout(() => {
-        navigate('/auth', { replace: true });
-      }, 3000);
-    }
-  }, [searchParams, authLoading, toast, navigate]);
 
   // Auto-focus first input when form loads or mode changes
   // Also reset email verification state when switching modes to avoid stale state
@@ -166,33 +87,6 @@ const Auth = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Prevent double submission
-    if (loading) return;
-    
-    // Validate form before submission
-    if (!isLogin) {
-      if (!emailValidation.isValid || passwordStrength.score < 3 || !passwordsMatch || !acceptedTerms) {
-        // Track validation failure
-        analytics.track('signup_failed', {
-          reason: 'validation',
-          email_invalid: !emailValidation.isValid,
-          password_weak: passwordStrength.score < 3,
-          passwords_mismatch: !passwordsMatch,
-          terms_not_accepted: !acceptedTerms,
-        });
-        return;
-      }
-      // Track signup start
-      analytics.track('signup_started', {
-        has_business_name: !!businessName,
-        password_strength: passwordStrength.strength,
-      });
-    } else {
-      // Track login start
-      analytics.track('login_started');
-    }
-    
     setLoading(true);
 
     try {
@@ -208,17 +102,11 @@ const Auth = () => {
           if (error.message?.toLowerCase().includes('rate limit') || 
               error.message?.toLowerCase().includes('too many requests') ||
               error.message?.toLowerCase().includes('exceeded')) {
-            setRateLimitedUntil(new Date(Date.now() + RATE_LIMIT_COOLDOWN_MS));
+            setRateLimitedUntil(new Date(Date.now() + 60000)); // 1 minute cooldown
           }
           
           // Track failed attempts
           setFailedAttempts(prev => prev + 1);
-          
-          // Track login failure
-          analytics.track('login_failed', {
-            reason: error.message,
-            failed_attempts: failedAttempts + 1,
-          });
           
           toast({
             title: 'Sign in failed',
@@ -231,64 +119,31 @@ const Auth = () => {
           setRateLimitedUntil(null);
           setShowVerificationResend(false);
           
-          // Track successful login
-          analytics.track('login_completed');
-          
           // Store remember me preference
           if (!rememberMe) {
             sessionStorage.setItem('clearSessionOnClose', 'true');
           } else {
             sessionStorage.removeItem('clearSessionOnClose');
           }
-          navigate('/dashboard');
+          navigate('/');
         }
       } else {
         const { error, needsEmailConfirmation } = await signUp(email, password, businessName);
         if (error) {
-          console.error('[SignUp] Error details:', {
-            message: error.message,
-            name: error.name,
-            stack: error.stack,
-          });
-          
           // Check for rate limiting
           if (error.message?.toLowerCase().includes('rate limit') || 
               error.message?.toLowerCase().includes('too many requests') ||
               error.message?.toLowerCase().includes('exceeded')) {
-            setRateLimitedUntil(new Date(Date.now() + RATE_LIMIT_COOLDOWN_MS));
+            setRateLimitedUntil(new Date(Date.now() + 60000));
           }
-          
-          // Provide more specific error messages
-          let errorDescription = error.message || 'An unexpected error occurred';
-          
-          if (error.message?.toLowerCase().includes('email already registered')) {
-            errorDescription = 'This email is already registered. Please sign in instead.';
-          } else if (error.message?.toLowerCase().includes('invalid email')) {
-            errorDescription = 'Please enter a valid email address.';
-          } else if (error.message?.toLowerCase().includes('password')) {
-            errorDescription = 'Password must be at least 8 characters and meet all requirements.';
-          }
-          
-          // Track signup failure
-          analytics.track('signup_failed', {
-            reason: error.message,
-            error_type: error.name,
-          });
           
           toast({
             title: 'Sign up failed',
-            description: errorDescription,
+            description: error.message,
             variant: 'destructive',
           });
         } else {
           if (needsEmailConfirmation) {
-            // Track email verification sent
-            analytics.track('signup_email_verification_sent');
-            analytics.track('signup_completed', {
-              method: 'email',
-              needs_verification: true,
-            });
-            
             toast({
               title: 'Check your email to verify',
               description: 'We sent you a verification link. After verifying, come back and sign in.',
@@ -296,26 +151,11 @@ const Auth = () => {
             setShowVerificationResend(true);
             setIsLogin(true);
           } else {
-            // Track successful signup
-            analytics.track('signup_completed', {
-              method: 'email',
-              needs_verification: false,
-            });
-            
             toast({
               title: 'Welcome to SoloWipe!',
               description: 'Your account has been created.',
             });
-            // Add small delay to ensure profile is created by trigger
-            setTimeout(() => {
-              try {
-                navigate('/dashboard');
-              } catch (navError) {
-                console.error('[SignUp] Navigation error:', navError);
-                // Still navigate even if there's an error
-                window.location.href = '/dashboard';
-              }
-            }, 500);
+            navigate('/');
           }
         }
       }
@@ -384,7 +224,7 @@ const Auth = () => {
           {/* Logo */}
           <div className="text-center mb-10">
             <img 
-              src="/SoloLogo.jpg" 
+              src="/logo.png" 
               alt="SoloWipe" 
               className="h-12 mx-auto mb-4"
             />
@@ -419,33 +259,17 @@ const Auth = () => {
           )}
 
           {/* Form */}
-          <form 
-            onSubmit={handleSubmit} 
-            className="space-y-4"
-            aria-label={isLogin ? 'Sign in form' : 'Sign up form'}
-            noValidate
-          >
+          <form onSubmit={handleSubmit} className="space-y-4">
             {!isLogin && (
               <div className="relative">
-                <label htmlFor="business-name" className="sr-only">
-                  Business Name
-                </label>
-                <Building 
-                  className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" 
-                  aria-hidden="true"
-                />
+                <Building className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <input
                   ref={businessNameRef}
-                  id="business-name"
-                  name="business-name"
                   type="text"
                   placeholder="Business Name"
                   value={businessName}
                   onChange={(e) => setBusinessName(e.target.value)}
                   required={!isLogin}
-                  autoComplete="organization"
-                  aria-label="Business name"
-                  aria-required="true"
                   className={cn(
                     "w-full h-14 pl-12 pr-4 rounded-xl",
                     "bg-muted border-0",
@@ -458,24 +282,16 @@ const Auth = () => {
 
             <EmailInput
               ref={emailRef}
-              id={isLogin ? "login-email" : "signup-email"}
-              name={isLogin ? "login-email" : "signup-email"}
               placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               validation={emailValidation}
               showValidation={!isLogin}
               required
-              autoComplete={isLogin ? "email" : "email"}
-              aria-label="Email address"
-              aria-required="true"
-              aria-invalid={!isLogin && !emailValidation.isEmpty && !emailValidation.isValid}
             />
 
             <div className="space-y-2">
               <PasswordInput
-                id={isLogin ? "login-password" : "signup-password"}
-                name={isLogin ? "login-password" : "signup-password"}
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -483,21 +299,14 @@ const Auth = () => {
                 onBlur={() => setShowPasswordFeedback(false)}
                 required
                 minLength={8}
-                autoComplete={isLogin ? "current-password" : "new-password"}
-                aria-label="Password"
-                aria-required="true"
-                aria-invalid={!isLogin && password.length > 0 && passwordStrength.score < 3}
-                aria-describedby={!isLogin && password.length > 0 ? "password-strength" : undefined}
               />
               
               {/* Password Strength Indicator - only show on signup */}
               {!isLogin && password.length > 0 && (
-                <div id="password-strength" role="region" aria-live="polite" aria-label="Password strength">
-                  <PasswordStrengthIndicator 
-                    passwordStrength={passwordStrength}
-                    showChecklist={showPasswordFeedback || passwordStrength.score < 4}
-                  />
-                </div>
+                <PasswordStrengthIndicator 
+                  passwordStrength={passwordStrength}
+                  showChecklist={showPasswordFeedback || passwordStrength.score < 4}
+                />
               )}
             </div>
 
@@ -505,23 +314,14 @@ const Auth = () => {
             {!isLogin && (
               <div className="space-y-1">
                 <PasswordInput
-                  id="confirm-password"
-                  name="confirm-password"
                   placeholder="Confirm Password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   hasError={confirmPassword.length > 0 && !passwordsMatch}
                   required={!isLogin}
-                  autoComplete="new-password"
-                  aria-label="Confirm password"
-                  aria-required="true"
-                  aria-invalid={confirmPassword.length > 0 && !passwordsMatch}
-                  aria-describedby={confirmPassword.length > 0 && !passwordsMatch ? "confirm-password-error" : undefined}
                 />
                 {confirmPassword.length > 0 && !passwordsMatch && (
-                  <p id="confirm-password-error" className="text-xs text-destructive pl-1" role="alert">
-                    Passwords do not match
-                  </p>
+                  <p className="text-xs text-destructive pl-1">Passwords do not match</p>
                 )}
               </div>
             )}
@@ -544,29 +344,6 @@ const Auth = () => {
               </div>
             )}
 
-            {/* Free Trial Info - only show on signup */}
-            {!isLogin && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-primary/5 border border-primary/20 rounded-xl p-4 space-y-2"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-xs font-bold text-primary">✓</span>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-foreground">
-                      Start with 10 free jobs
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      No payment required. Use SoloWipe free for your first 10 completed jobs, then choose a plan that works for you.
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
             {/* Terms checkbox - only show on signup */}
             {!isLogin && (
               <div className="flex items-start gap-3">
@@ -581,27 +358,13 @@ const Auth = () => {
                   className="text-sm text-muted-foreground cursor-pointer select-none leading-tight"
                 >
                   I agree to the{' '}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate('/terms');
-                    }}
-                    className="text-primary hover:underline"
-                  >
+                  <a href="/terms" target="_blank" className="text-primary hover:underline">
                     Terms of Service
-                  </button>{' '}
+                  </a>{' '}
                   and{' '}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate('/privacy');
-                    }}
-                    className="text-primary hover:underline"
-                  >
+                  <a href="/privacy" target="_blank" className="text-primary hover:underline">
                     Privacy Policy
-                  </button>
+                  </a>
                 </label>
               </div>
             )}
@@ -641,14 +404,9 @@ const Auth = () => {
                 "bg-primary hover:bg-primary/90 text-primary-foreground",
                 "font-semibold text-base"
               )}
-              aria-label={loading ? 'Processing' : isLogin ? 'Sign in to your account' : 'Create new account'}
-              aria-busy={loading}
             >
               {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" aria-hidden="true" />
-                  <span>Processing...</span>
-                </>
+                <Loader2 className="w-5 h-5 animate-spin" />
               ) : rateLimitSeconds > 0 ? (
                 `Wait ${rateLimitSeconds}s`
               ) : isLogin ? (
@@ -675,50 +433,24 @@ const Auth = () => {
               type="button"
               variant="outline"
               disabled={oauthLoading !== null}
-              aria-label="Sign in with Google"
-              aria-busy={oauthLoading === 'google'}
               onClick={async () => {
                 setOauthLoading('google');
-                // Track OAuth signin start
-                analytics.track('oauth_signin_started', { provider: 'google' });
                 try {
                   const { error } = await signInWithOAuth('google');
                   if (error) {
-                    // Track OAuth failure
-                    analytics.track('oauth_signin_failed', {
-                      provider: 'google',
-                      reason: error.message,
-                    });
-                    let errorMessage = error.message || 'Failed to sign in with Google';
-                    
-                    // Provide more helpful error messages
-                    if (error.message?.includes('redirect_uri')) {
-                      errorMessage = 'Redirect URL configuration error. Please ensure Google OAuth is properly configured in Supabase.';
-                    } else if (error.message?.includes('configuration')) {
-                      errorMessage = 'Google OAuth is not properly configured. Please contact support.';
-                    } else if (error.message?.includes('provider')) {
-                      errorMessage = 'Google sign-in provider is not enabled. Please contact support.';
-                    }
-                    
                     toast({
                       title: 'Sign in failed',
-                      description: errorMessage,
+                      description: error.message || 'Failed to sign in with Google',
                       variant: 'destructive',
                     });
-                    setOauthLoading(null);
-                  } else {
-                    // Track OAuth success (redirect will happen)
-                    analytics.track('oauth_signin_completed', { provider: 'google' });
-                    // Note: Supabase will redirect to Google
-                    // The loading state will be cleared when user returns or if redirect fails
                   }
                 } catch (err) {
-                  console.error('[Auth] OAuth error:', err);
                   toast({
                     title: 'Sign in failed',
-                    description: err instanceof Error ? err.message : 'Failed to sign in with Google. Please try again.',
+                    description: err instanceof Error ? err.message : 'Failed to sign in with Google',
                     variant: 'destructive',
                   });
+                } finally {
                   setOauthLoading(null);
                 }
               }}

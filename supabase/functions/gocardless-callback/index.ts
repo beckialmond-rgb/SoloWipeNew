@@ -1,28 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.87.1";
 
-// CORS headers - in production, restrict origin to specific domains
-// TODO: Replace '*' with specific allowed origins (e.g., 'https://solowipe.co.uk')
-// For now, using '*' for compatibility, but this should be restricted in production
-function getCorsHeaders(request: Request) {
-  const origin = request.headers.get('Origin');
-  // In production, validate origin against allowed list
-  // For now, return all origins (development only - should be restricted in production)
-  const allowedOrigin = origin || '*';
-  
-  return {
-    'Access-Control-Allow-Origin': allowedOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 // Encryption key derived from a secret - in production this should use Supabase Vault
 async function getEncryptionKey(): Promise<CryptoKey> {
-  const secret = Deno.env.get('SERVICE_ROLE_KEY');
-  if (!secret) {
-    throw new Error('SERVICE_ROLE_KEY environment variable is required for encryption');
-  }
+  const secret = Deno.env.get('SERVICE_ROLE_KEY') || 'fallback-secret-key';
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -66,23 +52,14 @@ async function encryptToken(token: string): Promise<string> {
 }
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
-  
-  // Handle CORS preflight requests - MUST be first, before ANY other code
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response(null, { headers: corsHeaders });
   }
-  
-  console.log(`[${new Date().toISOString()}] Callback request received: ${req.method} ${req.url}`);
 
   try {
     console.log('[GC-CALLBACK] Starting callback processing');
     
     const authHeader = req.headers.get('Authorization');
-    
     if (!authHeader) {
       console.error('[GC-CALLBACK] No authorization header');
       return new Response(JSON.stringify({ error: 'No authorization header' }), {
@@ -110,16 +87,10 @@ serve(async (req) => {
     console.log('[GC-CALLBACK] User authenticated:', user.id);
 
     // Create admin client for database operations
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY');
-    if (!supabaseUrl || !serviceRoleKey) {
-      console.error('[GC-CALLBACK] Missing required environment variables');
-      return new Response(JSON.stringify({ error: 'Server configuration error' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    const adminClient = createClient(supabaseUrl, serviceRoleKey);
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SERVICE_ROLE_KEY') ?? ''
+    );
 
     // IDEMPOTENCY CHECK: Check if user already has a valid GoCardless connection
     const { data: existingProfile, error: profileError } = await adminClient
@@ -165,25 +136,10 @@ serve(async (req) => {
     }
 
     console.log('[GC-CALLBACK] Processing authorization code, redirectUrl:', redirectUrl);
-    console.log('[GC-CALLBACK] === CALLBACK URL DIAGNOSTICS ===');
-    console.log('[GC-CALLBACK] Request URL (if available):', req.url);
-    console.log('[GC-CALLBACK] Authorization code received:', code ? `${code.substring(0, 10)}...${code.substring(code.length - 4)}` : 'MISSING');
-    console.log('[GC-CALLBACK] Authorization code length:', code?.length || 0);
-    console.log('[GC-CALLBACK] Redirect URL received:', redirectUrl);
-    console.log('[GC-CALLBACK] === END CALLBACK DIAGNOSTICS ===');
 
     const clientId = Deno.env.get('GOCARDLESS_CLIENT_ID');
     const clientSecret = Deno.env.get('GOCARDLESS_CLIENT_SECRET');
     const environment = Deno.env.get('GOCARDLESS_ENVIRONMENT') || 'sandbox';
-    
-    console.log('[GC-CALLBACK] === ENVIRONMENT CHECK ===');
-    console.log('[GC-CALLBACK] Environment:', environment);
-    console.log('[GC-CALLBACK] Client ID (first 8 chars):', clientId?.substring(0, 8) + '...');
-    console.log('[GC-CALLBACK] Client Secret exists:', !!clientSecret);
-    console.log('[GC-CALLBACK] ⚠️ VERIFY: Environment matches between connect and callback');
-    console.log('[GC-CALLBACK] ⚠️ VERIFY: Sandbox Client ID with Sandbox redirect_uri');
-    console.log('[GC-CALLBACK] ⚠️ VERIFY: Production Client ID with Production redirect_uri');
-    console.log('[GC-CALLBACK] === END ENVIRONMENT CHECK ===');
     
     if (!clientId || !clientSecret) {
       console.error('[GC-CALLBACK] GoCardless credentials not configured');
@@ -193,33 +149,14 @@ serve(async (req) => {
       });
     }
 
+    console.log('[GC-CALLBACK] Environment:', environment);
+
     // Exchange authorization code for access token
     const tokenUrl = environment === 'live'
       ? 'https://connect.gocardless.com/oauth/access_token'
       : 'https://connect-sandbox.gocardless.com/oauth/access_token';
 
-    console.log('[GC-CALLBACK] === TOKEN EXCHANGE REQUEST ===');
-    console.log('[GC-CALLBACK] Token exchange URL:', tokenUrl);
-    console.log('[GC-CALLBACK] Using redirect_uri:', redirectUrl);
-    console.log('[GC-CALLBACK] ⚠️ CRITICAL: redirect_uri MUST exactly match what was sent in authorize request');
-    console.log('[GC-CALLBACK] ⚠️ CRITICAL: Check for trailing slash, http vs https, www vs non-www');
-    console.log('[GC-CALLBACK] Authorization code length:', code?.length);
-    console.log('[GC-CALLBACK] Request body (sanitized):', {
-      grant_type: 'authorization_code',
-      client_id: clientId?.substring(0, 8) + '...',
-      client_secret: '***HIDDEN***',
-      redirect_uri: redirectUrl,
-      code: code ? `${code.substring(0, 10)}...${code.substring(code.length - 4)}` : 'MISSING',
-    });
-    console.log('[GC-CALLBACK] === END TOKEN EXCHANGE REQUEST ===');
-
-    if (!redirectUrl) {
-      console.error('[GC-CALLBACK] redirectUrl is missing - this will cause token exchange to fail');
-      return new Response(JSON.stringify({ error: 'Redirect URL is required for token exchange' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    console.log('[GC-CALLBACK] Exchanging code for token at:', tokenUrl);
 
     const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
@@ -237,28 +174,11 @@ serve(async (req) => {
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('[GC-CALLBACK] === TOKEN EXCHANGE FAILED ===');
-      console.error('[GC-CALLBACK] Status:', tokenResponse.status);
-      console.error('[GC-CALLBACK] Status Text:', tokenResponse.statusText);
-      console.error('[GC-CALLBACK] Error response:', errorText);
-      console.error('[GC-CALLBACK] Request details:', {
-        redirect_uri: redirectUrl,
-        redirect_uri_length: redirectUrl.length,
-        redirect_uri_has_trailing_slash: redirectUrl.endsWith('/'),
-        code_length: code?.length,
-        environment,
-        token_url: tokenUrl,
-      });
-      console.error('[GC-CALLBACK] ⚠️ COMMON CAUSES:');
-      console.error('[GC-CALLBACK] 1. redirect_uri mismatch (check trailing slash, http vs https)');
-      console.error('[GC-CALLBACK] 2. Environment mismatch (sandbox vs production)');
-      console.error('[GC-CALLBACK] 3. Authorization code already used or expired');
-      console.error('[GC-CALLBACK] 4. Client ID/Secret mismatch with environment');
-      console.error('[GC-CALLBACK] === END ERROR DIAGNOSTICS ===');
+      console.error('[GC-CALLBACK] Token exchange failed:', errorText);
       
       // Check if it's a "code already used" error - this means a previous call succeeded
-      if (errorText.includes('already been used') || errorText.includes('invalid_grant') || errorText.includes('invalid_code')) {
-        console.log('[GC-CALLBACK] Code invalid/used - checking if connection exists');
+      if (errorText.includes('already been used') || errorText.includes('invalid_grant')) {
+        console.log('[GC-CALLBACK] Code already used - checking if connection exists');
         
         // Re-check the profile in case the previous call succeeded
         const { data: recheckProfile } = await adminClient
@@ -268,7 +188,7 @@ serve(async (req) => {
           .single();
         
         if (recheckProfile?.gocardless_access_token_encrypted) {
-          console.log('[GC-CALLBACK] ✅ Previous call succeeded, connection exists');
+          console.log('[GC-CALLBACK] Previous call succeeded, connection exists');
           return new Response(JSON.stringify({ 
             success: true, 
             organisationId: recheckProfile.gocardless_organisation_id,
@@ -277,16 +197,6 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
-        
-        // If code is invalid but no connection exists, it might be a redirect_uri mismatch
-        console.error('[GC-CALLBACK] Code invalid but no connection found. Likely redirect_uri mismatch.');
-        return new Response(JSON.stringify({ 
-          error: 'Authorization code invalid. This usually means the redirect URL doesn\'t match. Please try connecting again.',
-          details: errorText 
-        }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
       }
       
       return new Response(JSON.stringify({ error: 'Failed to exchange authorization code', details: errorText }), {

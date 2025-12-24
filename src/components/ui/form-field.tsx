@@ -39,17 +39,16 @@ export function FormField({
   );
 }
 
-// Premium Input class helper with error state
+// Input class helper with error state
 export function getInputClassName(hasError: boolean) {
   return cn(
-    "w-full h-14 px-4 rounded-xl input-premium",
-    "bg-background border-2",
-    "text-foreground placeholder:text-muted-foreground/60",
-    "focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 focus:-translate-y-0.5",
-    "transition-all duration-300 ease-out",
-    "hover:border-primary/50 hover:shadow-md",
+    "w-full h-14 px-4 rounded-xl",
+    "bg-muted border-2",
+    "text-foreground placeholder:text-muted-foreground",
+    "focus:outline-none focus:ring-2 focus:ring-primary",
+    "transition-colors",
     hasError 
-      ? "border-destructive focus:ring-destructive/20 focus:border-destructive" 
-      : "border-border"
+      ? "border-destructive focus:ring-destructive" 
+      : "border-transparent"
   );
 }

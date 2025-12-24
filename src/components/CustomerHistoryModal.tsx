@@ -85,7 +85,7 @@ export function CustomerHistoryModal({ customer, isOpen, onClose }: CustomerHist
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[70] bg-foreground/50 backdrop-blur-sm"
+        className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm"
         onClick={onClose}
       >
         <motion.div
@@ -95,10 +95,6 @@ export function CustomerHistoryModal({ customer, isOpen, onClose }: CustomerHist
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
           className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[90vh] overflow-y-auto safe-bottom"
-          style={{ 
-            bottom: '80px',
-            maxHeight: 'calc(90vh - 80px)'
-          }}
         >
           {/* Handle */}
           <div className="flex justify-center pt-3 pb-2">
@@ -225,13 +221,9 @@ export function CustomerHistoryModal({ customer, isOpen, onClose }: CustomerHist
                           {job.status === 'completed' && job.payment_status && (
                             <p className={cn(
                               "text-xs",
-                              job.payment_status === 'paid' ? "text-accent" : 
-                              job.payment_status === 'processing' ? "text-yellow-600 dark:text-yellow-400" : 
-                              "text-amber-500"
+                              job.payment_status === 'paid' ? "text-accent" : "text-amber-500"
                             )}>
-                              {job.payment_status === 'paid' ? 'Paid' : 
-                               job.payment_status === 'processing' ? 'Processing' : 
-                               'Unpaid'}
+                              {job.payment_status === 'paid' ? 'Paid' : 'Unpaid'}
                             </p>
                           )}
                         </div>

@@ -20,53 +20,41 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
       <button
         onClick={onClick}
         className={cn(
-          "w-full h-full bg-card rounded-xl shadow-depth-2 border-2 border-border p-5",
-          "flex items-center justify-between gap-5 text-left",
-          "hover:bg-muted/50 active:bg-muted/70 transition-all duration-300 ease-out touch-sm min-h-[88px]",
-          "hover:shadow-depth-3 hover:-translate-y-1 hover:border-primary/30",
-          "focus:outline-none focus:ring-4 focus:ring-primary/20 focus:ring-offset-2",
-          "overflow-hidden card-premium"
+          "w-full h-full bg-card rounded-xl shadow-sm border border-border p-4",
+          "flex items-center gap-4 text-left",
+          "hover:bg-muted/50 transition-colors",
+          "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+          "overflow-hidden"
         )}
       >
         <div className="flex-1 min-w-0 overflow-hidden">
-          <div className="flex items-center gap-2 mb-2 min-w-0 flex-nowrap">
-            <h3 className="font-bold text-foreground truncate text-xl flex-shrink min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-nowrap">
+            <h3 className="font-semibold text-foreground truncate text-base flex-shrink min-w-0">
               {customer.name}
             </h3>
-            {/* Status indicators */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              {customer.notes && (
-                <StickyNote className="w-4 h-4 text-warning flex-shrink-0" title="Has notes" />
-              )}
-              {customer.gocardless_mandate_status === 'pending' ? (
-                <span 
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/15 dark:bg-warning/25 text-warning dark:text-warning text-xs font-semibold flex-shrink-0 border border-warning/30 dark:border-warning/40"
-                  title="DD Pending"
-                >
-                  <Clock className="w-3 h-3" />
-                  Pending
-                </span>
-              ) : customer.gocardless_id ? (
-                <span 
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/15 dark:bg-success/25 text-success dark:text-success text-xs font-semibold flex-shrink-0 border border-success/30 dark:border-success/40"
-                  title="Direct Debit Active"
-                >
-                  <CreditCard className="w-3 h-3" />
-                  DD
-                </span>
-              ) : null}
-            </div>
+            {customer.notes && (
+              <StickyNote className="w-4 h-4 text-warning flex-shrink-0" />
+            )}
+            {customer.gocardless_mandate_status === 'pending' ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-warning/10 text-warning text-[10px] font-medium flex-shrink-0">
+                <Clock className="w-2.5 h-2.5" />
+                Pending
+              </span>
+            ) : customer.gocardless_id ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-success/10 text-success text-[10px] font-medium flex-shrink-0">
+                <CreditCard className="w-2.5 h-2.5" />
+                DD
+              </span>
+            ) : null}
           </div>
-          
-          {/* Compact info grid */}
-          <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
-            <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
-            <span className="truncate break-words">{customer.address?.split(/[,\n]/)[0].trim() || 'No address'}</span>
+          <div className="flex items-center gap-1.5 mt-1 text-sm text-muted-foreground min-w-0 overflow-hidden">
+            <MapPin className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate min-w-0">{customer.address}</span>
           </div>
         </div>
         
         <div className="flex items-center gap-3 flex-shrink-0">
-          <span className="font-bold text-foreground text-xl">
+          <span className="font-bold text-foreground text-lg">
             £{customer.price}
           </span>
           <ChevronRight className="w-5 h-5 text-muted-foreground" />

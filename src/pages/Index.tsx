@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, differenceInDays, addDays } from 'date-fns';
 import { AnimatePresence, motion, Reorder } from 'framer-motion';
@@ -10,7 +10,6 @@ import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
 import { TextCustomerButton } from '@/components/TextCustomerButton';
-import { TomorrowSMSButton } from '@/components/TomorrowSMSButton';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { JobNotesModal } from '@/components/JobNotesModal';
 import { OnMyWayButton } from '@/components/OnMyWayButton';
@@ -26,21 +25,13 @@ import { BusinessNameModal } from '@/components/BusinessNameModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
 import { useSubscription } from '@/hooks/useSubscription';
-import { useUsageCounters } from '@/hooks/useUsageCounters';
-import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 import { useToast } from '@/hooks/use-toast';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useJobReminders } from '@/hooks/useJobReminders';
 import { useHaptics } from '@/hooks/useHaptics';
-import { useTimezone } from '@/hooks/useTimezone';
 import { syncStatus } from '@/lib/offlineStorage';
-import { cn } from '@/lib/utils';
-import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, ChevronUp, UserPlus, Navigation, X, Gift, CreditCard, AlertTriangle, MapPin, MessageSquare } from 'lucide-react';
-import { useSMSTemplateContext } from '@/contexts/SMSTemplateContext';
-import { prepareSMSContext, openSMSApp } from '@/utils/openSMS';
+import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, UserPlus, Navigation, X, Gift, CreditCard, AlertTriangle, MapPin } from 'lucide-react';
 import { JobWithCustomer } from '@/types/database';
-import { DEFAULT_BUSINESS_NAME } from '@/constants/app';
-import { getUserFriendlyError } from '@/lib/errorMessages';
 import { ToastAction } from '@/components/ui/toast';
 import {
   AlertDialog,
@@ -60,19 +51,15 @@ const Index = () => {
   const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading, markJobPaid, profile, isMarkingPaid } = useSupabaseData();
   const { user } = useAuth();
   const { subscribed, status } = useSubscription();
-  const { data: usageCounters } = useUsageCounters();
-  const { requirePremium, openPaywall, isInGracePeriod } = useSoftPaywall();
   const { toast, dismiss } = useToast();
   const { showTour, completeTour } = useWelcomeTour();
   const { success } = useHaptics();
-  const { timezone } = useTimezone();
-  const { showTemplatePicker } = useSMSTemplateContext();
   
-  // Check if user has free usage remaining (usage-based trial)
-  const jobsCompleted = usageCounters?.jobs_completed_count || 0;
-  const jobsRemaining = usageCounters?.jobsRemaining || 0;
-  const hasFreeUsage = jobsRemaining > 0;
-  const showTrialBanner = !subscribed && status !== 'trialing' && hasFreeUsage;
+  // Calculate grace period for trial banner
+  const gracePeriodDaysRemaining = user?.created_at 
+    ? Math.max(0, 7 - differenceInDays(new Date(), new Date(user.created_at)))
+    : 0;
+  const isInGracePeriod = !subscribed && status !== 'trialing' && gracePeriodDaysRemaining > 0;
   const [trialBannerDismissed, setTrialBannerDismissed] = useState(() => {
     return localStorage.getItem('solowipe_trial_banner_dismissed') === 'true';
   });
@@ -99,8 +86,6 @@ const Index = () => {
   }, [pendingJobs, upcomingJobs, tomorrowDate]);
   
   const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
-  // Track previous job IDs to prevent unnecessary updates
-  const previousJobIdsRef = useRef<string>('');
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
@@ -110,24 +95,6 @@ const Index = () => {
   const [isSkippingAll, setIsSkippingAll] = useState(false);
   const [notesJob, setNotesJob] = useState<JobWithCustomer | null>(null);
   const [completedOpen, setCompletedOpen] = useState(true);
-  const [smsQueue, setSmsQueue] = useState<{ index: number; jobIds: string[] } | null>(null);
-  const [showNextSMS, setShowNextSMS] = useState(false);
-  const [receiptQueue, setReceiptQueue] = useState<{ index: number; jobIds: string[] } | null>(null);
-  const [showNextReceipt, setShowNextReceipt] = useState(false);
-  const [sentReceipts, setSentReceipts] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem('solowipe_sent_receipts');
-    if (stored) {
-      try {
-        return new Set(JSON.parse(stored));
-      } catch {
-        return new Set();
-      }
-    }
-    return new Set();
-  });
-  const [tomorrowJobsHidden, setTomorrowJobsHidden] = useState(() => {
-    return localStorage.getItem('solowipe_tomorrow_jobs_hidden') === 'true';
-  });
   const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
   const [jobToComplete, setJobToComplete] = useState<JobWithCustomer | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -147,7 +114,7 @@ const Index = () => {
     const checkBusinessName = () => {
       if (user && !isLoading && profile) {
         const needsBusinessName = sessionStorage.getItem('needs_business_name') === 'true';
-        if (needsBusinessName && profile.business_name === DEFAULT_BUSINESS_NAME) {
+        if (needsBusinessName && profile.business_name === 'My Window Cleaning') {
           setShowBusinessNameModal(true);
         }
       }
@@ -172,260 +139,6 @@ const Index = () => {
     setTrialBannerDismissed(true);
     localStorage.setItem('solowipe_trial_banner_dismissed', 'true');
   };
-
-  // Handle sequential SMS sending - detect when user returns from SMS app
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && smsQueue) {
-        // User returned to app - show "Next" button or auto-continue
-        setShowNextSMS(true);
-      }
-    };
-
-    const handleFocus = () => {
-      if (smsQueue) {
-        setShowNextSMS(true);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [smsQueue]);
-
-  // Handle "Send All" SMS workflow
-  const handleSendAllSMS = () => {
-    const jobsWithPhone = tomorrowJobs.filter(job => job.customer?.mobile_phone);
-    if (jobsWithPhone.length === 0) return;
-
-    // Store queue in state and localStorage
-    const jobIds = jobsWithPhone.map(job => job.id);
-    const queue = { index: 0, jobIds };
-    setSmsQueue(queue);
-    localStorage.setItem('solowipe_sms_queue', JSON.stringify(queue));
-
-    // Open first SMS
-    openSMSForJob(jobsWithPhone[0], 0, jobIds);
-  };
-
-  const openSMSForJob = (job: JobWithCustomer, index: number, jobIds: string[]) => {
-    if (!job.customer?.mobile_phone) return;
-
-    const customerName = job.customer.name || 'Customer';
-    const customerAddress = job.customer.address || 'No address';
-    // Use actual job price from customer, ensure it's a valid number
-    const jobPrice = (job.customer.price && job.customer.price > 0) ? job.customer.price : undefined;
-    const isGoCardlessActive = job.customer?.gocardless_mandate_status === 'active' && !!job.customer?.gocardless_id;
-
-    const context = prepareSMSContext({
-      customerName,
-      customerAddress,
-      price: jobPrice,
-      jobTotal: jobPrice, // Also set jobTotal for consistency
-      scheduledDate: job.scheduled_date,
-      isGoCardlessActive,
-      businessName,
-      serviceType: 'Window Clean',
-    });
-
-    showTemplatePicker('tomorrow_sms_button', context, (message) => {
-      // Mark as sent in queue (but don't mark individual receipts)
-      setShowNextSMS(false);
-      openSMSApp(job.customer.mobile_phone!, message, user?.id);
-    });
-  };
-
-  const handleNextSMS = () => {
-    if (!smsQueue) return;
-
-    const nextIndex = smsQueue.index + 1;
-    const nextJobId = smsQueue.jobIds[nextIndex];
-
-    if (nextIndex >= smsQueue.jobIds.length) {
-      // All done
-      setSmsQueue(null);
-      setShowNextSMS(false);
-      localStorage.removeItem('solowipe_sms_queue');
-      toast({
-        title: 'All reminders sent!',
-        description: `Sent ${smsQueue.jobIds.length} reminder${smsQueue.jobIds.length > 1 ? 's' : ''}.`,
-      });
-      return;
-    }
-
-    // Find next job
-    const nextJob = tomorrowJobs.find(job => job.id === nextJobId);
-    if (nextJob) {
-      const updatedQueue = { ...smsQueue, index: nextIndex };
-      setSmsQueue(updatedQueue);
-      localStorage.setItem('solowipe_sms_queue', JSON.stringify(updatedQueue));
-      openSMSForJob(nextJob, nextIndex, smsQueue.jobIds);
-    }
-  };
-
-  const handleCancelSMSQueue = () => {
-    setSmsQueue(null);
-    setShowNextSMS(false);
-    localStorage.removeItem('solowipe_sms_queue');
-  };
-
-  // Handle sequential receipt sending - detect when user returns from SMS app
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && receiptQueue) {
-        setShowNextReceipt(true);
-      }
-    };
-
-    const handleFocus = () => {
-      if (receiptQueue) {
-        setShowNextReceipt(true);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [receiptQueue]);
-
-  // Handle "Send All Service Receipts" workflow
-  const handleSendAllReceipts = () => {
-    const jobsWithPhone = completedToday.filter(job => job.customer?.mobile_phone && !sentReceipts.has(job.id));
-    if (jobsWithPhone.length === 0) return;
-
-    // Store queue in state and localStorage
-    const jobIds = jobsWithPhone.map(job => job.id);
-    const queue = { index: 0, jobIds };
-    setReceiptQueue(queue);
-    localStorage.setItem('solowipe_receipt_queue', JSON.stringify(queue));
-
-    // Open first receipt SMS
-    openReceiptSMS(jobsWithPhone[0], 0, jobIds);
-  };
-
-  const openReceiptSMS = async (job: JobWithCustomer, index: number, jobIds: string[]) => {
-    if (!job.customer?.mobile_phone) return;
-
-    const customerName = job.customer.name || 'Customer';
-    const customerAddress = job.customer.address || 'No address';
-    // Use actual job amount_collected, fallback to customer price - ensure it's a valid number
-    const jobAmount = (job.amount_collected && job.amount_collected > 0) 
-      ? job.amount_collected 
-      : ((job.customer.price && job.customer.price > 0) ? job.customer.price : undefined);
-    const completedDateFormatted = job.completed_at 
-      ? format(new Date(job.completed_at), 'd MMM yyyy')
-      : '';
-
-    // Handle photo URL shortening if needed (template system will handle inclusion)
-    let photoUrl = job.photo_url;
-    if (photoUrl) {
-      try {
-        const encodedUrl = encodeURIComponent(photoUrl);
-        const tinyUrlResponse = await fetch(`https://tinyurl.com/api-create.php?url=${encodedUrl}`, {
-          method: 'GET',
-          headers: { 'Accept': 'text/plain' }
-        });
-        
-        if (tinyUrlResponse.ok) {
-          const shortUrl = await tinyUrlResponse.text();
-          if (shortUrl && !shortUrl.toLowerCase().includes('error') && shortUrl.startsWith('http')) {
-            photoUrl = shortUrl.trim();
-          }
-        }
-      } catch (error) {
-        console.warn('[Receipt SMS] Failed to shorten URL, using original:', error);
-      }
-    }
-
-    const context = prepareSMSContext({
-      customerName,
-      customerAddress,
-      price: jobAmount,
-      jobTotal: jobAmount,
-      completedDate: completedDateFormatted,
-      photoUrl: photoUrl,
-      businessName,
-    });
-
-    showTemplatePicker('receipt_sms', context, (message) => {
-      // Mark as sent
-      const newSentReceipts = new Set(sentReceipts);
-      newSentReceipts.add(job.id);
-      setSentReceipts(newSentReceipts);
-      localStorage.setItem('solowipe_sent_receipts', JSON.stringify([...newSentReceipts]));
-
-      setShowNextReceipt(false);
-              openSMSApp(job.customer.mobile_phone!, message, user?.id);
-    });
-  };
-
-  const handleNextReceipt = async () => {
-    if (!receiptQueue) return;
-
-    const nextIndex = receiptQueue.index + 1;
-    const nextJobId = receiptQueue.jobIds[nextIndex];
-
-    if (nextIndex >= receiptQueue.jobIds.length) {
-      // All done
-      setReceiptQueue(null);
-      setShowNextReceipt(false);
-      localStorage.removeItem('solowipe_receipt_queue');
-      toast({
-        title: 'All receipts sent!',
-        description: `Sent ${receiptQueue.jobIds.length} service receipt${receiptQueue.jobIds.length > 1 ? 's' : ''}.`,
-      });
-      return;
-    }
-
-    // Find next job
-    const nextJob = completedToday.find(job => job.id === nextJobId);
-    if (nextJob) {
-      const updatedQueue = { ...receiptQueue, index: nextIndex };
-      setReceiptQueue(updatedQueue);
-      localStorage.setItem('solowipe_receipt_queue', JSON.stringify(updatedQueue));
-      await openReceiptSMS(nextJob, nextIndex, receiptQueue.jobIds);
-    }
-  };
-
-  const handleCancelReceiptQueue = () => {
-    setReceiptQueue(null);
-    setShowNextReceipt(false);
-    localStorage.removeItem('solowipe_receipt_queue');
-  };
-
-  // Restore SMS queue on mount
-  useEffect(() => {
-    const stored = localStorage.getItem('solowipe_sms_queue');
-    if (stored) {
-      try {
-        const queue = JSON.parse(stored);
-        setSmsQueue(queue);
-        setShowNextSMS(true);
-      } catch (e) {
-        localStorage.removeItem('solowipe_sms_queue');
-      }
-    }
-
-    // Restore receipt queue on mount
-    const receiptStored = localStorage.getItem('solowipe_receipt_queue');
-    if (receiptStored) {
-      try {
-        const queue = JSON.parse(receiptStored);
-        setReceiptQueue(queue);
-        setShowNextReceipt(true);
-      } catch (e) {
-        localStorage.removeItem('solowipe_receipt_queue');
-      }
-    }
-  }, []);
 
   // Pull to refresh - full cloud sync
   const { isPulling, isRefreshing, pullDistance, handlers } = usePullToRefresh({
@@ -503,26 +216,11 @@ const Index = () => {
 
   // Sync local jobs with fetched pending jobs, applying saved order
   useEffect(() => {
-    // Create a stable string representation of current pending jobs
-    const newJobIds = pendingJobs.length > 0 
-      ? pendingJobs.map(j => j.id).sort().join(',')
-      : '';
-    
-    // If job IDs haven't changed, don't update (prevents infinite loop)
-    if (previousJobIdsRef.current === newJobIds) {
-      return;
-    }
-    
-    // Update ref with new job IDs
-    previousJobIdsRef.current = newJobIds;
-    
-    // Apply persisted order
     const { jobs: orderedJobs, wasRestored } = applyPersistedOrder(pendingJobs);
-    
-    // Update local jobs state only if it actually changed
     setLocalJobs(orderedJobs);
     
     // Show toast only once when order is restored
+    // Use a more stable check to prevent duplicate toasts
     if (wasRestored && !orderRestored && pendingJobs.length > 0) {
       setOrderRestored(true);
       const restoredKey = `solowipe_order_restored_${format(new Date(), 'yyyy-MM-dd')}`;
@@ -533,7 +231,8 @@ const Index = () => {
         duration: 2000,
       });
     }
-  }, [pendingJobs, applyPersistedOrder, orderRestored, toast]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingJobs, applyPersistedOrder]); // toast and orderRestored intentionally omitted to prevent infinite loops
 
   // Show welcome flow for new users
   useEffect(() => {
@@ -554,12 +253,6 @@ const Index = () => {
   };
 
   const handleCompleteRequest = (job: JobWithCustomer) => {
-    // Check if user has premium access before allowing job completion
-    if (!requirePremium('complete')) {
-      // Paywall modal will be shown by requirePremium
-      return;
-    }
-    
     setJobToComplete(job);
     setCapturedPhotoUrl(null);
     // Prefetch confetti chunk during the completion flow (keeps initial bundle smaller).
@@ -596,89 +289,41 @@ const Index = () => {
     try {
       const result = await completeJob(jobId, amount, photoUrl);
       
-      // Check for Direct Debit collection errors
-      if (result.ddError) {
-        const errorInfo = result.ddError;
-        let errorTitle = 'Payment Collection Failed';
-        let errorDescription = errorInfo.error || 'Failed to collect Direct Debit payment.';
-        
-        if (errorInfo.requiresReconnect) {
-          errorTitle = 'GoCardless Connection Expired';
-          errorDescription = 'Please reconnect your GoCardless account in Settings to continue collecting payments.';
-        } else if (errorInfo.requiresNewMandate) {
-          errorTitle = 'Direct Debit Mandate Not Active';
-          errorDescription = 'The customer\'s Direct Debit mandate is not active. Please set up a new mandate or collect payment manually.';
-        }
-        
-        toast({
-          title: errorTitle,
-          description: errorDescription,
-          variant: 'destructive',
-          duration: 8000,
-        });
-        
-        // Still show success message for job completion
-        const nextCleanMessage = result.nextDate 
-          ? `Next clean: ${result.nextDate}`
-          : 'One-off job - no reschedule';
-        
-        toast({
-          title: `Job Completed - £${result.collectedAmount}`,
-          description: `Job completed successfully. ${nextCleanMessage}. Payment needs to be collected manually.`,
-          duration: 5000,
-        });
-      } else {
-        // Normal success flow
-        const ddMessage = result.isDirectDebit ? ' (Direct Debit)' : '';
-        const nextCleanMessage = result.nextDate 
-          ? `Next clean: ${result.nextDate}`
-          : 'One-off job - no reschedule';
-        
-        const { id: toastId } = toast({
-          title: `£${result.collectedAmount} Collected!${ddMessage}`,
-          description: result.isDirectDebit 
-            ? `Payment collecting via DD. ${nextCleanMessage}`
-            : nextCleanMessage,
-          duration: 5000,
-          action: !result.isDirectDebit && result.newJobId ? (
-            <ToastAction
-              altText="Undo"
-              onClick={async () => {
-                dismiss(toastId);
-                try {
-                  await undoCompleteJob(result.jobId, result.newJobId!);
-                } catch {
-                  toast({
-                    title: 'Error',
-                    description: 'Failed to undo completion',
-                    variant: 'destructive',
-                  });
-                }
-              }}
-            >
-              Undo
-            </ToastAction>
-          ) : undefined,
-        });
-      }
+      const ddMessage = result.isDirectDebit ? ' (Direct Debit)' : '';
+      const { id: toastId } = toast({
+        title: `£${result.collectedAmount} Collected!${ddMessage}`,
+        description: result.isDirectDebit 
+          ? `Payment collecting via DD. Next clean: ${result.nextDate}`
+          : `Next clean: ${result.nextDate}`,
+        duration: 5000,
+        action: !result.isDirectDebit ? (
+          <ToastAction
+            altText="Undo"
+            onClick={async () => {
+              dismiss(toastId);
+              try {
+                await undoCompleteJob(result.jobId, result.newJobId);
+              } catch {
+                toast({
+                  title: 'Error',
+                  description: 'Failed to undo completion',
+                  variant: 'destructive',
+                });
+              }
+            }}
+          >
+            Undo
+          </ToastAction>
+        ) : undefined,
+      });
     } catch (error) {
       // Rollback on error - refetch to get current state
       await refetchAll();
-      
-      // Check if error is about job completion limit - show paywall instead of error toast
-      const errorMessage = error instanceof Error ? error.message : '';
-      if (errorMessage.includes('limit reached') || errorMessage.includes('upgrade to continue')) {
-        // Show paywall modal instead of error toast
-        openPaywall('complete');
-      } else {
-        // Show user-friendly error message
-        const friendlyMessage = getUserFriendlyError(error, { operation: 'Complete job' });
-        toast({
-          title: 'Failed to complete job',
-          description: friendlyMessage,
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to complete job. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setCompletingJobId(null);
       setJobToComplete(null);
@@ -923,7 +568,7 @@ const Index = () => {
         ) : (
           <>
             {/* Trial Welcome Banner */}
-            {showTrialBanner && !trialBannerDismissed && (
+            {isInGracePeriod && !trialBannerDismissed && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -943,7 +588,7 @@ const Index = () => {
                   <div>
                     <h3 className="font-semibold text-foreground">Welcome to your free trial!</h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      You've completed <span className="font-medium text-emerald-600">{jobsCompleted} job{jobsCompleted !== 1 ? 's' : ''}</span>. Complete <span className="font-medium text-emerald-600">{jobsRemaining} more free job{jobsRemaining !== 1 ? 's' : ''}</span> to experience SoloWipe. Add customers, complete jobs, and see how SoloWipe transforms your workflow.
+                      You have <span className="font-medium text-emerald-600">{gracePeriodDaysRemaining} day{gracePeriodDaysRemaining !== 1 ? 's' : ''}</span> to explore all Pro features free. Add customers, complete jobs, and see how SoloWipe transforms your workflow.
                     </p>
                   </div>
                 </div>
@@ -964,7 +609,7 @@ const Index = () => {
                     {profile?.gocardless_access_token_encrypted ? (
                       <button
                         onClick={() => navigate('/settings')}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-success/10 dark:bg-success/20 border border-success/30 dark:border-success/40 rounded-lg text-sm hover:bg-success/20 dark:hover:bg-success/30 transition-colors"
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-success/10 border border-success/20 rounded-lg text-sm hover:bg-success/20 transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           <CreditCard className="w-4 h-4 text-success" />
@@ -980,7 +625,7 @@ const Index = () => {
                     ) : (
                       <button
                         onClick={() => navigate('/settings')}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-warning/10 dark:bg-warning/20 border border-warning/30 dark:border-warning/40 rounded-lg text-sm hover:bg-warning/20 dark:hover:bg-warning/30 transition-colors"
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 bg-warning/10 border border-warning/20 rounded-lg text-sm hover:bg-warning/20 transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           <AlertTriangle className="w-4 h-4 text-warning" />
@@ -1004,7 +649,7 @@ const Index = () => {
                     <div className="relative">
                       <button
                         onClick={() => navigate('/settings')}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2 pr-10 bg-primary/10 dark:bg-primary/20 border border-primary/30 dark:border-primary/40 rounded-lg text-sm hover:bg-primary/20 dark:hover:bg-primary/30 transition-colors"
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 pr-10 bg-primary/10 border border-primary/20 rounded-lg text-sm hover:bg-primary/20 transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           <CreditCard className="w-4 h-4 text-primary" />
@@ -1027,60 +672,33 @@ const Index = () => {
               return null;
             })()}
 
-            {/* Today's Stats Dashboard - High Contrast Hero Card */}
+            {/* Today's Stats Summary */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className={cn(
-                "relative rounded-2xl p-6 shadow-2xl overflow-hidden mb-6",
-                "bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800",
-                "dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-800 dark:to-slate-900",
-                "border-2 border-slate-600 dark:border-slate-600"
-              )}
+              className="bg-card rounded-xl border border-border p-5 mb-6"
             >
-              {/* Decorative accent */}
-              <div className="absolute top-0 right-0 w-32 h-32 bg-primary/15 dark:bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-              
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <p className="text-slate-200 dark:text-slate-300 text-sm font-semibold mb-1 uppercase tracking-wide">Today's Run</p>
-                    <p className="text-3xl font-extrabold text-white dark:text-white">
-                      {new Intl.DateTimeFormat('en-GB', {
-                        timeZone: timezone,
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long',
-                      }).format(new Date())}
-                    </p>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-3">
+                    <Clock className="w-6 h-6 text-primary" />
                   </div>
-                  <div className="w-14 h-14 rounded-full bg-white/20 dark:bg-white/15 backdrop-blur-sm flex items-center justify-center border-2 border-white/40 dark:border-white/30">
-                    <Clock className="w-7 h-7 text-white dark:text-white" strokeWidth={2.5} />
-                  </div>
+                  <p className="text-2xl font-bold text-foreground">{localJobs.length}</p>
+                  <p className="text-sm text-muted-foreground mt-1">Pending</p>
                 </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 border-2 border-white/30 dark:border-white/20 shadow-lg">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-blue-500 dark:bg-blue-500 flex items-center justify-center mb-3 shadow-md">
-                      <Clock className="w-6 h-6 text-white dark:text-white" />
-                    </div>
-                    <p className="text-3xl font-extrabold text-white dark:text-white text-center leading-tight">{localJobs.length}</p>
-                    <p className="text-slate-200 dark:text-slate-200 text-xs font-semibold text-center mt-2 uppercase tracking-wide">Pending</p>
+                <div className="text-center">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-success/10 flex items-center justify-center mb-3">
+                    <CheckCircle className="w-6 h-6 text-success" />
                   </div>
-                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 border-2 border-white/30 dark:border-white/20 shadow-lg">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500 dark:bg-emerald-500 flex items-center justify-center mb-3 shadow-md">
-                      <CheckCircle className="w-6 h-6 text-white dark:text-white" />
-                    </div>
-                    <p className="text-3xl font-extrabold text-white dark:text-white text-center leading-tight">{completedToday.length}</p>
-                    <p className="text-slate-200 dark:text-slate-200 text-xs font-semibold text-center mt-2 uppercase tracking-wide">Done</p>
+                  <p className="text-2xl font-bold text-foreground">{completedToday.length}</p>
+                  <p className="text-sm text-muted-foreground mt-1">Completed</p>
+                </div>
+                <div className="text-center">
+                  <div className="w-12 h-12 mx-auto rounded-full bg-success/10 flex items-center justify-center mb-3">
+                    <PoundSterling className="w-6 h-6 text-success" />
                   </div>
-                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 border-2 border-white/30 dark:border-white/20 shadow-lg">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-green-500 dark:bg-green-500 flex items-center justify-center mb-3 shadow-md">
-                      <PoundSterling className="w-6 h-6 text-white dark:text-white" />
-                    </div>
-                    <p className="text-3xl font-extrabold text-green-200 dark:text-green-300 text-center leading-tight">£{todayEarnings}</p>
-                    <p className="text-slate-200 dark:text-slate-200 text-xs font-semibold text-center mt-2 uppercase tracking-wide">Earned</p>
-                  </div>
+                  <p className="text-2xl font-bold text-success">£{todayEarnings}</p>
+                  <p className="text-sm text-muted-foreground mt-1">Earned</p>
                 </div>
               </div>
             </motion.div>
@@ -1107,11 +725,11 @@ const Index = () => {
                 animate={{ opacity: 1, y: 0 }}
                 className="mb-6 flex items-center justify-between gap-4"
               >
-                <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary/15 dark:bg-primary/20 text-primary dark:text-primary rounded-xl border-2 border-primary/40 dark:border-primary/40 shadow-md">
-                  <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-extrabold shadow-sm">
+                <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary/10 text-primary rounded-xl">
+                  <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
                     {localJobs.length}
                   </span>
-                  <span className="font-semibold text-foreground dark:text-foreground">
+                  <span className="font-medium">
                     {localJobs.length === 1 ? 'job' : 'jobs'} today
                   </span>
                 </div>
@@ -1122,7 +740,7 @@ const Index = () => {
                     size="default"
                     onClick={() => setQuickAddOpen(true)}
                     disabled={completingJobId !== null || isSkippingAll}
-                    className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
+                    className="gap-2"
                   >
                     <UserPlus className="w-4 h-4" />
                     Quick Add
@@ -1132,7 +750,7 @@ const Index = () => {
                     size="default"
                     onClick={handleSkipAllRequest}
                     disabled={isSkippingAll || completingJobId !== null}
-                    className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
+                    className="gap-2"
                   >
                     <SkipForward className="w-4 h-4" />
                     {isSkippingAll ? 'Skipping...' : 'Skip All'}
@@ -1155,7 +773,6 @@ const Index = () => {
                   <JobCard
                     key={job.id}
                     job={job}
-                    businessName={businessName}
                     onComplete={handleCompleteRequest}
                     onSkip={handleSkipRequestById}
                     index={index}
@@ -1195,130 +812,52 @@ const Index = () => {
                 transition={{ delay: 0.3 }}
                 className="mt-8"
               >
-                <button
-                  onClick={() => {
-                    if (tomorrowJobsHidden) {
-                      setTomorrowJobsHidden(false);
-                      localStorage.removeItem('solowipe_tomorrow_jobs_hidden');
-                    } else {
-                      setTomorrowJobsHidden(true);
-                      localStorage.setItem('solowipe_tomorrow_jobs_hidden', 'true');
-                    }
-                  }}
-                  className="flex items-center justify-between w-full py-2 mb-4"
-                  aria-label={tomorrowJobsHidden ? "Show tomorrow's jobs" : "Hide tomorrow's jobs"}
-                >
+                <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-foreground">
                     Tomorrow's Jobs ({tomorrowJobs.length})
                   </h2>
-                  {tomorrowJobsHidden ? (
-                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                  ) : (
-                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
-                  )}
-                </button>
+                </div>
                 
-                {!tomorrowJobsHidden && (
-                  <>
-                    {/* Send All Button */}
-                    {tomorrowJobs.filter(job => job.customer?.mobile_phone).length > 1 && (
-                      <div className="mb-4">
-                        <Button
-                          onClick={handleSendAllSMS}
-                          className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
-                          disabled={!!smsQueue}
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                          {smsQueue ? `Sending ${smsQueue.index + 1}/${smsQueue.jobIds.length}...` : 'Send All Reminders'}
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Next SMS Button (shown when queue is active) */}
-                    {showNextSMS && smsQueue && (
-                      <div className="mb-4 p-3 bg-primary/10 dark:bg-primary/20 border border-primary/30 dark:border-primary/40 rounded-lg">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-foreground">
-                              {smsQueue.index + 1} of {smsQueue.jobIds.length} sent
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Ready for next reminder?
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              onClick={handleNextSMS}
-                              size="sm"
-                              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                            >
-                              Next
-                            </Button>
-                            <Button
-                              onClick={handleCancelSMSQueue}
-                              size="sm"
-                              variant="ghost"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-3">
-                      {tomorrowJobs.map((job, index) => {
-                        const customerName = job.customer?.name || 'Customer';
-                        const isInQueue = smsQueue?.jobIds.includes(job.id);
-                        const isCurrentInQueue = smsQueue && smsQueue.jobIds[smsQueue.index] === job.id;
-                        
-                        return (
-                          <motion.div
-                            key={job.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            className={cn(
-                              "bg-card rounded-xl border border-border p-4",
-                              isCurrentInQueue && "ring-2 ring-primary"
-                            )}
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start gap-2 mb-1">
-                                  <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                                  <h3 className="font-semibold text-foreground text-base leading-tight truncate min-w-0">
-                                    {job.customer?.address || 'No address'}
-                                  </h3>
-                                </div>
-                                <div className="flex items-center gap-3 mt-2">
-                                  <span className="text-xl font-bold text-foreground">
-                                    £{job.customer?.price || 0}
-                                  </span>
-                                  <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
-                                    {customerName}
-                                  </span>
-                                </div>
-                              </div>
-                              
-                              {/* SMS Button with tomorrow reminder template */}
-                              <TomorrowSMSButton
-                                phoneNumber={job.customer?.mobile_phone}
-                                customerName={customerName}
-                                customerAddress={job.customer?.address || 'your address'}
-                                jobPrice={job.customer?.price || 0}
-                                scheduledDate={job.scheduled_date}
-                                isGoCardlessActive={job.customer?.gocardless_mandate_status === 'active' && !!job.customer?.gocardless_id}
-                                businessName={businessName}
-                                iconOnly={true}
-                              />
+                <div className="space-y-3">
+                  {tomorrowJobs.map((job, index) => {
+                    const customerName = job.customer?.name || 'Customer';
+                    
+                    return (
+                      <motion.div
+                        key={job.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="bg-card rounded-xl border border-border p-4"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start gap-2 mb-1">
+                              <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                              <h3 className="font-semibold text-foreground text-base leading-tight truncate min-w-0">
+                                {job.customer?.address || 'No address'}
+                              </h3>
                             </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
+                            <div className="flex items-center gap-3 mt-2">
+                              <span className="text-xl font-bold text-foreground">
+                                £{job.customer?.price || 0}
+                              </span>
+                              <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
+                                {customerName}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* SMS Button */}
+                          <TextCustomerButton
+                            phoneNumber={job.customer?.mobile_phone}
+                            customerName={customerName}
+                          />
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
               </motion.div>
             )}
 
@@ -1331,74 +870,19 @@ const Index = () => {
                   </h2>
                   <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${completedOpen ? 'rotate-180' : ''}`} />
                 </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3 mt-3 pb-24">
-                  {/* Send All Service Receipts Button */}
-                  {completedToday.filter(job => job.customer?.mobile_phone && !sentReceipts.has(job.id)).length > 1 && (
-                    <div className="mb-4">
-                      <Button
-                        onClick={handleSendAllReceipts}
-                        className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
-                        disabled={!!receiptQueue}
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                        {receiptQueue ? `Sending ${receiptQueue.index + 1}/${receiptQueue.jobIds.length}...` : 'Send All Service Receipts'}
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Next Receipt Button (shown when queue is active) */}
-                  {showNextReceipt && receiptQueue && (
-                    <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-foreground">
-                            {receiptQueue.index + 1} of {receiptQueue.jobIds.length} sent
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Ready for next receipt?
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            onClick={handleNextReceipt}
-                            size="sm"
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                          >
-                            Next
-                          </Button>
-                          <Button
-                            onClick={handleCancelReceiptQueue}
-                            size="sm"
-                            variant="ghost"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
+                <CollapsibleContent className="space-y-3 mt-3">
                   {completedToday.map((job, index) => (
                     <div key={job.id}>
                       <CompletedJobItem
                         job={job}
                         index={index}
-                        businessName={businessName}
                         onAddNote={(job) => setNotesJob(job)}
                         onMarkPaid={(job) => !isMarkingPaid && handleMarkPaidRequest(job)}
                         isProcessing={isMarkingPaid}
-                        receiptSent={sentReceipts.has(job.id)}
-                        isCurrentInQueue={receiptQueue && receiptQueue.jobIds[receiptQueue.index] === job.id}
-                        onReceiptSent={(jobId) => {
-                          const newSentReceipts = new Set(sentReceipts);
-                          newSentReceipts.add(jobId);
-                          setSentReceipts(newSentReceipts);
-                          localStorage.setItem('solowipe_sent_receipts', JSON.stringify([...newSentReceipts]));
-                        }}
                       />
                       {/* Ask for Review button after completion - only if google review link is configured */}
                       {job.customer?.mobile_phone && profile?.google_review_link && (
-                        <div className="mt-3 mb-6 flex justify-end">
+                        <div className="mt-2 flex justify-end">
                           <AskForReviewButton
                             customerName={job.customer.name || 'Customer'}
                             customerPhone={job.customer.mobile_phone}
@@ -1414,7 +898,7 @@ const Index = () => {
             )}
 
             {/* Upcoming Jobs Section */}
-            <UpcomingJobsSection jobs={upcomingJobs} businessName={businessName} onJobClick={handleJobClick} onSkip={handleSkipRequest} />
+            <UpcomingJobsSection jobs={upcomingJobs} onJobClick={handleJobClick} onSkip={handleSkipRequest} />
           </>
         )}
       </main>
