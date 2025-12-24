@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ChevronRight, ChevronLeft, Home, Users, Calendar, Wallet, Settings } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Home, Users, Calendar, Wallet, Settings, Camera, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -14,36 +14,41 @@ interface TourStep {
 const tourSteps: TourStep[] = [
   {
     title: "Welcome to SoloWipe!",
-    description: "Your all-in-one window cleaning business manager. Let's take a quick tour of the key features.",
-    icon: <Home className="w-8 h-8" />,
+    description: "Your all-in-one window cleaning business manager. Let's take a quick tour of the key features that will help you run your business more efficiently.",
+    icon: <Sparkles className="w-8 h-8" />,
   },
   {
     title: "Today's Dashboard",
-    description: "See all your jobs for today at a glance. Mark jobs as done with one tap, and the next appointment is automatically scheduled.",
+    description: "See all your jobs for today at a glance. Mark jobs as done with one tap, capture photos of completed work, and the next appointment is automatically scheduled. Use route optimization to plan your day efficiently.",
     icon: <Home className="w-8 h-8" />,
     highlight: "today",
   },
   {
     title: "Customer Management",
-    description: "Keep track of all your customers, their addresses, prices, and special notes. Send SMS reminders and get directions with one tap.",
+    description: "Keep track of all your customers, their addresses, prices, and special notes. Send SMS reminders with customizable templates, get directions with one tap, and quickly add new customers on the go.",
     icon: <Users className="w-8 h-8" />,
     highlight: "customers",
   },
   {
     title: "Calendar View",
-    description: "Plan ahead with the calendar view. See your scheduled jobs for the week and month to optimize your routes.",
+    description: "Plan ahead with the calendar view. See your scheduled jobs for the week and month to optimize your routes and never miss an appointment.",
     icon: <Calendar className="w-8 h-8" />,
     highlight: "calendar",
   },
   {
     title: "Money & Payments",
-    description: "Track unpaid jobs and mark them as collected. See your earnings history and export reports for your accountant.",
+    description: "Track unpaid jobs and mark them as collected. Set up Direct Debit for automatic payments, see your earnings history, and export reports for your accountant. Payments with Direct Debit are collected automatically when you complete a job.",
     icon: <Wallet className="w-8 h-8" />,
     highlight: "money",
   },
   {
+    title: "Powerful Features",
+    description: "Capture photos of completed work, send SMS reminders with templates, optimize your route for efficiency, and set up Direct Debit for hassle-free payments. Everything you need to run your business smoothly.",
+    icon: <Camera className="w-8 h-8" />,
+  },
+  {
     title: "You're All Set!",
-    description: "That's the basics! Explore the Settings for more options. Tap anywhere to start using SoloWipe.",
+    description: "That's the basics! Explore the Settings for more options like SMS templates, business details, and subscription management. Tap anywhere to start using SoloWipe.",
     icon: <Settings className="w-8 h-8" />,
   },
 ];
@@ -223,7 +228,8 @@ export function useWelcomeTour() {
 
   const resetTour = () => {
     localStorage.removeItem(TOUR_COMPLETED_KEY);
-    setShowTour(true);
+    // Small delay to ensure smooth transition
+    setTimeout(() => setShowTour(true), 100);
   };
 
   return { showTour, completeTour, resetTour };

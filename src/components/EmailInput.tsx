@@ -10,11 +10,12 @@ interface EmailInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 't
 }
 
 export const EmailInput = forwardRef<HTMLInputElement, EmailInputProps>(
-  ({ className, showIcon = true, validation, showValidation = true, onBlur, ...props }, ref) => {
+  ({ className, showIcon = true, validation, showValidation = true, onBlur, id, ...props }, ref) => {
     const [touched, setTouched] = useState(false);
     
     const showError = showValidation && touched && validation && !validation.isEmpty && !validation.isValid;
     const showSuccess = showValidation && touched && validation && !validation.isEmpty && validation.isValid;
+    const errorId = id ? `${id}-error` : 'email-error';
 
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
       setTouched(true);
@@ -29,6 +30,7 @@ export const EmailInput = forwardRef<HTMLInputElement, EmailInputProps>(
           )}
           <input
             ref={ref}
+            id={id}
             type="email"
             className={cn(
               "w-full h-14 pr-12 rounded-xl",
@@ -40,6 +42,7 @@ export const EmailInput = forwardRef<HTMLInputElement, EmailInputProps>(
               className
             )}
             onBlur={handleBlur}
+            aria-describedby={showError ? errorId : undefined}
             {...props}
           />
           {showValidation && touched && !validation?.isEmpty && (
@@ -53,8 +56,8 @@ export const EmailInput = forwardRef<HTMLInputElement, EmailInputProps>(
           )}
         </div>
         {showError && validation?.error && (
-          <p className="text-xs text-destructive flex items-center gap-1 pl-1">
-            <AlertCircle className="w-3 h-3" />
+          <p id={errorId} className="text-xs text-destructive flex items-center gap-1 pl-1" role="alert">
+            <AlertCircle className="w-3 h-3" aria-hidden="true" />
             {validation.error}
           </p>
         )}

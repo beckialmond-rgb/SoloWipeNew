@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { X, HelpCircle, ChevronDown, ChevronUp, Mail, MessageCircle, FileText, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -15,31 +16,59 @@ const faqs: FAQItem[] = [
   },
   {
     question: "How do I mark a job as complete?",
-    answer: "On the Today tab, find the job you've completed and tap the green 'Done' button. The job will be marked complete and automatically reschedule based on the customer's frequency.",
+    answer: "On the Today tab, find the job you've completed and swipe left or tap the green 'Done' button. You can adjust the price, add a photo, and send a receipt. The job will automatically reschedule based on the customer's frequency.",
   },
   {
     question: "How do I skip a job?",
-    answer: "If a customer isn't home or requests to skip, tap the 'Skip' button on the job card. The job will be rescheduled to their next regular date.",
+    answer: "If a customer isn't home or requests to skip, swipe right or tap the 'Skip' button on the job card. The job will be rescheduled to their next regular date.",
   },
   {
-    question: "How do I set up Direct Debit payments?",
-    answer: "Go to Settings and connect your GoCardless account. Once connected, you can set up Direct Debit mandates for individual customers from their customer card.",
+    question: "How do I set up Direct Debit (GoCardless) payments?",
+    answer: "Go to Settings > Financial > GoCardless and click 'Connect GoCardless'. Once connected, open a customer's card and click 'Send Direct Debit Invite'. The customer will receive an SMS with a link to set up their mandate. In sandbox mode, mandates take 1 business day to become active.",
+  },
+  {
+    question: "Why does my Direct Debit payment show as 'Processing'?",
+    answer: "GoCardless payments take 3-5 working days to process. When you complete a job with Direct Debit, it shows as 'Processing' until the funds arrive. You'll see a yellow badge with the estimated payout date. Once funds arrive, the status updates to 'Paid' automatically.",
+  },
+  {
+    question: "How do I customize SMS messages?",
+    answer: "Go to Settings > SMS Templates. You can customize messages for receipts, reminders, reviews, and more. Use variables like {{customer_firstName}} and {{job_total}} to personalize messages. Changes save automatically.",
   },
   {
     question: "How do I track my earnings?",
-    answer: "The Money tab shows all unpaid and paid jobs. For detailed reports and charts, go to Settings > Earnings & Stats.",
+    answer: "The Money tab shows all unpaid and paid jobs. For detailed reports, charts, and customer breakdowns, go to Settings > Earnings & Stats. You can filter by date range and see earnings by payment method.",
   },
   {
-    question: "How do I export data for my accountant?",
-    answer: "Go to Settings > Export for Xero. Select a date range and download a CSV file that's compatible with Xero and other accounting software.",
+    question: "What are Business Insights?",
+    answer: "Business Insights (Settings > Financial > Business Insights) shows your weekly earnings, customer count, upcoming jobs, and growth trends. It helps you understand your business performance at a glance.",
+  },
+  {
+    question: "How does the Price Increase Wizard work?",
+    answer: "Go to Settings > Financial > Price Increase Wizard. Select which customers to update, enter the new price, and choose whether to send SMS notifications. The wizard helps you manage price changes efficiently.",
+  },
+  {
+    question: "How do I send referral SMS to customers?",
+    answer: "Go to the Customers page and click 'Referral SMS'. Select which customers you want to send the referral message to. Each customer gets a unique referral code to share with friends and family.",
   },
   {
     question: "Can I use the app offline?",
-    answer: "Yes! SoloWipe works offline. Any changes you make will sync automatically when you're back online. Look for the offline indicator at the top of the screen.",
+    answer: "Yes! SoloWipe works offline. Any changes you make (completing jobs, adding customers, etc.) will sync automatically when you're back online. Look for the sync status in Settings to see when data was last synced.",
   },
   {
-    question: "How do I cancel my subscription?",
-    answer: "Go to Settings and find the Subscription section. Tap 'Manage Subscription' to open the billing portal where you can cancel or change your plan.",
+    question: "What happens when I reach the 10-job limit?",
+    answer: "You can complete 10 jobs for free to try SoloWipe. After that, you'll see a subscription prompt. Subscribe to unlock unlimited jobs, SMS receipts, route optimization, and all premium features. You can start with a 7-day free trial.",
+  },
+  {
+    question: "How do I manage my subscription?",
+    answer: "Go to Settings > Financial > Subscription. You can see your current plan, manage billing, or cancel your subscription. Tap 'Manage Subscription' to open the billing portal where you can update payment methods or cancel anytime.",
+  },
+  {
+    question: "How do I export data for my accountant?",
+    answer: "Go to Settings > Financial > Export for Xero. Select a date range and download a CSV file that's compatible with Xero and other accounting software. You can also export all your data from Settings > Data Management.",
+  },
+  {
+    question: "What is route optimization?",
+    answer: "Route optimization (available on the Today tab) helps you plan the most efficient route for your jobs. It considers distance and suggests the best order to visit customers, saving you time and fuel.",
   },
 ];
 
@@ -50,9 +79,15 @@ interface HelpSectionProps {
 
 export function HelpSection({ isOpen, onClose }: HelpSectionProps) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const handleContactSupport = () => {
     window.location.href = 'mailto:aaron@solowipe.co.uk?subject=SoloWipe Support Request';
+  };
+
+  const handleTermsPrivacy = () => {
+    onClose(); // Close help modal first
+    navigate('/legal'); // Navigate to legal page
   };
 
   return (
@@ -96,7 +131,7 @@ export function HelpSection({ isOpen, onClose }: HelpSectionProps) {
             <div className="overflow-y-auto max-h-[calc(85vh-80px)] pb-safe">
               {/* Quick Actions */}
               <div className="p-4 border-b border-border">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <Button
                     variant="outline"
                     onClick={handleContactSupport}
@@ -107,11 +142,22 @@ export function HelpSection({ isOpen, onClose }: HelpSectionProps) {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => window.open('https://solowipe.app/terms', '_blank')}
+                    onClick={handleTermsPrivacy}
                     className="h-auto py-4 flex flex-col items-center gap-2"
                   >
                     <FileText className="w-5 h-5 text-muted-foreground" />
                     <span className="text-sm">Terms & Privacy</span>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      onClose();
+                      navigate('/cookies');
+                    }}
+                    className="h-auto py-4 flex flex-col items-center gap-2"
+                  >
+                    <FileText className="w-5 h-5 text-muted-foreground" />
+                    <span className="text-sm">Cookie Policy</span>
                   </Button>
                 </div>
               </div>

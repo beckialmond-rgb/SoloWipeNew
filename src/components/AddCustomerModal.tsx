@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/drawer';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { customerSchema, validateForm, sanitizeString } from '@/lib/validations';
+import { customerSchema, validateForm, sanitizeString, cleanPhoneNumber } from '@/lib/validations';
 import { useToast } from '@/hooks/use-toast';
 import { FormField, getInputClassName } from '@/components/ui/form-field';
 
@@ -69,7 +69,7 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
       await onSubmit({
         name: validation.data.name,
         address: validation.data.address,
-        mobile_phone: validation.data.mobile_phone || '',
+        mobile_phone: cleanPhoneNumber(validation.data.mobile_phone) || '',
         price: validation.data.price,
         frequency_weeks: validation.data.frequency_weeks,
         first_clean_date: firstCleanDate,

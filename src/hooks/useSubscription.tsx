@@ -35,6 +35,7 @@ export function useSubscription() {
     }
 
     try {
+      setLoading(true);
       const { data, error } = await supabase.functions.invoke('check-subscription', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -42,7 +43,21 @@ export function useSubscription() {
       });
 
       if (error) {
-        console.error('Error checking subscription:', error);
+        // CORS errors or function not available - handle gracefully
+        if (error.message?.includes('CORS') || error.message?.includes('Failed to send') || error.message?.includes('ERR_FAILED')) {
+          console.warn('[useSubscription] Edge function not available (CORS/network error), using defaults');
+        } else {
+          console.warn('[useSubscription] Error checking subscription (non-critical):', error.message || error);
+        }
+        // On error, default to inactive (safer than assuming active)
+        setSubscription({
+          subscribed: false,
+          productId: null,
+          subscriptionEnd: null,
+          tier: null,
+          status: 'inactive',
+          trialEnd: null,
+        });
         setLoading(false);
         return;
       }
@@ -57,7 +72,16 @@ export function useSubscription() {
         trialEnd: data?.trial_end || null,
       });
     } catch (err) {
-      console.error('Failed to check subscription:', err);
+      console.error('[useSubscription] Failed to check subscription:', err);
+      // On error, default to inactive
+      setSubscription({
+        subscribed: false,
+        productId: null,
+        subscriptionEnd: null,
+        tier: null,
+        status: 'inactive',
+        trialEnd: null,
+      });
     } finally {
       setLoading(false);
     }
@@ -68,7 +92,7 @@ export function useSubscription() {
     checkSubscription();
   }, [checkSubscription]);
 
-  // Auto-refresh every minute
+  // Auto-refresh every minute to stay in sync with webhook updates
   useEffect(() => {
     if (!session?.access_token) return;
     
@@ -76,16 +100,21 @@ export function useSubscription() {
     return () => clearInterval(interval);
   }, [session?.access_token, checkSubscription]);
 
-  const createCheckout = async (priceType: 'monthly' | 'annual') => {
+  const createCheckout = async (priceType: 'monthly' | 'annual', couponCode?: string | null) => {
     if (!session?.access_token) {
       const authError = new Error('Not authenticated');
-      console.error('❌ STRIPE CHECKOUT ERROR: Authentication failed', { priceType });
+      console.error('❌ STRIPE CHECKOUT ERROR: Authentication failed', { priceType, couponCode });
       throw authError;
     }
 
     try {
+      const body: { priceType: string; couponCode?: string } = { priceType };
+      if (couponCode) {
+        body.couponCode = couponCode;
+      }
+      
       const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { priceType },
+        body,
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
@@ -94,6 +123,7 @@ export function useSubscription() {
       if (error) {
         console.error('❌ STRIPE CHECKOUT ERROR: Function invocation failed', {
           priceType,
+          couponCode,
           error: JSON.stringify(error, Object.getOwnPropertyNames(error)),
         });
         throw error;
@@ -102,6 +132,7 @@ export function useSubscription() {
       if (data?.error) {
         console.error('❌ STRIPE CHECKOUT ERROR: Server returned error', {
           priceType,
+          couponCode,
           error: data.error,
         });
         throw new Error(data.error);
@@ -111,12 +142,17 @@ export function useSubscription() {
         const noUrlError = new Error('No checkout URL returned from server');
         console.error('❌ STRIPE CHECKOUT ERROR: Missing checkout URL', {
           priceType,
+          couponCode,
           data,
         });
         throw noUrlError;
       }
       
-      console.log('✅ Stripe checkout session created successfully', { priceType, url: data.url });
+      console.log('✅ Stripe checkout session created successfully', { 
+        priceType, 
+        couponCode: couponCode || 'none',
+        url: data.url 
+      });
       return data.url;
     } catch (err) {
       // Re-throw after logging
@@ -152,6 +188,7 @@ export function useSubscription() {
   return {
     ...subscription,
     loading,
+    hasActiveSubscription: subscription.subscribed, // Alias for compatibility
     checkSubscription,
     createCheckout,
     openCustomerPortal,

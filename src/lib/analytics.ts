@@ -13,7 +13,17 @@ type EventName =
   | 'dd_mandate_created'
   | 'page_view'
   | 'feature_used'
-  | 'error_occurred';
+  | 'error_occurred'
+  | 'signup_started'
+  | 'signup_completed'
+  | 'signup_failed'
+  | 'signup_email_verification_sent'
+  | 'login_started'
+  | 'login_completed'
+  | 'login_failed'
+  | 'oauth_signin_started'
+  | 'oauth_signin_completed'
+  | 'oauth_signin_failed';
 
 interface EventProperties {
   [key: string]: string | number | boolean | undefined;

@@ -16,7 +16,7 @@ const Install = () => {
   const handleInstall = async () => {
     const success = await promptInstall();
     if (success) {
-      navigate('/');
+      navigate('/dashboard');
     }
   };
 
@@ -35,7 +35,7 @@ const Install = () => {
           SoloWipe is ready to use from your home screen.
         </p>
         <Button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/dashboard')}
           className="h-14 px-8 rounded-xl bg-primary hover:bg-primary/90"
         >
           Open App
@@ -54,7 +54,7 @@ const Install = () => {
         {/* Header */}
         <div className="text-center mb-10">
           <img
-            src="/logo.png"
+            src="/SoloLogo.jpg"
             alt="SoloWipe"
             className="h-16 mx-auto mb-4"
           />

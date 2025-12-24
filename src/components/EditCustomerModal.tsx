@@ -4,7 +4,7 @@ import { X, User, MapPin, Phone, PoundSterling, Repeat, FileText } from 'lucide-
 import { Button } from '@/components/ui/button';
 import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
-import { customerSchema, validateForm, sanitizeString } from '@/lib/validations';
+import { customerSchema, validateForm, sanitizeString, cleanPhoneNumber } from '@/lib/validations';
 import { useToast } from '@/hooks/use-toast';
 import { FormField, getInputClassName } from '@/components/ui/form-field';
 
@@ -76,7 +76,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
       await onSubmit(customer.id, {
         name: validation.data.name,
         address: validation.data.address,
-        mobile_phone: validation.data.mobile_phone || null,
+        mobile_phone: cleanPhoneNumber(validation.data.mobile_phone),
         price: validation.data.price,
         frequency_weeks: validation.data.frequency_weeks,
         notes: validation.data.notes || null,
@@ -101,7 +101,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-foreground/50 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] bg-foreground/50 backdrop-blur-sm"
           onClick={handleBackdropClick}
         >
         <motion.div
@@ -110,28 +110,28 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           onClick={(e) => e.stopPropagation()}
-          className="absolute bottom-0 left-0 right-0 bg-card rounded-t-3xl max-h-[90vh] overflow-y-auto safe-bottom flex flex-col"
+          className="absolute left-0 right-0 bg-card rounded-t-3xl flex flex-col overflow-hidden"
+          style={{ 
+            bottom: '80px',
+            maxHeight: 'calc(90vh - 80px)'
+          }}
         >
-          {/* Handle */}
-          <div className="flex justify-center pt-3 pb-2">
-            <div className="w-12 h-1.5 bg-muted rounded-full" />
+          {/* Fixed Header */}
+          <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0 border-b border-border">
+            <h2 className="text-2xl font-bold text-foreground">Edit Customer</h2>
+            <button
+              onClick={handleBackdropClick}
+              disabled={isSubmitting}
+              className="p-2 rounded-full hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-target"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5 text-muted-foreground" />
+            </button>
           </div>
 
-          {/* Close button */}
-          <button
-            onClick={handleBackdropClick}
-            disabled={isSubmitting}
-            className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="Close"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-
-          <form onSubmit={handleSubmit} className="px-6 pb-8 pt-2 flex-1 overflow-y-auto">
-            <h2 className="text-2xl font-bold text-foreground mb-6">Edit Customer</h2>
-
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
             {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto px-4 py-4">
+            <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
               <div className="space-y-4">
               {/* Name */}
               <FormField 
@@ -251,22 +251,24 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
                   )}
                 />
               </FormField>
-              </div>
+            </div>
             </div>
 
-            {/* Submit Button - Sticky at bottom */}
-            <div className="sticky bottom-0 bg-card pt-4 -mx-6 px-6 border-t border-border mt-6">
+            {/* Fixed Footer with Submit Button */}
+            <div className="flex-shrink-0 bg-card pt-4 pb-24 border-t border-border px-6 safe-bottom">
               <Button
                 type="submit"
                 disabled={isSubmitting || !name.trim() || !address.trim()}
+                size="lg"
                 className={cn(
-                  "w-full fat-button rounded-xl",
+                  "w-full rounded-lg touch-sm min-h-[44px] gap-2",
                   "bg-primary hover:bg-primary/90 text-primary-foreground",
-                  "font-semibold text-base",
                   "disabled:opacity-50"
                 )}
               >
-                {isSubmitting ? 'Saving...' : 'Save Changes'}
+                <span className="text-sm font-medium">
+                  {isSubmitting ? 'Saving...' : 'Save Changes'}
+                </span>
               </Button>
             </div>
           </form>

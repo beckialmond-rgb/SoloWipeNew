@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Users, Plus, CreditCard, Send, CheckSquare, Square, Loader2, X, Download, Upload, Mail } from 'lucide-react';
+import { Search, Users, Plus, CreditCard, Send, CheckSquare, Square, Loader2, X, Download, Upload, Mail, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
@@ -8,6 +8,7 @@ import { CustomerDetailModal } from '@/components/CustomerDetailModal';
 import { AddCustomerModal } from '@/components/AddCustomerModal';
 import { EditCustomerModal } from '@/components/EditCustomerModal';
 import { CustomerHistoryModal } from '@/components/CustomerHistoryModal';
+import { ReferralSMSModal } from '@/components/ReferralSMSModal';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { Button } from '@/components/ui/button';
@@ -18,12 +19,15 @@ import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { downloadCustomersForXero } from '@/utils/exportCSV';
+import { useSMSTemplateContext } from '@/contexts/SMSTemplateContext';
+import { prepareSMSContext, openSMSApp } from '@/utils/openSMS';
 
 type DDFilter = 'all' | 'with-dd' | 'without-dd' | 'pending';
 
 const Customers = () => {
   const { customers, businessName, profile, isLoading, addCustomer, updateCustomer, archiveCustomer, refetchAll } = useSupabaseData();
   const { requirePremium } = useSoftPaywall();
+  const { showTemplatePicker } = useSMSTemplateContext();
   const [searchQuery, setSearchQuery] = useState('');
   const [ddFilter, setDDFilter] = useState<DDFilter>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -33,6 +37,7 @@ const Customers = () => {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSendingBulkDD, setIsSendingBulkDD] = useState(false);
+  const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
 
   const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
 
@@ -94,11 +99,23 @@ const Customers = () => {
       return;
     }
 
+    // For bulk operations, we'll process each customer individually with template picker
+    // This ensures each customer gets a personalized message
     setIsSendingBulkDD(true);
-    let successCount = 0;
-    let failCount = 0;
+    let processedCount = 0;
+    const totalCustomers = selectedCustomers.length;
 
-    for (const customer of selectedCustomers) {
+    const processNextCustomer = async (index: number) => {
+      if (index >= selectedCustomers.length) {
+        setIsSendingBulkDD(false);
+        clearSelection();
+        refetchAll();
+        toast.success(`Processed ${processedCount} customer${processedCount !== 1 ? 's' : ''}`);
+        return;
+      }
+
+      const customer = selectedCustomers[index];
+      
       try {
         const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
           body: { customerId: customer.id }
@@ -107,31 +124,35 @@ const Customers = () => {
         if (error) throw error;
         if (!data?.authorisationUrl) throw new Error('No authorization URL returned');
 
-        const firstName = customer.name.split(' ')[0];
-        const message = encodeURIComponent(
-          `Hi ${firstName}, please set up your Direct Debit for ${businessName} using this secure link: ${data.authorisationUrl}`
-        );
-        const phone = customer.mobile_phone?.replace(/\s/g, '') || '';
-        
-        // Open SMS for each customer (will open multiple SMS apps)
-        window.open(`sms:${phone}?body=${message}`, '_blank');
-        successCount++;
+        if (!customer.mobile_phone) {
+          console.warn(`Customer ${customer.name} has no phone number, skipping`);
+          processNextCustomer(index + 1);
+          return;
+        }
+
+        const context = prepareSMSContext({
+          customerName: customer.name,
+          ddLink: data.authorisationUrl,
+          businessName,
+        });
+
+        // Show template picker for this customer
+        showTemplatePicker('dd_bulk_invite', context, (message) => {
+          openSMSApp(customer.mobile_phone, message);
+          processedCount++;
+          // Process next customer after a short delay to allow SMS app to open
+          setTimeout(() => processNextCustomer(index + 1), 500);
+        });
       } catch (error) {
         console.error(`Failed to generate DD link for ${customer.name}:`, error);
-        failCount++;
+        toast.error(`Failed for ${customer.name}`);
+        // Continue with next customer even if this one failed
+        processNextCustomer(index + 1);
       }
-    }
+    };
 
-    setIsSendingBulkDD(false);
-    clearSelection();
-    refetchAll();
-
-    if (successCount > 0) {
-      toast.success(`Opened SMS for ${successCount} customer${successCount !== 1 ? 's' : ''}`);
-    }
-    if (failCount > 0) {
-      toast.error(`Failed for ${failCount} customer${failCount !== 1 ? 's' : ''}`);
-    }
+    // Start processing from the first customer
+    processNextCustomer(0);
   };
 
   const handleEditCustomer = (customer: Customer) => {
@@ -142,13 +163,29 @@ const Customers = () => {
 
   const handleArchiveCustomer = async (customerId: string) => {
     if (!requirePremium('edit')) return;
-    await archiveCustomer(customerId);
-    setSelectedCustomer(null);
+    
+    try {
+      await archiveCustomer(customerId);
+      
+      // Close the modal after successful archive
+      setTimeout(() => {
+        setSelectedCustomer(null);
+      }, 200);
+    } catch (error) {
+      console.error('[Customers] Error archiving customer:', error);
+      // Error toast is already shown by archiveCustomer function
+      // Modal stays open so user can see the error and try again if needed
+    }
   };
 
   const handleViewHistory = (customer: Customer) => {
+    // Close detail modal first, then open history modal after a brief delay
+    // This ensures proper modal transition and prevents z-index conflicts
     setSelectedCustomer(null);
-    setHistoryCustomer(customer);
+    // Small delay to allow detail modal to start closing animation
+    setTimeout(() => {
+      setHistoryCustomer(customer);
+    }, 150);
   };
 
   const handleAddClick = () => {
@@ -215,50 +252,51 @@ const Customers = () => {
           </motion.div>
         ) : (
           <>
-            {/* Search */}
+            {/* Search - Enhanced Fintech Style */}
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className="mb-6"
             >
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground z-10" />
                 <input
                   type="text"
                   placeholder="Search customers..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className={cn(
-                    "w-full h-12 pl-12 pr-4 rounded-xl",
-                    "bg-muted border border-border",
+                    "w-full h-12 pl-12 pr-4 rounded-xl touch-sm",
+                    "bg-card border border-border shadow-sm",
                     "text-foreground placeholder:text-muted-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
-                    "transition-all duration-200"
+                    "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50",
+                    "transition-all duration-200",
+                    "dark:bg-card dark:border-border"
                   )}
                 />
               </div>
             </motion.div>
 
-            {/* DD Filter - only show if GoCardless connected */}
+            {/* DD Filter - only show if GoCardless connected - Optimized for mobile */}
             {isGoCardlessConnected && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="flex gap-2 mb-4 overflow-x-auto pb-1"
+                className="flex gap-2 mb-4 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide"
               >
                 <button
                   onClick={() => setDDFilter('all')}
                   className={cn(
-                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5",
+                    "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
                     ddFilter === 'all'
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
                   )}
                 >
                   All
                   <span className={cn(
-                    "px-1.5 py-0.5 rounded-full text-[10px] font-bold min-w-[20px] text-center",
+                    "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
                     ddFilter === 'all' ? "bg-primary-foreground/20" : "bg-background"
                   )}>
                     {ddCounts.all}
@@ -267,16 +305,16 @@ const Customers = () => {
                 <button
                   onClick={() => setDDFilter('with-dd')}
                   className={cn(
-                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5",
+                    "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
                     ddFilter === 'with-dd'
-                      ? "bg-success text-success-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      ? "bg-success text-success-foreground shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
                   )}
                 >
-                  <CreditCard className="w-3.5 h-3.5" />
+                  <CreditCard className="w-4 h-4" />
                   DD
                   <span className={cn(
-                    "px-1.5 py-0.5 rounded-full text-[10px] font-bold min-w-[20px] text-center",
+                    "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
                     ddFilter === 'with-dd' ? "bg-success-foreground/20" : "bg-background"
                   )}>
                     {ddCounts.withDD}
@@ -285,15 +323,15 @@ const Customers = () => {
                 <button
                   onClick={() => setDDFilter('without-dd')}
                   className={cn(
-                    "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5",
+                    "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
                     ddFilter === 'without-dd'
-                      ? "bg-muted-foreground text-background"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      ? "bg-muted-foreground text-background shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
                   )}
                 >
                   No DD
                   <span className={cn(
-                    "px-1.5 py-0.5 rounded-full text-[10px] font-bold min-w-[20px] text-center",
+                    "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
                     ddFilter === 'without-dd' ? "bg-background/20" : "bg-background"
                   )}>
                     {ddCounts.withoutDD}
@@ -303,15 +341,15 @@ const Customers = () => {
                   <button
                     onClick={() => setDDFilter('pending')}
                     className={cn(
-                      "px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex items-center gap-1.5",
+                      "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
                       ddFilter === 'pending'
-                        ? "bg-warning text-warning-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        ? "bg-warning text-warning-foreground shadow-sm"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
                     )}
                   >
                     Pending
                     <span className={cn(
-                      "px-1.5 py-0.5 rounded-full text-[10px] font-bold min-w-[20px] text-center",
+                      "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
                       ddFilter === 'pending' ? "bg-warning-foreground/20" : "bg-background"
                     )}>
                       {ddCounts.pending}
@@ -321,40 +359,54 @@ const Customers = () => {
               </motion.div>
             )}
 
-            {/* Customer count and actions */}
-            <div className="flex items-center justify-between mb-5">
+            {/* Customer count and actions - Optimized for mobile */}
+            <div className="mb-5 space-y-3">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Users className="w-4 h-4" />
-                <span>{filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}</span>
+                <span className="font-medium">{filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}</span>
               </div>
               
-              <div className="flex items-center gap-2">
-                {/* Export to Xero button */}
-                {!selectMode && filteredCustomers.length > 0 && (
+              {/* Action buttons - Stack on mobile for better touch targets */}
+              {!selectMode && filteredCustomers.length > 0 && (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {/* Export to Xero button */}
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="default"
                     onClick={handleExportToXero}
-                    className="text-primary border-primary/20 hover:bg-primary/10"
+                    className="flex-1 h-11 text-primary border-primary/20 hover:bg-primary/10 touch-sm font-medium"
                   >
-                    <Download className="w-4 h-4 mr-1.5" />
+                    <Download className="w-4 h-4 mr-2" />
                     Export for Xero
                   </Button>
-                )}
-                
-                {/* Bulk DD Link action - only show if GoCardless connected and eligible customers exist */}
-                {isGoCardlessConnected && customersEligibleForDD.length > 0 && !selectMode && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectMode(true)}
-                    className="text-primary border-primary/20 hover:bg-primary/10"
-                  >
-                    <Send className="w-4 h-4 mr-1.5" />
-                    Bulk DD Link
-                  </Button>
-                )}
-              </div>
+                  
+                  {/* Bulk DD Link action - only show if GoCardless connected and eligible customers exist */}
+                  {isGoCardlessConnected && customersEligibleForDD.length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="default"
+                      onClick={() => setSelectMode(true)}
+                      className="flex-1 h-11 text-primary border-primary/20 hover:bg-primary/10 touch-sm font-medium"
+                    >
+                      <Send className="w-4 h-4 mr-2" />
+                      Bulk DD Link
+                    </Button>
+                  )}
+
+                  {/* Friends & Family Referral */}
+                  {customers.filter(c => c.mobile_phone).length > 0 && (
+                    <Button
+                      variant="outline"
+                      size="default"
+                      onClick={() => setIsReferralModalOpen(true)}
+                      className="flex-1 h-11 text-primary border-primary/20 hover:bg-primary/10 touch-sm font-medium"
+                    >
+                      <Gift className="w-4 h-4 mr-2" />
+                      Referral SMS
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Select mode header */}
@@ -411,7 +463,7 @@ const Customers = () => {
                 const isSelected = selectedIds.has(customer.id);
                 
                 return (
-                  <div key={customer.id} className="flex items-center gap-3 h-[72px] overflow-hidden">
+                  <div key={customer.id} className="flex items-center gap-3 min-h-[88px] overflow-hidden">
                     {/* Checkbox in select mode */}
                     {selectMode && (
                       <button
@@ -441,30 +493,30 @@ const Customers = () => {
               })}
             </div>
 
-            {/* Import Help CTA - only show when there are customers */}
+            {/* Import Help CTA - only show when there are customers - Optimized for mobile */}
             {!selectMode && filteredCustomers.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="mt-6 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30"
+                className="mt-6 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-200 dark:border-blue-900/30"
               >
                 <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-                    <Upload className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                    <Upload className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                    <p className="text-base font-semibold text-blue-900 dark:text-blue-100 mb-1.5">
                       Moving from another app?
                     </p>
-                    <p className="text-xs text-blue-700 dark:text-blue-300/80 mb-3">
+                    <p className="text-sm text-blue-700 dark:text-blue-300/80 mb-4">
                       Don't type them in manually! We can import your customers for you.
                     </p>
                     <a
                       href="mailto:support@solowipe.co.uk?subject=Help me import my customers"
-                      className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-200 dark:hover:bg-blue-900/60 rounded-lg transition-colors"
+                      className="inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-200 dark:hover:bg-blue-900/60 active:bg-blue-300 dark:active:bg-blue-900/80 rounded-lg transition-colors touch-sm w-full sm:w-auto"
                     >
-                      <Mail className="w-3.5 h-3.5" />
+                      <Mail className="w-4 h-4" />
                       Get Import Help
                     </a>
                   </div>
@@ -508,7 +560,7 @@ const Customers = () => {
       {selectedCustomer && (
         <CustomerDetailModal
           customer={selectedCustomer}
-          businessName={businessName}
+          businessName={businessName || profile?.business_name || 'My Window Cleaning'}
           profile={profile}
           onClose={() => setSelectedCustomer(null)}
           onEdit={handleEditCustomer}
@@ -538,6 +590,14 @@ const Customers = () => {
         customer={historyCustomer}
         isOpen={!!historyCustomer}
         onClose={() => setHistoryCustomer(null)}
+      />
+
+      {/* Referral SMS Modal */}
+      <ReferralSMSModal
+        isOpen={isReferralModalOpen}
+        onClose={() => setIsReferralModalOpen(false)}
+        customers={customers}
+        businessName={businessName || 'Your Business'}
       />
     </div>
   );

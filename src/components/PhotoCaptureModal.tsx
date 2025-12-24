@@ -98,7 +98,7 @@ export const PhotoCaptureModal = ({ isOpen, onClose, onCapture, jobId }: PhotoCa
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black z-50"
+        className="fixed inset-0 bg-black z-[70]"
       >
         {/* Header - fixed at top */}
         <div className="fixed top-0 left-0 right-0 flex items-center justify-between p-4 bg-black/80 z-10">

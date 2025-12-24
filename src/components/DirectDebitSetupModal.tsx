@@ -5,6 +5,8 @@ import { Loader2, Copy, MessageSquare, ExternalLink, CheckCircle2, Settings, Bug
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Customer } from '@/types/database';
+import { useSMSTemplateContext } from '@/contexts/SMSTemplateContext';
+import { openSMSApp, prepareSMSContext } from '@/utils/openSMS';
 import {
   Drawer,
   DrawerClose,
@@ -20,6 +22,7 @@ interface DirectDebitSetupModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  businessName?: string;
 }
 
 interface DebugLog {
@@ -29,8 +32,9 @@ interface DebugLog {
   status: 'info' | 'success' | 'error';
 }
 
-export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: DirectDebitSetupModalProps) {
+export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess, businessName = 'SoloWipe' }: DirectDebitSetupModalProps) {
   const navigate = useNavigate();
+  const { showTemplatePicker } = useSMSTemplateContext();
   const [isLoading, setIsLoading] = useState(false);
   const [authorisationUrl, setAuthorisationUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -85,12 +89,23 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
         },
       });
 
+      // Check for error in response data (non-2xx responses from Supabase functions)
+      if (data?.error && !error) {
+        addDebugLog('Function Error', `Error in data: ${data.error}`, 'error');
+        throw new Error(data.error || 'Failed to create Direct Debit setup');
+      }
+
       if (error) {
         addDebugLog('Function Error', JSON.stringify(error), 'error');
         throw error;
       }
 
       addDebugLog('Response', JSON.stringify(data), data?.authorisationUrl ? 'success' : 'error');
+
+      if (!data?.authorisationUrl) {
+        addDebugLog('Missing URL', 'Function response does not contain authorisation URL', 'error');
+        throw new Error('Failed to create Direct Debit setup link. Please try again.');
+      }
 
       if (data?.authorisationUrl) {
         setAuthorisationUrl(data.authorisationUrl);
@@ -155,11 +170,51 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
   const handleSendSms = () => {
     if (!authorisationUrl || !customer.mobile_phone) return;
     
-    const message = encodeURIComponent(
-      `Hi ${customer.name.split(' ')[0]}, please set up your Direct Debit for window cleaning payments using this secure link: ${authorisationUrl}`
-    );
-    addDebugLog('SMS Opened', `To: ${customer.mobile_phone}`, 'info');
-    window.open(`sms:${customer.mobile_phone}?body=${message}`, '_blank');
+    addDebugLog('SMS Template Picker', `Opening template picker for ${customer.name}`, 'info');
+    
+    const context = prepareSMSContext({
+      customerName: customer.name,
+      ddLink: authorisationUrl,
+      businessName: businessName,
+    });
+    
+    // Only update status to 'pending' AFTER user confirms sending SMS
+    // This prevents showing "pending" if user cancels the SMS picker
+    showTemplatePicker('dd_setup_modal_sms', context, async (message) => {
+      // User confirmed sending SMS - now update status to pending
+      try {
+        const { error: updateError } = await supabase
+          .from('customers')
+          .update({ 
+            gocardless_mandate_status: 'pending'
+          })
+          .eq('id', customer.id);
+
+        if (updateError) {
+          console.error('[DD Setup] Failed to update status to pending:', updateError);
+          addDebugLog('Status Update Failed', updateError.message, 'error');
+          // Continue anyway - SMS will be sent, status can be updated later
+        } else {
+          console.log('[DD Setup] Status updated to pending after SMS confirmation');
+          addDebugLog('Status Updated', 'Set to pending after SMS confirmation', 'success');
+        }
+      } catch (updateErr) {
+        console.error('[DD Setup] Error updating status:', updateErr);
+        addDebugLog('Status Update Error', updateErr instanceof Error ? updateErr.message : 'Unknown error', 'error');
+        // Continue anyway - SMS will be sent
+      }
+
+      addDebugLog('SMS Opened', `To: ${customer.mobile_phone}`, 'info');
+      openSMSApp(customer.mobile_phone, message);
+      
+      toast({
+        title: 'SMS sent!',
+        description: 'Direct Debit setup link sent. Customer status updated to pending.',
+      });
+      
+      // Trigger success callback to refresh data
+      onSuccess();
+    });
   };
 
   const handleOpenLink = () => {
@@ -194,8 +249,8 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
 
   return (
     <Drawer open={isOpen} onOpenChange={handleClose}>
-      <DrawerContent className="max-h-[85vh] flex flex-col">
-        <DrawerHeader className="text-left flex-shrink-0">
+      <DrawerContent className="max-h-[90vh] flex flex-col overflow-hidden">
+        <DrawerHeader className="text-left flex-shrink-0 border-b border-border">
           <div className="flex items-center justify-between">
             <div>
               <DrawerTitle>Set Up Direct Debit</DrawerTitle>
@@ -217,7 +272,7 @@ export function DirectDebitSetupModal({ customer, isOpen, onClose, onSuccess }: 
           </div>
         </DrawerHeader>
 
-        <div className="px-4 pb-4 overflow-y-auto flex-1">
+        <div className="px-4 pb-4 overflow-y-auto flex-1 min-h-0" style={{ maxHeight: 'calc(90vh - 180px)' }}>
           {/* Debug Panel */}
           {showDebug && (
             <div className="mb-4 p-3 bg-muted/50 rounded-lg border border-border text-xs font-mono">

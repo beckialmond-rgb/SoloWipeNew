@@ -5,12 +5,14 @@ export interface ExportJob extends JobWithCustomer {
   invoice_number: string | null;
 }
 
-// Calculate platform fee: (amount * 0.0075) + £0.20
+// Calculate SoloWipe Platform Fee: (amount * 0.0075) + £0.30
+// This is the platform commission fee
 function calculatePlatformFee(amountPounds: number): number {
-  return (amountPounds * 0.0075) + 0.20;
+  return (amountPounds * 0.0075) + 0.30;
 }
 
-// Calculate processing fee: (amount * 0.01) + £0.20, capped at £4.00
+// Calculate GoCardless Processing Fee: (amount * 0.01) + £0.20, capped at £4.00
+// This is the standard GoCardless fee (separate from our platform fee)
 function calculateProcessingFee(amountPounds: number): number {
   const fee = (amountPounds * 0.01) + 0.20;
   return Math.min(fee, 4.00);

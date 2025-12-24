@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Cloud, CloudRain, Sun, CloudSun, Snowflake, Wind, AlertTriangle } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useTimezone } from '@/hooks/useTimezone';
 
 interface WeatherData {
   temp: number;
@@ -11,9 +12,19 @@ interface WeatherData {
 
 // Simple weather simulation based on UK patterns
 // In production, you'd connect to OpenWeatherMap API
-function getSimulatedWeather(): WeatherData {
-  const hour = new Date().getHours();
-  const month = new Date().getMonth();
+function getSimulatedWeather(timezone: string): WeatherData {
+  // Get current hour and month in the user's timezone
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    hour: '2-digit',
+    month: '2-digit',
+    hour12: false,
+  });
+  
+  const parts = formatter.formatToParts(now);
+  const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+  const month = parseInt(parts.find(p => p.type === 'month')?.value || '1', 10) - 1;
   
   // Base temp varies by month (UK climate)
   const baseTemp = [4, 5, 7, 10, 14, 17, 19, 19, 16, 12, 7, 5][month];
@@ -37,7 +48,7 @@ function getSimulatedWeather(): WeatherData {
     }
   }
   
-  // Rain warning for afternoon
+  // Rain warning for afternoon (formatted in user's timezone)
   const rainExpected = condition !== 'rain' && Math.random() > 0.7 
     ? `${12 + Math.floor(Math.random() * 6)}:00`
     : undefined;
@@ -79,19 +90,20 @@ const WeatherIcon = ({ condition }: { condition: WeatherData['condition'] }) => 
 };
 
 export function WeatherWidget() {
+  const { timezone } = useTimezone();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   
   useEffect(() => {
     // Initial load
-    setWeather(getSimulatedWeather());
+    setWeather(getSimulatedWeather(timezone));
     
     // Update every 30 minutes
     const interval = setInterval(() => {
-      setWeather(getSimulatedWeather());
+      setWeather(getSimulatedWeather(timezone));
     }, 30 * 60 * 1000);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [timezone]);
   
   if (!weather) return null;
   

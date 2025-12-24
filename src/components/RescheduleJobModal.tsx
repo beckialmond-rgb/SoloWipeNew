@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
+import { format, addWeeks } from 'date-fns';
 import { CalendarIcon } from 'lucide-react';
 import {
   Dialog,
@@ -36,23 +36,20 @@ export function RescheduleJobModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  // Reset selected date when job changes
+  // Reset selected date when job changes or modal opens
+  // Auto-calculate next date based on customer frequency
   useEffect(() => {
     if (job && open) {
-      setSelectedDate(new Date(job.scheduled_date));
+      // Calculate next date: current scheduled_date + customer frequency
+      const currentDate = new Date(job.scheduled_date);
+      const frequencyWeeks = job.customer?.frequency_weeks ?? 4;
+      const nextDate = addWeeks(currentDate, frequencyWeeks);
+      setSelectedDate(nextDate);
     } else if (!open) {
       setSelectedDate(undefined);
     }
-  }, [job, open]);
-
-  // Reset selected date when job changes or modal opens
-  // Using useEffect instead of setState in render to prevent React warnings/infinite loops
-  useEffect(() => {
-    if (job && open) {
-      setSelectedDate(new Date(job.scheduled_date));
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job?.id, open]); // Only reset when job.id changes or modal opens (job object reference may change)
+  }, [job?.id, open]); // Only reset when job.id changes or modal opens
 
   // Clean up state when modal closes
   useEffect(() => {

@@ -16,9 +16,9 @@ const Terms = () => {
 
         {/* Header */}
         <div className="mb-8">
-          <img src="/logo.png" alt="SoloWipe" className="h-10 mb-6" />
+          <img src="/SoloLogo.jpg" alt="SoloWipe" className="h-10 mb-6" />
           <h1 className="text-3xl font-bold text-foreground mb-2">Terms of Service</h1>
-          <p className="text-muted-foreground">Last updated: December 2024</p>
+          <p className="text-muted-foreground">Last updated: January 2025</p>
         </div>
 
         {/* Content */}
@@ -79,8 +79,16 @@ const Terms = () => {
 
           <section>
             <h2 className="text-xl font-semibold text-foreground mb-3">7. Limitation of Liability</h2>
+            <p className="text-muted-foreground leading-relaxed mb-3">
+              Nothing in these Terms shall exclude or limit our liability for:
+            </p>
+            <ul className="list-disc list-inside text-muted-foreground mb-3 space-y-1">
+              <li>death or personal injury caused by our negligence;</li>
+              <li>fraud or fraudulent misrepresentation; or</li>
+              <li>any other liability that cannot be excluded or limited by English law.</li>
+            </ul>
             <p className="text-muted-foreground leading-relaxed">
-              SoloWipe shall not be liable for any indirect, incidental, special, consequential, or punitive damages 
+              Subject to the above, SoloWipe shall not be liable for any indirect, incidental, special, consequential, or punitive damages 
               resulting from your use of or inability to use the service. Our total liability shall not exceed the 
               amount paid by you for the service in the past 12 months.
             </p>
@@ -96,7 +104,16 @@ const Terms = () => {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-foreground mb-3">9. Contact Information</h2>
+            <h2 className="text-xl font-semibold text-foreground mb-3">9. Governing Law</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              These Terms shall be governed by and construed in accordance with the laws of England and Wales. 
+              Any disputes arising under or in connection with these Terms shall be subject to the exclusive 
+              jurisdiction of the courts of England and Wales.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-foreground mb-3">10. Contact Information</h2>
             <p className="text-muted-foreground leading-relaxed">
               If you have any questions about these Terms of Service, please contact us through the app settings 
               or email us at{' '}

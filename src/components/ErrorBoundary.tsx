@@ -98,7 +98,41 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    // Enhanced mobile error logging
+    const deviceInfo = {
+      userAgent: navigator.userAgent,
+      platform: navigator.platform,
+      language: navigator.language,
+      screenSize: `${window.screen.width}x${window.screen.height}`,
+      viewportSize: `${window.innerWidth}x${window.innerHeight}`,
+      online: navigator.onLine,
+      cookieEnabled: navigator.cookieEnabled,
+      storageAvailable: {
+        localStorage: (() => {
+          try {
+            localStorage.setItem('__test__', '1');
+            localStorage.removeItem('__test__');
+            return true;
+          } catch {
+            return false;
+          }
+        })(),
+        sessionStorage: (() => {
+          try {
+            sessionStorage.setItem('__test__', '1');
+            sessionStorage.removeItem('__test__');
+            return true;
+          } catch {
+            return false;
+          }
+        })(),
+        indexedDB: 'indexedDB' in window,
+      },
+    };
+
+    console.error('[ErrorBoundary] Caught an error:', error, errorInfo);
+    console.error('[ErrorBoundary] Device info:', deviceInfo);
+    console.error('[ErrorBoundary] Error stack:', error.stack);
     
     // Auto-recover from stale module errors
     if (isStaleModuleError(error) && !this.state.isRecovering) {
@@ -108,7 +142,12 @@ export class ErrorBoundary extends Component<Props, State> {
         console.warn('[ErrorBoundary] Auto-recovery already attempted this session; showing fallback UI instead.');
         return;
       }
-      sessionStorage.setItem('errorBoundaryAutoRecoveryCount', String(recoveryCount + 1));
+      try {
+        sessionStorage.setItem('errorBoundaryAutoRecoveryCount', String(recoveryCount + 1));
+      } catch {
+        // If sessionStorage fails, use a different method
+        console.warn('[ErrorBoundary] sessionStorage unavailable, skipping recovery count');
+      }
 
       console.log('[ErrorBoundary] Detected stale module error, initiating auto-recovery...');
       this.handleAutoRecovery();

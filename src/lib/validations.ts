@@ -16,7 +16,17 @@ export const customerSchema = z.object({
     .string()
     .trim()
     .max(20, 'Phone number must be less than 20 characters')
-    .regex(/^[\d\s\-+()]*$/, 'Phone number contains invalid characters')
+    .refine(
+      (val) => {
+        if (!val || val === '') return true; // Optional field
+        const validation = validateAndCleanPhoneNumber(val);
+        return validation.isValid;
+      },
+      (val) => {
+        const validation = validateAndCleanPhoneNumber(val);
+        return { message: validation.error || 'Invalid phone number format' };
+      }
+    )
     .optional()
     .or(z.literal('')),
   price: z
@@ -104,4 +114,87 @@ export function sanitizeString(input: string): string {
   return input
     .replace(/[<>]/g, '') // Remove potential HTML tags
     .trim();
+}
+
+/**
+ * Phone number validation and cleaning for UK numbers
+ * Validates UK phone number formats and cleans them for storage
+ */
+export function validateAndCleanPhoneNumber(phone: string | null | undefined): {
+  isValid: boolean;
+  cleaned?: string;
+  error?: string;
+} {
+  if (!phone || typeof phone !== 'string') {
+    return { isValid: true, cleaned: null }; // Phone is optional
+  }
+
+  // Remove all whitespace, dashes, parentheses, and plus signs for validation
+  const cleaned = phone.replace(/[\s\-+()]/g, '');
+
+  // Empty after cleaning is valid (optional field)
+  if (!cleaned) {
+    return { isValid: true, cleaned: null };
+  }
+
+  // Check if it contains only digits
+  if (!/^\d+$/.test(cleaned)) {
+    return {
+      isValid: false,
+      error: 'Phone number can only contain numbers, spaces, dashes, parentheses, or +',
+    };
+  }
+
+  // UK phone number validation
+  // Valid formats:
+  // - Mobile: 07xxxxxxxxx (11 digits starting with 07)
+  // - Landline: 01x xxxx xxxx, 02x xxxx xxxx (10-11 digits)
+  // - International: +44... (validated separately if starts with +44)
+  // - Short codes: 3-6 digits (for special services)
+
+  const length = cleaned.length;
+
+  // Too short or too long
+  if (length < 3 || length > 15) {
+    return {
+      isValid: false,
+      error: 'Phone number must be between 3 and 15 digits',
+    };
+  }
+
+  // UK mobile numbers (11 digits starting with 07)
+  if (length === 11 && cleaned.startsWith('07')) {
+    return { isValid: true, cleaned };
+  }
+
+  // UK landline numbers (10-11 digits starting with 01 or 02)
+  if ((length === 10 || length === 11) && (cleaned.startsWith('01') || cleaned.startsWith('02'))) {
+    return { isValid: true, cleaned };
+  }
+
+  // International format starting with 44 (UK country code)
+  if (length >= 12 && cleaned.startsWith('44')) {
+    return { isValid: true, cleaned };
+  }
+
+  // Short codes (3-6 digits) - accept but warn
+  if (length >= 3 && length <= 6) {
+    return { isValid: true, cleaned };
+  }
+
+  // If we get here, it's an unusual format but not necessarily invalid
+  // Accept it but store cleaned version
+  return {
+    isValid: true,
+    cleaned,
+  };
+}
+
+/**
+ * Clean phone number for display/storage (removes formatting)
+ */
+export function cleanPhoneNumber(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const result = validateAndCleanPhoneNumber(phone);
+  return result.cleaned ?? null;
 }

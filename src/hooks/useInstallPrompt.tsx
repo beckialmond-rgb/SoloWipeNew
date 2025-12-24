@@ -20,18 +20,32 @@ export const useInstallPrompt = () => {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
         (window.navigator as NavigatorWithStandalone).standalone === true;
       setIsInstalled(isStandalone);
+      
+      // If installed, ensure install prompt state is reset
+      if (isStandalone) {
+        setDeferredPrompt(null);
+        setCanInstall(false);
+      }
     };
     
     checkInstalled();
 
     // Listen for display mode changes
     const mediaQuery = window.matchMedia('(display-mode: standalone)');
-    mediaQuery.addEventListener('change', checkInstalled);
+    
+    // Use addEventListener for better browser support
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', checkInstalled);
+    } else {
+      // Fallback for older browsers
+      mediaQuery.addListener(checkInstalled);
+    }
 
     // Capture the install prompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
+      const promptEvent = e as BeforeInstallPromptEvent;
+      setDeferredPrompt(promptEvent);
       setCanInstall(true);
     };
 
@@ -49,25 +63,43 @@ export const useInstallPrompt = () => {
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
-      mediaQuery.removeEventListener('change', checkInstalled);
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', checkInstalled);
+      } else {
+        mediaQuery.removeListener(checkInstalled);
+      }
     };
   }, []);
 
   const promptInstall = useCallback(async () => {
-    if (!deferredPrompt) return false;
+    if (!deferredPrompt) {
+      console.warn('Install prompt not available');
+      return false;
+    }
 
     try {
+      // Show the install prompt
       await deferredPrompt.prompt();
+      
+      // Wait for user's choice
       const { outcome } = await deferredPrompt.userChoice;
       
+      // Clean up after user makes a choice
+      setDeferredPrompt(null);
+      setCanInstall(false);
+      
       if (outcome === 'accepted') {
-        setDeferredPrompt(null);
-        setCanInstall(false);
+        // Installation will trigger 'appinstalled' event
         return true;
       }
+      
+      // User dismissed - prompt may become available again later
       return false;
     } catch (error) {
       console.error('Error prompting install:', error);
+      // On error, clean up the deferred prompt
+      setDeferredPrompt(null);
+      setCanInstall(false);
       return false;
     }
   }, [deferredPrompt]);

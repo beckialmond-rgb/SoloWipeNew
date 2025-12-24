@@ -9,19 +9,22 @@ interface SkeletonLoaderProps {
 function JobCardSkeleton() {
   return (
     <motion.div 
-      initial={{ opacity: 0.5 }}
-      animate={{ opacity: [0.5, 1, 0.5] }}
-      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-      className="bg-card rounded-xl border border-border p-4"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="bg-card rounded-xl border-2 border-border p-5 shadow-depth-2 relative overflow-hidden card-premium"
     >
-      <div className="flex items-start gap-3">
-        <Skeleton className="w-10 h-10 rounded-full flex-shrink-0" />
-        <div className="flex-1 space-y-2">
-          <Skeleton className="h-5 w-3/4" />
-          <Skeleton className="h-4 w-1/2" />
-          <Skeleton className="h-4 w-1/4" />
+      {/* Premium shimmer overlay */}
+      <div className="absolute inset-0 skeleton-shimmer" />
+      
+      <div className="flex items-start gap-4 relative z-10">
+        <Skeleton className="w-12 h-12 rounded-xl flex-shrink-0 skeleton-premium" />
+        <div className="flex-1 space-y-3">
+          <Skeleton className="h-6 w-3/4 skeleton-premium rounded-lg" />
+          <Skeleton className="h-4 w-1/2 skeleton-premium rounded-lg" />
+          <Skeleton className="h-4 w-1/4 skeleton-premium rounded-lg" />
         </div>
-        <Skeleton className="w-20 h-10 rounded-lg" />
+        <Skeleton className="w-24 h-10 rounded-lg skeleton-premium" />
       </div>
     </motion.div>
   );
@@ -30,18 +33,20 @@ function JobCardSkeleton() {
 function CustomerCardSkeleton() {
   return (
     <motion.div 
-      initial={{ opacity: 0.5 }}
-      animate={{ opacity: [0.5, 1, 0.5] }}
-      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
-      className="bg-card rounded-xl border border-border p-4"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="bg-card rounded-xl border-2 border-border p-5 shadow-depth-2 relative overflow-hidden card-premium"
     >
-      <div className="flex items-center gap-3">
-        <Skeleton className="w-12 h-12 rounded-full" />
+      <div className="absolute inset-0 skeleton-shimmer" />
+      
+      <div className="flex items-center gap-4 relative z-10">
+        <Skeleton className="w-14 h-14 rounded-xl skeleton-premium" />
         <div className="flex-1 space-y-2">
-          <Skeleton className="h-5 w-1/2" />
-          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-5 w-1/2 skeleton-premium rounded-lg" />
+          <Skeleton className="h-4 w-3/4 skeleton-premium rounded-lg" />
         </div>
-        <Skeleton className="w-16 h-6 rounded-md" />
+        <Skeleton className="w-20 h-8 rounded-lg skeleton-premium" />
       </div>
     </motion.div>
   );
@@ -110,13 +115,18 @@ export function SkeletonLoader({ type, count = 3 }: SkeletonLoaderProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {Array.from({ length: count }).map((_, i) => (
         <motion.div
           key={i}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.1 }}
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ 
+            delay: i * 0.08,
+            duration: 0.4,
+            type: "spring",
+            stiffness: 100
+          }}
         >
           <SkeletonComponent />
         </motion.div>

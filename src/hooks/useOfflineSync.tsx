@@ -15,11 +15,31 @@ export function useOfflineSync() {
   const [isSyncing, setIsSyncing] = useState(false);
   const syncingRef = useRef(false);
 
+  // Track if we've already warned about large queue to avoid spam
+  const hasWarnedRef = useRef(false);
+  
   // Update pending count
   const updatePendingCount = useCallback(async () => {
     const count = await mutationQueue.count();
+    const previousCount = pendingCount;
     setPendingCount(count);
-  }, []);
+    
+    // Warn user if queue crosses the threshold (only once)
+    if (count >= 50 && previousCount < 50 && isOnline && !hasWarnedRef.current) {
+      hasWarnedRef.current = true;
+      toast({
+        title: 'Large offline queue',
+        description: `You have ${count} pending changes. Please sync now to avoid data loss.`,
+        variant: 'destructive',
+        duration: 5000,
+      });
+    }
+    
+    // Reset warning flag if queue drops below threshold
+    if (count < 50) {
+      hasWarnedRef.current = false;
+    }
+  }, [isOnline, pendingCount]);
 
   // Process a single mutation
   const processMutation = useCallback(async (mutation: OfflineMutation): Promise<boolean> => {
@@ -32,16 +52,15 @@ export function useOfflineSync() {
             photoUrl?: string;
             customerData: {
               customer_id: string;
-              frequency_weeks: number;
+              frequency_weeks: number | null;
               price: number;
               gocardless_id?: string;
+              scheduled_date?: string;
             };
           };
 
           const now = new Date();
           const completedAt = now.toISOString();
-          const nextDate = addWeeks(now, customerData.frequency_weeks);
-          const nextScheduledDate = format(nextDate, 'yyyy-MM-dd');
           const isGoCardless = !!customerData.gocardless_id;
           const amountCollected = customAmount ?? customerData.price;
 
@@ -62,16 +81,57 @@ export function useOfflineSync() {
 
           if (updateError) throw updateError;
 
-          // Create future job
-          const { error: insertError } = await supabase
-            .from('jobs')
-            .insert({
-              customer_id: customerData.customer_id,
-              scheduled_date: nextScheduledDate,
-              status: 'pending',
-            });
+          // Check for frequency - if missing or null, treat as 'One-off' and don't reschedule
+          const frequencyWeeks = customerData.frequency_weeks;
+          const shouldReschedule = frequencyWeeks != null && frequencyWeeks > 0;
+          
+          if (!shouldReschedule) {
+            console.log(`[Offline Sync] Customer ID ${customerData.customer_id} has no frequency (${frequencyWeeks}), treating as One-off. No reschedule.`);
+            break;
+          }
 
-          if (insertError) throw insertError;
+          // Validate scheduled_date if provided
+          let baseDate = now;
+          if (customerData.scheduled_date) {
+            try {
+              const parsedDate = new Date(customerData.scheduled_date);
+              if (!isNaN(parsedDate.getTime())) {
+                baseDate = parsedDate;
+              } else {
+                console.error(`[Offline Sync] Invalid scheduled_date for customer ID ${customerData.customer_id}:`, customerData.scheduled_date);
+              }
+            } catch (dateError) {
+              console.error(`[Offline Sync] Error parsing scheduled_date for customer ID ${customerData.customer_id}:`, dateError);
+            }
+          }
+
+          // Create future job only if rescheduling
+          try {
+            const nextDate = addWeeks(baseDate, frequencyWeeks);
+            const nextScheduledDate = format(nextDate, 'yyyy-MM-dd');
+            
+            const { error: insertError } = await supabase
+              .from('jobs')
+              .insert({
+                customer_id: customerData.customer_id,
+                scheduled_date: nextScheduledDate,
+                status: 'pending',
+              });
+
+            if (insertError) {
+              console.error(`[Offline Sync] Failed to create next job for customer ID ${customerData.customer_id}:`, insertError);
+              throw insertError;
+            }
+            
+            console.log(`[Offline Sync] Successfully created next job for customer ID ${customerData.customer_id}: ${nextScheduledDate}`);
+          } catch (rescheduleError) {
+            console.error(`[Offline Sync] Failed to reschedule job for customer ID ${customerData.customer_id}:`, {
+              frequency_weeks: frequencyWeeks,
+              scheduled_date: customerData.scheduled_date,
+              error: rescheduleError
+            });
+            // Don't fail the entire sync if rescheduling fails - job is already marked complete
+          }
           break;
         }
 

@@ -4,50 +4,51 @@ import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 import { Sparkles, Check, Clock, Shield, Zap, TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useUsageCounters } from '@/hooks/useUsageCounters';
 import { useState } from 'react';
 import { toast } from '@/hooks/use-toast';
 
 const TRIAL_BENEFITS = [
-  { icon: Zap, text: 'Complete jobs & auto-reschedule', highlight: 'Save 30+ mins daily' },
-  { icon: TrendingUp, text: 'Track payments & earnings', highlight: 'Never miss a payment' },
-  { icon: Shield, text: 'Photo evidence protection', highlight: 'Dispute-proof records' },
+  { icon: Zap, text: 'Unlimited jobs & customers', highlight: 'No limits, grow freely' },
+  { icon: TrendingUp, text: 'SMS receipts included', highlight: 'Covers SMS & GoCardless costs' },
+  { icon: Shield, text: 'Route optimization & insights', highlight: 'Work smarter, earn more' },
 ];
 
 const ACTION_CONTEXT = {
   complete: {
-    headline: "You're about to complete a job!",
-    subtext: "Subscribe to track earnings, auto-reschedule, and grow your business.",
-    emoji: "✓",
+    headline: "You've automated 10 cleans!",
+    subtext: "Upgrade to keep your business sparkling. Unlimited jobs & SMS receipts.",
+    emoji: "🎉",
   },
   skip: {
-    headline: "Need to skip this job?",
-    subtext: "Subscribe to auto-reschedule and keep your calendar organised.",
-    emoji: "⏭️",
+    headline: "You've automated 10 cleans!",
+    subtext: "Upgrade to keep your business sparkling. Unlimited jobs & SMS receipts.",
+    emoji: "🎉",
   },
   'add-customer': {
-    headline: "Ready to add a customer?",
-    subtext: "Subscribe to build your customer list and grow your round.",
-    emoji: "👤",
+    headline: "You've automated 10 cleans!",
+    subtext: "Upgrade to keep your business sparkling. Unlimited customers & features.",
+    emoji: "🎉",
   },
   'mark-paid': {
-    headline: "Time to record a payment!",
-    subtext: "Subscribe to track who owes you and never chase money again.",
-    emoji: "💷",
+    headline: "You've automated 10 cleans!",
+    subtext: "Upgrade to keep your business sparkling. Track payments & earnings.",
+    emoji: "🎉",
   },
   edit: {
-    headline: "Want to update this info?",
-    subtext: "Subscribe to manage customer details and preferences.",
-    emoji: "✏️",
+    headline: "You've automated 10 cleans!",
+    subtext: "Upgrade to keep your business sparkling. Manage all your customers.",
+    emoji: "🎉",
   },
   default: {
-    headline: "Unlock the full app",
-    subtext: "Subscribe to access all features and streamline your business.",
-    emoji: "🚀",
+    headline: "You've automated 10 cleans!",
+    subtext: "Upgrade to keep your business sparkling. Unlimited jobs & SMS receipts.",
+    emoji: "🎉",
   },
 };
 
 const EXPIRED_CONTEXT = {
-  headline: "Your trial has ended",
+  headline: "Your free trial has ended",
   subtext: "Subscribe now to continue using all premium features.",
   emoji: "⏰",
 };
@@ -55,7 +56,11 @@ const EXPIRED_CONTEXT = {
 export function TrialGateModal() {
   const { isModalOpen, triggerAction, isTrialExpired, closePaywall } = useSoftPaywall();
   const { createCheckout } = useSubscription();
+  const { data: usageCounters } = useUsageCounters();
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Show jobs completed if available
+  const jobsCompleted = usageCounters?.jobs_completed_count || 0;
 
   const handleSubscribe = async (priceType: 'monthly' | 'annual') => {
     // Prevent double-clicks
@@ -70,8 +75,12 @@ export function TrialGateModal() {
       const url = await createCheckout(priceType);
       if (url) {
         console.log(`➡️ Redirecting to Stripe checkout: ${url}`);
-        window.location.href = url;
+        // Close paywall before redirecting - subscription will be active when they return
         closePaywall();
+        // Small delay to ensure modal closes before redirect
+        setTimeout(() => {
+          window.location.href = url;
+        }, 100);
       } else {
         throw new Error('No checkout URL received');
       }
@@ -88,7 +97,6 @@ export function TrialGateModal() {
         description: errorMessage,
         variant: 'destructive',
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -134,21 +142,37 @@ export function TrialGateModal() {
             <DialogTitle className="text-2xl font-bold text-primary-foreground leading-tight">
               {context.headline}
             </DialogTitle>
-            <DialogDescription className="text-primary-foreground/85 mt-2 text-base">
+            <DialogDescription className="text-primary-foreground/90 mt-2 text-base font-medium">
               {context.subtext}
             </DialogDescription>
+            {!isTrialExpired && (
+              <p className="text-primary-foreground/75 text-sm mt-3">
+                You've used all your free jobs. Subscribe now to continue with unlimited access.
+              </p>
+            )}
           </DialogHeader>
 
-          {/* Trial badge - only show if not expired */}
-          {!isTrialExpired && (
+          {/* Usage badge - show jobs completed and progress */}
+          {!isTrialExpired && jobsCompleted > 0 && (
             <motion.div
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.15 }}
-              className="mt-6 inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2"
+              className="mt-6 space-y-2"
             >
-              <Clock className="w-4 h-4" />
-              <span className="text-sm font-semibold">7 days free trial</span>
+              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2">
+                <Check className="w-4 h-4" />
+                <span className="text-sm font-semibold">{jobsCompleted} of 10 free jobs used</span>
+              </div>
+              {/* Progress bar */}
+              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(100, (jobsCompleted / 10) * 100)}%` }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                  className="h-full bg-white/80 rounded-full"
+                />
+              </div>
             </motion.div>
           )}
         </motion.div>
@@ -211,7 +235,7 @@ export function TrialGateModal() {
                   </>
                 ) : (
                   <>
-                    Start Free Trial - £15/month
+                    Start Free Trial — Then £15/month
                     <Sparkles className="w-5 h-5 ml-2" />
                   </>
                 )}

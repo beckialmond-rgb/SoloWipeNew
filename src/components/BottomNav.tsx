@@ -12,18 +12,20 @@ export function BottomNav() {
   const { pendingCount } = useOffline();
   const today = format(new Date(), 'yyyy-MM-dd');
 
-  // Count unpaid jobs (only for active customers)
+  // Count unpaid jobs (includes archived customers for accurate financial tracking)
   const { data: unpaidCount = 0 } = useQuery({
     queryKey: ['unpaidCount', user?.id],
     queryFn: async () => {
       if (!user) return 0;
       
+      // NOTE: Include unpaid jobs from archived customers for accurate financial tracking
+      // Archived customers are hidden from customer list but their unpaid jobs still need to be collected
       const { count, error } = await supabase
         .from('jobs')
         .select('*, customer:customers!inner(*)', { count: 'exact', head: true })
         .eq('status', 'completed')
-        .eq('payment_status', 'unpaid')
-        .eq('customer.status', 'active');
+        .eq('payment_status', 'unpaid');
+        // NOTE: Removed customer.status filter - include archived customers' unpaid jobs
       
       if (error) {
         console.error('Failed to fetch unpaid count:', error);
@@ -62,7 +64,7 @@ export function BottomNav() {
   });
 
   const navItems = [
-    { to: '/', icon: Home, label: 'Today', badge: pendingTodayCount, badgeColor: 'bg-primary' },
+    { to: '/dashboard', icon: Home, label: 'Today', badge: pendingTodayCount, badgeColor: 'bg-primary' },
     { to: '/customers', icon: Users, label: 'Customers', badge: 0, badgeColor: '' },
     { to: '/money', icon: Wallet, label: 'Money', badge: unpaidCount, badgeColor: 'bg-amber-500' },
     { to: '/calendar', icon: CalendarDays, label: 'Calendar', badge: 0, badgeColor: '' },
@@ -70,7 +72,7 @@ export function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-sm border-t border-border safe-bottom">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-md border-t border-border/50 shadow-lg safe-bottom">
       <div className="flex items-center justify-around h-18 max-w-lg mx-auto py-2">
         {navItems.map(({ to, icon: Icon, label, badge, badgeColor }) => (
           <NavLink

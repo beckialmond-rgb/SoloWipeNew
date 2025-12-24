@@ -38,6 +38,7 @@ export function OfflineIndicator() {
   }, [isSyncing]);
 
   const shouldShow = !isOnline || pendingCount > 0 || isSyncing || showReconnected;
+  const isQueueLarge = pendingCount >= 50;
 
   return (
     <AnimatePresence>
@@ -52,11 +53,15 @@ export function OfflineIndicator() {
             className={cn(
               "relative overflow-hidden",
               !isOnline
-                ? 'bg-amber-500 text-amber-950'
+                ? isQueueLarge
+                  ? 'bg-red-600 text-white'
+                  : 'bg-amber-500 text-amber-950'
                 : showReconnected && !isSyncing
                 ? 'bg-emerald-500 text-emerald-950'
                 : isSyncing
                 ? 'bg-primary text-primary-foreground'
+                : isQueueLarge
+                ? 'bg-orange-500 text-white'
                 : 'bg-blue-500 text-white'
             )}
           >
@@ -94,7 +99,12 @@ export function OfflineIndicator() {
               ) : pendingCount > 0 ? (
                 <>
                   <Cloud className="h-4 w-4" />
-                  <span>{pendingCount} change{pendingCount > 1 ? 's' : ''} will sync shortly</span>
+                  <span>
+                    {pendingCount} change{pendingCount > 1 ? 's' : ''} will sync shortly
+                    {isQueueLarge && (
+                      <span className="ml-2 font-semibold">⚠️ Queue is large - sync soon!</span>
+                    )}
+                  </span>
                 </>
               ) : null}
             </div>

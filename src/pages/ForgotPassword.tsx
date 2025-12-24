@@ -50,7 +50,7 @@ const ForgotPassword = forwardRef<HTMLDivElement>((_, ref) => {
           {/* Logo */}
           <div className="text-center mb-10">
             <img 
-              src="/logo.png" 
+              src="/SoloLogo.jpg" 
               alt="SoloWipe" 
               className="h-12 mx-auto mb-4"
             />

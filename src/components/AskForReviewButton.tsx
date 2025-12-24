@@ -2,6 +2,8 @@ import { Star } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { useSMSTemplateContext } from '@/contexts/SMSTemplateContext';
+import { prepareSMSContext, openSMSApp } from '@/utils/openSMS';
 
 interface AskForReviewButtonProps {
   customerName: string;
@@ -18,6 +20,7 @@ export function AskForReviewButton({
   googleReviewLink,
   className 
 }: AskForReviewButtonProps) {
+  const { showTemplatePicker } = useSMSTemplateContext();
   
   const handleAskForReview = () => {
     if (!customerPhone) {
@@ -29,22 +32,14 @@ export function AskForReviewButton({
       return;
     }
     
-    const phone = customerPhone.replace(/\s/g, '');
-    
-    let message = `Hi ${customerName}, thanks for using ${businessName}! If you're happy with the clean, we'd really appreciate a quick Google review.`;
-    
-    if (googleReviewLink) {
-      message += ` ${googleReviewLink}`;
-    }
-    
-    message += ` Thank you! 🙏`;
-    
-    const encodedMessage = encodeURIComponent(message);
-    window.open(`sms:${phone}?body=${encodedMessage}`, '_self');
-    
-    toast({
-      title: "Review request opened",
-      description: "SMS app opened with review request.",
+    const context = prepareSMSContext({
+      customerName,
+      businessName,
+      review_link: googleReviewLink || '',
+    });
+
+    showTemplatePicker('review_request', context, (message) => {
+      openSMSApp(customerPhone, message);
     });
   };
 
@@ -55,15 +50,20 @@ export function AskForReviewButton({
       whileTap={{ scale: 0.95 }}
       onClick={handleAskForReview}
       className={cn(
-        "flex items-center gap-1.5 px-3 py-1.5",
-        "bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-lg",
-        "text-xs font-medium",
-        "hover:bg-amber-500/20 transition-colors",
+        "flex items-center gap-2 px-4 py-2",
+        "bg-amber-500/15 dark:bg-amber-500/20",
+        "text-amber-700 dark:text-amber-300",
+        "border border-amber-500/30 dark:border-amber-500/40",
+        "rounded-lg text-sm font-semibold",
+        "hover:bg-amber-500/25 dark:hover:bg-amber-500/30",
+        "hover:border-amber-500/50 dark:hover:border-amber-500/60",
+        "transition-all shadow-sm hover:shadow",
+        "active:scale-95",
         className
       )}
     >
-      <Star className="w-3.5 h-3.5" />
-      <span>Ask Review</span>
+      <Star className="w-4 h-4 fill-amber-500/20" />
+      <span>Ask for Review</span>
     </motion.button>
   );
 }

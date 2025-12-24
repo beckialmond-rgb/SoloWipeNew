@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, Loader2, FileJson, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
@@ -16,6 +18,7 @@ export const DataExportModal = React.forwardRef<HTMLDivElement, DataExportModalP
   const { user } = useAuth();
   const [isExporting, setIsExporting] = useState(false);
   const [exportComplete, setExportComplete] = useState(false);
+  const [includeArchived, setIncludeArchived] = useState(true);
 
   const handleExport = async () => {
     if (!user) return;
@@ -24,11 +27,22 @@ export const DataExportModal = React.forwardRef<HTMLDivElement, DataExportModalP
     setExportComplete(false);
 
     try {
+      // Build queries based on includeArchived toggle
+      let customersQuery = supabase.from('customers').select('*').eq('profile_id', user.id);
+      if (!includeArchived) {
+        customersQuery = customersQuery.eq('is_archived', false);
+      }
+      
+      let jobsQuery = supabase.from('jobs').select('*, customers!inner(profile_id)').eq('customers.profile_id', user.id);
+      if (!includeArchived) {
+        jobsQuery = jobsQuery.eq('customers.is_archived', false);
+      }
+      
       // Fetch all user data
       const [profileResult, customersResult, jobsResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', user.id).single(),
-        supabase.from('customers').select('*').eq('profile_id', user.id),
-        supabase.from('jobs').select('*, customers!inner(profile_id)').eq('customers.profile_id', user.id),
+        customersQuery,
+        jobsQuery,
       ]);
 
       if (profileResult.error) throw profileResult.error;
@@ -124,15 +138,33 @@ export const DataExportModal = React.forwardRef<HTMLDivElement, DataExportModalP
 
             {/* Content */}
             <div className="px-6 pb-6">
-              <div className="bg-muted/30 rounded-lg p-4 mb-4">
-                <h3 className="font-medium text-foreground mb-2">What's included:</h3>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  <li>• Your profile information</li>
-                  <li>• All customer records</li>
-                  <li>• Complete job history</li>
-                  <li>• Payment records</li>
-                  <li>• Usage statistics</li>
-                </ul>
+              <div className="mb-4">
+                <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg mb-4">
+                  <div className="flex-1">
+                    <Label htmlFor="include-archived-data" className="text-sm font-medium text-foreground cursor-pointer">
+                      Include Archived Customers
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Include archived customers and their data for complete backup
+                    </p>
+                  </div>
+                  <Switch
+                    id="include-archived-data"
+                    checked={includeArchived}
+                    onCheckedChange={setIncludeArchived}
+                  />
+                </div>
+                
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <h3 className="font-medium text-foreground mb-2">What's included:</h3>
+                  <ul className="text-sm text-muted-foreground space-y-1">
+                    <li>• Your profile information</li>
+                    <li>• {includeArchived ? 'All' : 'Active'} customer records</li>
+                    <li>• Complete job history</li>
+                    <li>• Payment records</li>
+                    <li>• Usage statistics</li>
+                  </ul>
+                </div>
               </div>
 
               <p className="text-sm text-muted-foreground mb-6">

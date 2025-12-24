@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, addMonths, subMonths, isToday, parseISO, startOfWeek, endOfWeek, addWeeks, subWeeks, isWithinInterval } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, Clock, Plus, Grid3X3, List } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, CheckCircle, Clock, Plus, Grid3X3, List, Target, PoundSterling, AlertCircle } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingState } from '@/components/LoadingState';
@@ -41,6 +41,32 @@ const Calendar = () => {
 
   // Get jobs for selected date
   const selectedDateJobs = selectedDate ? getJobsForDate(selectedDate) : [];
+
+  // Calculate stats for selected date
+  const selectedDateStats = useMemo(() => {
+    if (!selectedDate) return null;
+    const jobs = getJobsForDate(selectedDate);
+    const pendingJobs = jobs.filter(j => j.status === 'pending');
+    const completedJobs = jobs.filter(j => j.status === 'completed');
+    const unpaidJobs = jobs.filter(j => j.status === 'completed' && j.payment_status === 'unpaid');
+    
+    const totalRevenue = jobs.reduce((sum, job) => {
+      return sum + (job.amount_collected ?? job.customer.price ?? 0);
+    }, 0);
+    
+    const potentialRevenue = pendingJobs.reduce((sum, job) => {
+      return sum + (job.customer.price ?? 0);
+    }, 0);
+    
+    return {
+      total: jobs.length,
+      pending: pendingJobs.length,
+      completed: completedJobs.length,
+      unpaid: unpaidJobs.length,
+      totalRevenue,
+      potentialRevenue,
+    };
+  }, [selectedDate, allJobs]);
 
   // Calendar grid days - month view
   const monthStart = startOfMonth(currentDate);
@@ -132,17 +158,23 @@ const Calendar = () => {
           <LoadingState message="Loading calendar..." />
         ) : (
           <>
-            {/* Calendar Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <CalendarDays className="w-6 h-6 text-primary" />
-                <h1 className="text-2xl font-bold text-foreground">Calendar</h1>
+            {/* Calendar Header - Enhanced */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center justify-between mb-6"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-primary/15 dark:bg-primary/20 flex items-center justify-center">
+                  <CalendarDays className="w-5 h-5 text-primary dark:text-primary" />
+                </div>
+                <h1 className="text-2xl font-extrabold text-foreground dark:text-foreground">Calendar</h1>
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={toggleViewMode}
-                className="gap-2"
+                className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md touch-sm"
               >
                 {viewMode === 'month' ? (
                   <>
@@ -156,20 +188,24 @@ const Calendar = () => {
                   </>
                 )}
               </Button>
-            </div>
+            </motion.div>
 
-            {/* Navigation */}
-            <div className="flex items-center justify-between mb-4">
+            {/* Navigation - Enhanced with Large Touch Targets */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex items-center justify-between mb-6"
+            >
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
                 onClick={handlePrev}
-                className="h-10 w-10"
+                className="h-12 w-12 border-2 shadow-sm hover:shadow-md touch-sm"
               >
-                <ChevronLeft className="w-5 h-5" />
+                <ChevronLeft className="w-6 h-6" strokeWidth={2.5} />
               </Button>
-              <div className="flex flex-col items-center gap-1">
-                <h2 className="text-lg font-semibold text-foreground text-center">
+              <div className="flex flex-col items-center gap-2">
+                <h2 className="text-xl font-extrabold text-foreground dark:text-foreground text-center">
                   {getHeaderText()}
                 </h2>
                 {/* Show "Today" button only when today is not visible in current view */}
@@ -181,32 +217,37 @@ const Calendar = () => {
                   return !isTodayVisible;
                 })() && (
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={() => {
                       lightTap();
                       setCurrentDate(new Date());
                       setSelectedDate(new Date());
                     }}
-                    className="h-6 text-xs text-primary"
+                    className="h-8 text-xs font-semibold text-primary border-2 shadow-sm touch-sm"
                   >
                     Today
                   </Button>
                 )}
               </div>
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
                 onClick={handleNext}
-                className="h-10 w-10"
+                className="h-12 w-12 border-2 shadow-sm hover:shadow-md touch-sm"
               >
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-6 h-6" strokeWidth={2.5} />
               </Button>
-            </div>
+            </motion.div>
 
-            {/* Calendar Grid with Swipe */}
+            {/* Calendar Grid with Swipe - Enhanced */}
             <motion.div 
-              className="bg-card rounded-xl border border-border p-4 mb-6 touch-pan-y"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={cn(
+                "bg-card rounded-2xl border-2 border-border shadow-xl p-4 mb-6 touch-pan-y",
+                "dark:border-border"
+              )}
               drag="x"
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.2}
@@ -219,10 +260,10 @@ const Calendar = () => {
                 }
               }}
             >
-              {/* Week day headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
+              {/* Week day headers - Enhanced */}
+              <div className="grid grid-cols-7 gap-1 mb-3">
                 {weekDays.map(day => (
-                  <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
+                  <div key={day} className="text-center text-xs font-bold text-foreground dark:text-foreground py-2 uppercase tracking-wide">
                     {day}
                   </div>
                 ))}
@@ -237,11 +278,12 @@ const Calendar = () => {
                       <div key={`empty-${index}`} className="aspect-square" />
                     ))}
 
-                    {/* Days of the month */}
+                    {/* Days of the month - Enhanced with Vibrant Indicators */}
                     {daysInMonth.map(day => {
                       const dayJobs = getJobsForDate(day);
-                      const hasPending = dayJobs.some(j => j.status === 'pending');
-                      const hasCompleted = dayJobs.some(j => j.status === 'completed');
+                      const pendingJobs = dayJobs.filter(j => j.status === 'pending');
+                      const completedJobs = dayJobs.filter(j => j.status === 'completed');
+                      const unpaidJobs = dayJobs.filter(j => j.status === 'completed' && j.payment_status === 'unpaid');
                       const isSelected = selectedDate && isSameDay(day, selectedDate);
                       const isDayToday = isToday(day);
 
@@ -251,28 +293,42 @@ const Calendar = () => {
                           whileTap={{ scale: 0.95 }}
                           onClick={() => handleDateClick(day)}
                           className={cn(
-                            "aspect-square flex flex-col items-center justify-center rounded-lg relative transition-all",
-                            isSelected && "bg-primary text-primary-foreground",
-                            !isSelected && isDayToday && "bg-primary/10 text-primary font-bold",
-                            !isSelected && !isDayToday && "hover:bg-muted",
-                            !isSameMonth(day, currentDate) && "text-muted-foreground/50"
+                            "aspect-square flex flex-col items-center justify-center rounded-xl relative transition-all touch-sm min-h-[48px]",
+                            "border-2",
+                            isSelected && "bg-primary text-primary-foreground border-primary shadow-lg scale-105",
+                            !isSelected && isDayToday && "bg-primary/15 dark:bg-primary/20 text-primary dark:text-primary font-extrabold border-primary/40 dark:border-primary/40 shadow-md",
+                            !isSelected && !isDayToday && "hover:bg-muted/50 dark:hover:bg-muted/50 border-transparent hover:border-border",
+                            !isSameMonth(day, currentDate) && "text-muted-foreground/40 opacity-50"
                           )}
                         >
-                          <span className="text-sm">{format(day, 'd')}</span>
+                          <span className={cn(
+                            "text-base font-bold",
+                            isSelected && "text-primary-foreground",
+                            !isSelected && isDayToday && "text-primary dark:text-primary",
+                            !isSelected && !isDayToday && "text-foreground dark:text-foreground"
+                          )}>
+                            {format(day, 'd')}
+                          </span>
                           
-                          {/* Job indicators */}
+                          {/* Job indicators - Vibrant Pills */}
                           {dayJobs.length > 0 && (
-                            <div className="flex gap-0.5 mt-0.5">
-                              {hasPending && (
+                            <div className="flex gap-1 mt-1 flex-wrap justify-center max-w-full">
+                              {pendingJobs.length > 0 && (
                                 <span className={cn(
-                                  "w-1.5 h-1.5 rounded-full",
-                                  isSelected ? "bg-primary-foreground" : "bg-primary"
+                                  "w-2 h-2 rounded-full",
+                                  isSelected ? "bg-primary-foreground" : "bg-blue-500 dark:bg-blue-500"
                                 )} />
                               )}
-                              {hasCompleted && (
+                              {completedJobs.length > 0 && (
                                 <span className={cn(
-                                  "w-1.5 h-1.5 rounded-full",
-                                  isSelected ? "bg-primary-foreground/70" : "bg-green-500"
+                                  "w-2 h-2 rounded-full",
+                                  isSelected ? "bg-primary-foreground/70" : "bg-green-500 dark:bg-green-500"
+                                )} />
+                              )}
+                              {unpaidJobs.length > 0 && (
+                                <span className={cn(
+                                  "w-2 h-2 rounded-full",
+                                  isSelected ? "bg-primary-foreground/50" : "bg-amber-500 dark:bg-amber-500"
                                 )} />
                               )}
                             </div>
@@ -285,11 +341,12 @@ const Calendar = () => {
 
                 {viewMode === 'week' && (
                   <>
-                    {/* Week view - larger day cells */}
+                    {/* Week view - Enhanced larger day cells */}
                     {daysInWeek.map(day => {
                       const dayJobs = getJobsForDate(day);
-                      const hasPending = dayJobs.some(j => j.status === 'pending');
-                      const hasCompleted = dayJobs.some(j => j.status === 'completed');
+                      const pendingJobs = dayJobs.filter(j => j.status === 'pending');
+                      const completedJobs = dayJobs.filter(j => j.status === 'completed');
+                      const unpaidJobs = dayJobs.filter(j => j.status === 'completed' && j.payment_status === 'unpaid');
                       const isSelected = selectedDate && isSameDay(day, selectedDate);
                       const isDayToday = isToday(day);
                       const jobCount = dayJobs.length;
@@ -297,40 +354,56 @@ const Calendar = () => {
                       return (
                         <motion.button
                           key={day.toISOString()}
-                          whileTap={{ scale: 0.95 }}
+                          whileTap={{ scale: 0.98 }}
                           onClick={() => handleDateClick(day)}
                           className={cn(
-                            "min-h-[80px] flex flex-col items-center justify-start pt-2 rounded-lg relative transition-all",
-                            isSelected && "bg-primary text-primary-foreground",
-                            !isSelected && isDayToday && "bg-primary/10 text-primary font-bold",
-                            !isSelected && !isDayToday && "hover:bg-muted"
+                            "min-h-[100px] flex flex-col items-center justify-start pt-3 rounded-xl relative transition-all touch-sm border-2",
+                            isSelected && "bg-primary text-primary-foreground border-primary shadow-lg",
+                            !isSelected && isDayToday && "bg-primary/15 dark:bg-primary/20 text-primary dark:text-primary font-extrabold border-primary/40 dark:border-primary/40 shadow-md",
+                            !isSelected && !isDayToday && "hover:bg-muted/50 dark:hover:bg-muted/50 border-transparent hover:border-border"
                           )}
                         >
-                          <span className="text-xs text-muted-foreground mb-1">
+                          <span className={cn(
+                            "text-xs font-bold uppercase tracking-wide mb-1",
+                            isSelected ? "text-primary-foreground/80" : isDayToday ? "text-primary dark:text-primary" : "text-muted-foreground"
+                          )}>
                             {format(day, 'EEE')}
                           </span>
-                          <span className="text-lg font-semibold">{format(day, 'd')}</span>
+                          <span className={cn(
+                            "text-2xl font-extrabold",
+                            isSelected && "text-primary-foreground",
+                            !isSelected && isDayToday && "text-primary dark:text-primary",
+                            !isSelected && !isDayToday && "text-foreground dark:text-foreground"
+                          )}>
+                            {format(day, 'd')}
+                          </span>
                           
-                          {/* Job count badge */}
+                          {/* Job count badge - Enhanced */}
                           {jobCount > 0 && (
-                            <div className="mt-1 flex flex-col items-center gap-0.5">
+                            <div className="mt-2 flex flex-col items-center gap-1.5">
                               <span className={cn(
-                                "text-xs font-medium",
-                                isSelected ? "text-primary-foreground" : "text-foreground"
+                                "text-xs font-bold px-2 py-0.5 rounded-full",
+                                isSelected ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-foreground"
                               )}>
-                                {jobCount} job{jobCount !== 1 ? 's' : ''}
+                                {jobCount} {jobCount === 1 ? 'job' : 'jobs'}
                               </span>
-                              <div className="flex gap-0.5">
-                                {hasPending && (
+                              <div className="flex gap-1">
+                                {pendingJobs.length > 0 && (
                                   <span className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
-                                    isSelected ? "bg-primary-foreground" : "bg-primary"
+                                    "w-2 h-2 rounded-full",
+                                    isSelected ? "bg-primary-foreground" : "bg-blue-500 dark:bg-blue-500"
                                   )} />
                                 )}
-                                {hasCompleted && (
+                                {completedJobs.length > 0 && (
                                   <span className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
-                                    isSelected ? "bg-primary-foreground/70" : "bg-green-500"
+                                    "w-2 h-2 rounded-full",
+                                    isSelected ? "bg-primary-foreground/70" : "bg-green-500 dark:bg-green-500"
+                                  )} />
+                                )}
+                                {unpaidJobs.length > 0 && (
+                                  <span className={cn(
+                                    "w-2 h-2 rounded-full",
+                                    isSelected ? "bg-primary-foreground/50" : "bg-amber-500 dark:bg-amber-500"
                                   )} />
                                 )}
                               </div>
@@ -343,85 +416,180 @@ const Calendar = () => {
                 )}
               </div>
 
-              {/* Legend */}
-              <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-border">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-primary" />
-                  <span className="text-xs text-muted-foreground">Pending</span>
+              {/* Legend - Enhanced */}
+              <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t-2 border-border">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-blue-500 dark:bg-blue-500 shadow-sm" />
+                  <span className="text-xs font-semibold text-foreground dark:text-foreground">Pending</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-green-500" />
-                  <span className="text-xs text-muted-foreground">Completed</span>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-green-500 dark:bg-green-500 shadow-sm" />
+                  <span className="text-xs font-semibold text-foreground dark:text-foreground">Completed</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-amber-500 dark:bg-amber-500 shadow-sm" />
+                  <span className="text-xs font-semibold text-foreground dark:text-foreground">Unpaid</span>
                 </div>
               </div>
             </motion.div>
 
-            {/* Selected Date Jobs */}
+            {/* Selected Date Mini-Dashboard */}
             <AnimatePresence mode="wait">
               {selectedDate && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -20 }}
-                  className="space-y-3"
+                  transition={{ duration: 0.3 }}
+                  className="space-y-4"
                 >
-                  <h3 className="text-lg font-semibold text-foreground">
-                    {isToday(selectedDate) ? 'Today' : format(selectedDate, 'EEEE, d MMMM')}
-                  </h3>
+                  {/* Day Header */}
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-2xl font-extrabold text-foreground dark:text-foreground">
+                      {isToday(selectedDate) ? 'Today' : format(selectedDate, 'EEEE, d MMMM')}
+                    </h3>
+                    {selectedDateStats && selectedDateStats.total > 0 && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-primary/15 dark:bg-primary/20 rounded-full border border-primary/30 dark:border-primary/40">
+                        <Target className="w-4 h-4 text-primary dark:text-primary" />
+                        <span className="text-sm font-bold text-primary dark:text-primary">
+                          {selectedDateStats.total} {selectedDateStats.total === 1 ? 'job' : 'jobs'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
+                  {/* Stats Cards - Mini Dashboard */}
+                  {selectedDateStats && selectedDateStats.total > 0 && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {/* Potential Revenue */}
+                      {selectedDateStats.pending > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="bg-card rounded-xl border-2 border-border shadow-md p-4"
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-8 h-8 rounded-full bg-blue-500/15 dark:bg-blue-500/20 flex items-center justify-center">
+                              <Target className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Potential</span>
+                          </div>
+                          <p className="text-2xl font-extrabold text-foreground dark:text-foreground">
+                            £{selectedDateStats.potentialRevenue.toFixed(0)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">{selectedDateStats.pending} pending</p>
+                        </motion.div>
+                      )}
+                      
+                      {/* Total Revenue */}
+                      {selectedDateStats.totalRevenue > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: 0.1 }}
+                          className="bg-card rounded-xl border-2 border-border shadow-md p-4"
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-8 h-8 rounded-full bg-green-500/15 dark:bg-green-500/20 flex items-center justify-center">
+                              <PoundSterling className="w-4 h-4 text-green-600 dark:text-green-400" />
+                            </div>
+                            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Revenue</span>
+                          </div>
+                          <p className="text-2xl font-extrabold text-green-600 dark:text-green-400">
+                            £{selectedDateStats.totalRevenue.toFixed(0)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {selectedDateStats.completed} completed
+                            {selectedDateStats.unpaid > 0 && (
+                              <span className="text-amber-600 dark:text-amber-400 font-semibold ml-1">
+                                • {selectedDateStats.unpaid} unpaid
+                              </span>
+                            )}
+                          </p>
+                        </motion.div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Jobs List */}
                   {selectedDateJobs.length === 0 ? (
-                    <div className="bg-muted/50 rounded-xl p-6 text-center">
-                      <CalendarDays className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-muted-foreground mb-4">No jobs scheduled</p>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-card rounded-xl border-2 border-border shadow-md p-8 text-center"
+                    >
+                      <CalendarDays className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-foreground dark:text-foreground font-semibold mb-2">No jobs scheduled</p>
+                      <p className="text-sm text-muted-foreground mb-6">Add a customer to schedule work for this day</p>
                       <Button
                         onClick={() => setAddCustomerOpen(true)}
-                        className="gap-2"
+                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md touch-sm"
+                        size="lg"
                       >
-                        <Plus className="w-4 h-4" />
+                        <Plus className="w-5 h-5" />
                         Add Customer
                       </Button>
-                    </div>
+                    </motion.div>
                   ) : (
-                    <div className="space-y-2">
-                      {selectedDateJobs.map(job => (
+                    <div className="space-y-3">
+                      {selectedDateJobs.map((job, index) => (
                         <motion.div
                           key={job.id}
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: index * 0.05 }}
                           onClick={() => handleJobClick(job)}
                           className={cn(
-                            "flex items-center gap-3 p-4 rounded-xl transition-all",
+                            "flex items-center gap-4 p-4 rounded-xl transition-all shadow-sm hover:shadow-md",
+                            "border-2",
                             job.status === 'pending' 
-                              ? "bg-primary/5 border border-primary/20 cursor-pointer hover:bg-primary/10"
-                              : "bg-muted/50"
+                              ? "bg-primary/10 dark:bg-primary/20 border-primary/30 dark:border-primary/40 cursor-pointer hover:bg-primary/15 dark:hover:bg-primary/25"
+                              : job.payment_status === 'unpaid'
+                              ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
+                              : "bg-card border-border"
                           )}
                         >
                           {job.status === 'completed' ? (
-                            <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                            <div className="w-10 h-10 rounded-full bg-green-500/15 dark:bg-green-500/20 flex items-center justify-center shrink-0">
+                              <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" strokeWidth={2.5} />
+                            </div>
                           ) : (
-                            <Clock className="w-5 h-5 text-primary shrink-0" />
+                            <div className="w-10 h-10 rounded-full bg-blue-500/15 dark:bg-blue-500/20 flex items-center justify-center shrink-0">
+                              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" strokeWidth={2.5} />
+                            </div>
                           )}
                           
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-foreground truncate">
+                            <p className="font-bold text-foreground dark:text-foreground truncate text-base">
                               {job.customer.name}
                             </p>
-                            <p className="text-sm text-muted-foreground truncate">
+                            <p className="text-sm text-muted-foreground truncate mt-0.5">
                               {job.customer.address}
                             </p>
                           </div>
                           
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-3 shrink-0">
                             <div className="text-right">
-                              <p className="font-semibold text-foreground">
+                              <p className="font-extrabold text-foreground dark:text-foreground text-lg">
                                 £{job.amount_collected ?? job.customer.price}
                               </p>
-                              <p className={cn(
-                                "text-xs",
-                                job.status === 'completed' ? "text-green-500" : "text-primary"
-                              )}>
-                                {job.status === 'completed' ? 'Done' : 'Pending'}
-                              </p>
+                              <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                                {job.status === 'completed' && job.payment_status === 'unpaid' && (
+                                  <AlertCircle className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                                )}
+                                <p className={cn(
+                                  "text-xs font-semibold",
+                                  job.status === 'completed' 
+                                    ? job.payment_status === 'unpaid'
+                                      ? "text-amber-600 dark:text-amber-400"
+                                      : "text-green-600 dark:text-green-400"
+                                    : "text-blue-600 dark:text-blue-400"
+                                )}>
+                                  {job.status === 'completed' 
+                                    ? job.payment_status === 'unpaid' ? 'Unpaid' : 'Done'
+                                    : 'Pending'}
+                                </p>
+                              </div>
                             </div>
                             {/* Text Button - icon only for compact display */}
                             <div onClick={(e) => e.stopPropagation()}>
@@ -440,11 +608,17 @@ const Calendar = () => {
               )}
             </AnimatePresence>
 
-            {/* Hint when no date selected */}
+            {/* Hint when no date selected - Enhanced */}
             {!selectedDate && (
-              <div className="text-center text-muted-foreground text-sm">
-                Tap a date to see scheduled jobs
-              </div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center bg-card rounded-xl border-2 border-dashed border-border p-6"
+              >
+                <CalendarDays className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+                <p className="text-foreground dark:text-foreground font-semibold mb-1">Select a date</p>
+                <p className="text-sm text-muted-foreground">Tap any date on the calendar to view scheduled jobs</p>
+              </motion.div>
             )}
           </>
         )}

@@ -29,9 +29,9 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
-      // If there's a session but it's from a normal login (not password recovery), redirect to home
+      // If there's a session but it's from a normal login (not password recovery), redirect to dashboard
       if (session && !window.location.hash.includes('type=recovery')) {
-        navigate('/', { replace: true });
+        navigate('/dashboard', { replace: true });
         return;
       }
       
@@ -86,9 +86,9 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
           description: 'You can now sign in with your new password.',
         });
         
-        // Redirect to home after 2 seconds
+        // Redirect to dashboard after 2 seconds
         setTimeout(() => {
-          navigate('/');
+          navigate('/dashboard');
         }, 2000);
       }
     } finally {
@@ -117,7 +117,7 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
             className="w-full max-w-sm text-center"
           >
             <img 
-              src="/logo.png" 
+              src="/SoloLogo.jpg" 
               alt="SoloWipe" 
               className="h-12 mx-auto mb-4"
             />
@@ -152,7 +152,7 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
           {/* Logo */}
           <div className="text-center mb-10">
             <img 
-              src="/logo.png" 
+              src="/SoloLogo.jpg" 
               alt="SoloWipe" 
               className="h-12 mx-auto mb-4"
             />
