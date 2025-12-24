@@ -49,31 +49,37 @@ echo ""
 echo "Step 2: Pushing to GitHub..."
 echo ""
 
-# Create credential helper again for push
-CRED_FILE=$(mktemp)
-cat > "$CRED_FILE" <<EOF
+# Check if we're ahead and ready to push
+if git status | grep -q "ahead of"; then
+    # Create credential helper for push
+    CRED_FILE=$(mktemp)
+    cat > "$CRED_FILE" <<EOF
 #!/bin/sh
 echo username=beckialmond-rgb
 echo password=$TOKEN
 EOF
-chmod +x "$CRED_FILE"
+    chmod +x "$CRED_FILE"
 
-# Push
-git -c credential.helper="$CRED_FILE" push origin main
+    # Push
+    git -c credential.helper="$CRED_FILE" push origin main
 
-PUSH_EXIT=$?
+    PUSH_EXIT=$?
 
-# Clean up
-rm -f "$CRED_FILE"
+    # Clean up
+    rm -f "$CRED_FILE"
 
-if [ $PUSH_EXIT -eq 0 ]; then
-    echo ""
-    echo "✅ Success! Your code has been pushed to GitHub"
-    echo ""
-    git status
+    if [ $PUSH_EXIT -eq 0 ]; then
+        echo ""
+        echo "✅ Success! Your code has been pushed to GitHub"
+        echo ""
+        git status
+    else
+        echo ""
+        echo "❌ Push failed. Check the error above."
+        exit 1
+    fi
 else
-    echo ""
-    echo "❌ Push failed. Check the error above."
-    exit 1
+    echo "Nothing to push - branch is up to date or conflicts need resolution"
+    git status
 fi
 
