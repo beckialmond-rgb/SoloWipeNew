@@ -20,6 +20,7 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
+const Landing = lazy(() => import("./pages/Landing"));
 
 const WhatsNewModal = lazy(() =>
   import("@/components/WhatsNewModal").then((m) => ({ default: m.WhatsNewModal }))
@@ -93,6 +94,7 @@ const App = () => {
                   <KeyboardShortcutsProvider>
                     <Suspense fallback={<LoadingState message="Loading..." />}>
                       <Routes>
+                        <Route path="/landing" element={<Landing />} />
                         <Route path="/auth" element={<Auth />} />
                         <Route path="/forgot-password" element={<ForgotPassword />} />
                         <Route path="/reset-password" element={<ResetPassword />} />
