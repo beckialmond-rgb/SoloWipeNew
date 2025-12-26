@@ -513,7 +513,7 @@ const Customers = () => {
                       Don't type them in manually! We can import your customers for you.
                     </p>
                     <a
-                      href="mailto:support@solowipe.co.uk?subject=Help me import my customers"
+                      href="mailto:aaron@solowipe.co.uk?subject=Help me import my customers"
                       className="inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-200 dark:hover:bg-blue-900/60 active:bg-blue-300 dark:active:bg-blue-900/80 rounded-lg transition-colors touch-sm w-full sm:w-auto"
                     >
                       <Mail className="w-4 h-4" />

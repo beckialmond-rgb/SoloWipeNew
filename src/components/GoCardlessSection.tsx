@@ -273,6 +273,38 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
         throw new Error('User not authenticated');
       }
 
+      // CRITICAL FIX: Clear ALL old sessionStorage entries from previous connection attempts
+      // This prevents the callback page from thinking the URL was already processed
+      try {
+        const keysToRemove: string[] = [];
+        // Check all sessionStorage keys
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          if (key && key.startsWith('gocardless_callback_processed_')) {
+            keysToRemove.push(key);
+          }
+        }
+        // Remove all found keys
+        keysToRemove.forEach(key => {
+          sessionStorage.removeItem(key);
+        });
+        if (keysToRemove.length > 0) {
+          console.log('[GC-CLIENT] ✅ Cleared', keysToRemove.length, 'old sessionStorage entries');
+        } else {
+          console.log('[GC-CLIENT] ✅ No old sessionStorage entries to clear');
+        }
+        
+        // Also clear any localStorage items from previous failed attempts (but keep current ones)
+        // This ensures a clean slate for the new connection
+        const oldState = localStorage.getItem('gocardless_state');
+        if (oldState) {
+          console.log('[GC-CLIENT] Clearing old state from localStorage');
+          localStorage.removeItem('gocardless_state');
+        }
+      } catch (e) {
+        console.warn('[GC-CLIENT] ⚠️ Failed to clear sessionStorage:', e);
+      }
+
       // Step 1: Generate unique session token for persistent handshake
       const sessionToken = generateSessionToken();
       console.log('[GC-CLIENT] === PERSISTENT HANDSHAKE INITIALIZATION ===');
@@ -300,9 +332,18 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
       console.log('[GC-CLIENT] === END REDIRECT URL CONSTRUCTION ===');
       
       // Step 3: Store session token and user ID in localStorage (persistent handshake)
+      // CRITICAL: Set these BEFORE calling the edge function to ensure they're available
       localStorage.setItem('gocardless_session_token', sessionToken);
       localStorage.setItem('gocardless_user_id', user.id);
       localStorage.setItem('gocardless_redirect_url', redirectUrl);
+      
+      // Verify they were set
+      const verifyToken = localStorage.getItem('gocardless_session_token');
+      const verifyUserId = localStorage.getItem('gocardless_user_id');
+      const verifyRedirectUrl = localStorage.getItem('gocardless_redirect_url');
+      console.log('[GC-CLIENT] Verification - Token:', verifyToken ? '✅ Set' : '❌ MISSING');
+      console.log('[GC-CLIENT] Verification - User ID:', verifyUserId ? '✅ Set' : '❌ MISSING');
+      console.log('[GC-CLIENT] Verification - Redirect URL:', verifyRedirectUrl ? '✅ Set' : '❌ MISSING');
       
       console.log('[GC-CLIENT] === PERSISTENT HANDshake STORED ===');
       console.log('[GC-CLIENT] Session token stored in localStorage');
@@ -348,6 +389,9 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
       console.log('[GC-CLIENT] Has data:', !!data);
       console.log('[GC-CLIENT] Data URL:', data?.url ? 'Present' : 'Missing');
       console.log('[GC-CLIENT] Data error:', data?.error || 'None');
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/c4b701dd-7193-44af-8f36-968bf3584f49',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GoCardlessSection.tsx:390',message:'Connect function response - redirect URL being sent to GoCardless',data:{redirectUrl:redirectUrl,oauthUrl:data?.url?data.url.substring(0,100)+'...':'null',hasError:!!error,errorMessage:error?String(error):'null'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'I'})}).catch(()=>{});
+      // #endregion
       
       // Check for error in data (non-2xx responses from Supabase functions)
       if (data?.error && !error) {
@@ -403,14 +447,73 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
       if (data?.url) {
         console.log('[GC-CLIENT] === OAUTH URL RECEIVED FROM SERVER ===');
         console.log('[GC-CLIENT] Full OAuth URL:', data.url);
+        
+        // Extract redirect_uri from OAuth URL for verification
+        try {
+          const oauthUrlObj = new URL(data.url);
+          const redirectUriFromOAuth = oauthUrlObj.searchParams.get('redirect_uri');
+          const clientIdFromOAuth = oauthUrlObj.searchParams.get('client_id');
+          const oauthBaseUrl = oauthUrlObj.origin;
+          const isLive = oauthBaseUrl.includes('connect.gocardless.com') && !oauthBaseUrl.includes('sandbox');
+          const isSandbox = oauthBaseUrl.includes('sandbox');
+          
+          console.log('[GC-CLIENT] === OAUTH URL ANALYSIS ===');
+          console.log('[GC-CLIENT] OAuth Base URL:', oauthBaseUrl);
+          console.log('[GC-CLIENT] Detected Environment:', isSandbox ? 'SANDBOX' : (isLive ? 'LIVE' : 'UNKNOWN'));
+          console.log('[GC-CLIENT] Client ID in OAuth URL:', clientIdFromOAuth ? `${clientIdFromOAuth.substring(0, 8)}...` : 'MISSING');
+          console.log('[GC-CLIENT] Redirect URI in OAuth URL:', redirectUriFromOAuth);
+          console.log('[GC-CLIENT] Redirect URI we sent:', redirectUrl);
+          console.log('[GC-CLIENT] Match:', redirectUriFromOAuth === redirectUrl ? '✅ YES' : '❌ NO - MISMATCH!');
+          console.log('[GC-CLIENT] ⚠️ VERIFY: This redirect URI is registered in GoCardless Dashboard');
+          console.log('[GC-CLIENT] ⚠️ VERIFY: Environment matches -', isSandbox ? 'SANDBOX Client ID → SANDBOX Dashboard' : 'LIVE Client ID → LIVE Dashboard');
+          console.log('[GC-CLIENT] ⚠️ SANDBOX Dashboard: https://manage-sandbox.gocardless.com/settings/api');
+          console.log('[GC-CLIENT] ⚠️ LIVE Dashboard: https://manage.gocardless.com/settings/api');
+          console.log('[GC-CLIENT] === END OAUTH URL ANALYSIS ===');
+        } catch (e) {
+          console.warn('[GC-CLIENT] Could not parse OAuth URL:', e);
+        }
+        
         console.log('[GC-CLIENT] This URL will redirect user to GoCardless');
         console.log('[GC-CLIENT] After authorization, GoCardless will redirect to:', redirectUrl);
         console.log('[GC-CLIENT] GoCardless will append: ?code=XXX&state=YYY');
-        console.log('[GC-CLIENT] ⚠️ VERIFY: The redirect_uri in this OAuth URL matches GoCardless Dashboard');
+        console.log('[GC-CLIENT] ⚠️ CRITICAL: The redirect_uri MUST be registered in GoCardless Dashboard');
+        console.log('[GC-CLIENT] ⚠️ Go to: https://manage.gocardless.com/settings/api (or sandbox equivalent)');
+        console.log('[GC-CLIENT] ⚠️ Add this EXACT URL to Redirect URIs:', redirectUrl);
         console.log('[GC-CLIENT] === END OAUTH URL LOG ===');
         
         // Store OAuth state (in addition to session token)
         localStorage.setItem('gocardless_state', data.state);
+        
+        // Verify all localStorage items are set before redirecting
+        const verifyStorage = () => {
+          const storedSessionToken = localStorage.getItem('gocardless_session_token');
+          const storedUserId = localStorage.getItem('gocardless_user_id');
+          const storedRedirectUrl = localStorage.getItem('gocardless_redirect_url');
+          const storedState = localStorage.getItem('gocardless_state');
+          
+          const allPresent = storedSessionToken && storedUserId && storedRedirectUrl && storedState;
+          
+          console.log('[GC-CLIENT] === LOCALSTORAGE VERIFICATION ===');
+          console.log('[GC-CLIENT] Session token:', storedSessionToken ? '✅ Present' : '❌ MISSING');
+          console.log('[GC-CLIENT] User ID:', storedUserId ? '✅ Present' : '❌ MISSING');
+          console.log('[GC-CLIENT] Redirect URL:', storedRedirectUrl ? '✅ Present' : '❌ MISSING');
+          console.log('[GC-CLIENT] State:', storedState ? '✅ Present' : '❌ MISSING');
+          console.log('[GC-CLIENT] All items present:', allPresent ? '✅ YES' : '❌ NO');
+          console.log('[GC-CLIENT] === END VERIFICATION ===');
+          
+          if (!allPresent) {
+            console.error('[GC-CLIENT] ❌ CRITICAL: Not all localStorage items are present before redirect!');
+            console.error('[GC-CLIENT] This will cause the callback to fail. Aborting redirect.');
+            throw new Error('localStorage verification failed. Not all required items are present.');
+          }
+          
+          return allPresent;
+        };
+        
+        // Verify storage before redirecting
+        if (!verifyStorage()) {
+          throw new Error('Failed to store all required data in localStorage. Please try again.');
+        }
         
         addDebugLog('State Stored', `State: ${data.state.substring(0, 20)}...`, 'info');
         addDebugLog('Redirecting', 'Opening GoCardless OAuth...', 'info');
@@ -419,8 +522,20 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
         console.log('[GC-CLIENT] User ID:', user.id);
         console.log('[GC-CLIENT] Redirect URL:', redirectUrl);
         console.log('[GC-CLIENT] All data stored in localStorage - ready for redirect');
+        console.log('[GC-CLIENT] ✅ VERIFIED: All localStorage items present');
         console.log('[GC-CLIENT] Redirecting user to GoCardless OAuth page...');
         console.log('[GC-CLIENT] === END OUTBOUND HANDSHAKE ===');
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/c4b701dd-7193-44af-8f36-968bf3584f49',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'GoCardlessSection.tsx:498',message:'BEFORE redirect to GoCardless - final state check',data:{redirectUrl:redirectUrl,oauthUrl:data.url.substring(0,150)+'...',sessionToken:sessionToken.substring(0,20)+'...',userId:user.id,allStoragePresent:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'J'})}).catch(()=>{});
+        // #endregion
+        
+        // Small delay to ensure localStorage is fully written (browser optimization)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Final verification before redirect
+        if (!verifyStorage()) {
+          throw new Error('localStorage data lost before redirect. Please try again.');
+        }
         
         // Redirect to GoCardless OAuth
         window.location.href = data.url;

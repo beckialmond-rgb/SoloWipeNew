@@ -21,3 +21,10 @@
   to = "https://solowipe.co.uk/:splat"
   status = 301
   force = true
+
+# SPA fallback - all routes (including /gocardless-callback) go to index.html
+# This ensures the React router can handle the callback route
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

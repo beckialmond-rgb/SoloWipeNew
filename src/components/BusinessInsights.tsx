@@ -265,7 +265,7 @@ export function BusinessInsights({
           </div>
         )}
       </div>
-      <p className="text-xl sm:text-2xl font-extrabold text-foreground dark:text-foreground mb-1 break-words">{value}</p>
+      <p className="text-xl sm:text-2xl font-extrabold text-foreground dark:text-foreground mb-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{value}</p>
       <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</p>
       {subValue && (
         <p className="text-[10px] sm:text-xs text-muted-foreground mt-1.5 sm:mt-2 font-medium leading-tight break-words">{subValue}</p>
@@ -361,12 +361,12 @@ export function BusinessInsights({
                 </div>
                 <div
                   className={cn(
-                    "flex items-center gap-2 sm:gap-3 group touch-sm rounded-lg px-1 sm:px-2 -mx-1 sm:-mx-2 py-1 transition-all",
+                    "flex items-center gap-2 sm:gap-3 group touch-sm rounded-lg px-1 sm:px-2 -mx-1 sm:-mx-2 py-1 transition-all min-w-0",
                     !userWeeklyTarget && "ring-2 ring-primary/30 dark:ring-primary/40 ring-offset-2 ring-offset-card"
                   )}
                 >
                   <span className={cn(
-                    "text-lg sm:text-xl md:text-2xl font-extrabold break-words",
+                    "text-lg sm:text-xl md:text-2xl font-extrabold min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap",
                     targetProgress >= 100 ? "text-white" : "text-foreground"
                   )}>
                     £{thisWeek?.total.toFixed(0)} / £{weeklyTarget}
@@ -470,7 +470,7 @@ export function BusinessInsights({
             onClick={() => setMonthlyGoalModalOpen(true)}
             className="flex items-center gap-1 sm:gap-1.5 group touch-sm rounded-lg px-1.5 sm:px-2 -mx-1.5 sm:-mx-2 py-1 transition-colors hover:bg-muted/50 shrink-0"
           >
-            <span className="text-xs sm:text-sm font-extrabold text-foreground whitespace-nowrap">
+            <span className="text-xs sm:text-sm font-extrabold text-foreground truncate max-w-[140px] sm:max-w-none">
               £{currentMonthEarnings.toFixed(0)} / £{monthlyGoal}
             </span>
             <Edit2 className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-muted-foreground opacity-60 sm:opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
@@ -514,7 +514,7 @@ export function BusinessInsights({
             <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" strokeWidth={2.5} />
             <div className="flex-1 min-w-0">
               <p className="text-xs sm:text-sm font-bold text-blue-900 dark:text-blue-200 mb-1">Projected Month-End</p>
-              <p className="text-base sm:text-lg font-extrabold text-blue-700 dark:text-blue-300 break-words">
+              <p className="text-base sm:text-lg font-extrabold text-blue-700 dark:text-blue-300 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
                 £{projectedMonthEnd.toFixed(0)}
               </p>
               <p className="text-[10px] sm:text-xs text-blue-800 dark:text-blue-400 mt-1 leading-tight break-words">

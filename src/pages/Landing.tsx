@@ -706,7 +706,7 @@ const Landing = () => {
       )}
 
       {/* Built from Research Section - New Authentic Messaging */}
-      <section className="py-24 px-4 bg-gradient-to-b from-background via-slate-50/30 dark:via-slate-900/30 to-background relative overflow-hidden">
+      <section className="py-28 px-4 md:px-6 bg-gradient-to-b from-background via-slate-50/30 dark:via-slate-900/30 to-background relative overflow-hidden">
         {/* Decorative background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
@@ -719,22 +719,22 @@ const Landing = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-16"
+            className="text-center mb-20"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-sm font-semibold mb-6 border border-primary/20 dark:border-primary/30">
               <Users className="w-4 h-4" />
               Built from Real Conversations
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-6 leading-tight">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
               We Spoke to Local Cleaners. Here's What We Learned.
             </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium">
+            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium">
               SoloWipe isn't built on assumptions. After months of conversations with window cleaners across the UK, 
               we identified the real pain points that slow you down every day.
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mb-16">
             {[
               {
                 icon: Calendar,
@@ -775,7 +775,7 @@ const Landing = () => {
                   transition: { duration: 0.3 }
                 }}
                 className={cn(
-                  "bg-card rounded-2xl p-8 border-2 border-border shadow-lg hover:shadow-xl transition-all relative overflow-hidden group",
+                  "bg-card rounded-2xl p-8 md:p-10 border-2 border-border/60 dark:border-border/80 shadow-lg hover:shadow-xl transition-all duration-300 ease-out relative overflow-hidden group",
                   point.bgColor
                 )}
               >
@@ -820,7 +820,7 @@ const Landing = () => {
       </section>
 
       {/* Trust Bar & Preview Section - Premium Integration */}
-      <section className="py-16 px-4 bg-gradient-to-b from-slate-800 via-slate-700/50 to-background relative overflow-hidden">
+      <section className="py-28 px-4 md:px-6 bg-gradient-to-b from-slate-800 via-slate-700/50 to-background relative overflow-hidden">
         {/* Subtle background effects */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
@@ -834,7 +834,7 @@ const Landing = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-12"
+            className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto mb-16"
           >
             {trustStats.map((stat, index) => (
               <motion.div
@@ -853,7 +853,7 @@ const Landing = () => {
                   y: -6,
                   transition: { duration: 0.3 }
                 }}
-                className="bg-white/20 dark:bg-slate-800/70 glass-award rounded-2xl p-6 border-2 border-white/40 dark:border-slate-700/60 shadow-award hover:shadow-award transition-all text-center group cursor-pointer card-award relative overflow-hidden transform-3d-premium"
+                className="bg-white/20 dark:bg-slate-800/70 glass-award rounded-2xl p-6 md:p-8 border-2 border-white/40 dark:border-slate-700/60 shadow-award hover:shadow-award transition-all duration-300 ease-out text-center group cursor-pointer card-award relative overflow-hidden transform-3d-premium"
               >
                 {/* Premium Multi-Layer Glow Effects */}
                 <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-emerald-500/15 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -1021,7 +1021,7 @@ const Landing = () => {
       </section>
 
       {/* Built for the Trade - Image Grid */}
-      <section id="trade" className="py-28 px-4 bg-gradient-to-b from-background via-slate-50/50 dark:via-slate-900/50 to-background relative overflow-hidden" style={{ position: 'relative', zIndex: 10 }}>
+      <section id="trade" className="py-28 px-4 md:px-6 bg-gradient-to-b from-background via-slate-50/50 dark:via-slate-900/50 to-background relative overflow-hidden" style={{ position: 'relative', zIndex: 10 }}>
         {/* Subtle decorative elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/4 right-0 w-96 h-96 bg-primary/3 rounded-full blur-3xl" />
@@ -1033,23 +1033,23 @@ const Landing = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-100px' }}
             transition={{ duration: 0.6 }}
-            className="text-center mb-16"
+            className="text-center mb-20"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-sm font-semibold mb-6 border border-primary/20 dark:border-primary/30">
               <Sparkles className="w-4 h-4" />
               Real Workdays
             </div>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+            <h2 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-foreground mb-6 leading-tight tracking-tight">
               Built for Real Workdays
             </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium">
+            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium">
               Every feature was designed after listening to cleaners describe their actual workflow&mdash;from the van, 
               to the customer&apos;s home, to managing payments and back to planning the next round.
             </p>
           </motion.div>
 
           {/* Enhanced responsive image grid with fallbacks */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 auto-rows-fr relative z-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8 auto-rows-fr relative z-10">
             {tradeImages.map((img, index) => (
               <TradeImageCard key={`trade-img-${index}-${img.title}`} img={img} index={index} />
             ))}
@@ -1059,7 +1059,7 @@ const Landing = () => {
       </section>
 
       {/* Problem Section - "The Round You're Running Now" */}
-      <section id="problem" className="py-28 px-4 bg-gradient-to-b from-background via-slate-50/30 dark:via-slate-900/30 to-muted/30 relative overflow-hidden">
+      <section id="problem" className="py-28 px-4 md:px-6 bg-gradient-to-b from-background via-slate-50/30 dark:via-slate-900/30 to-muted/30 relative overflow-hidden">
         {/* Decorative background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-1/3 w-96 h-96 bg-red-500/5 rounded-full blur-3xl" />
@@ -1072,20 +1072,20 @@ const Landing = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-16"
+            className="text-center mb-20"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-sm font-semibold mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-sm font-semibold mb-6 border border-red-500/20 dark:border-red-500/30">
               The Problem
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
               Right now, your round is costing you more time than it should
             </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
+            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
               These are the exact problems local cleaners told us about—the daily frustrations that eat your time
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-3 gap-6 md:gap-8">
             {painPoints.map((point, index) => (
               <motion.div
                 key={index}
@@ -1104,7 +1104,7 @@ const Landing = () => {
                   transition: { duration: 0.3 }
                 }}
                 className={cn(
-                  "bg-card rounded-2xl p-8 border-2 border-border shadow-depth-2 hover:shadow-depth-4 transition-all relative overflow-hidden group card-premium",
+                  "bg-card rounded-2xl p-8 md:p-10 border-2 border-border/60 dark:border-border/80 shadow-depth-2 hover:shadow-depth-4 transition-all duration-300 ease-out relative overflow-hidden group card-premium",
                   point.bgColor
                 )}
               >
@@ -1130,7 +1130,7 @@ const Landing = () => {
       </section>
 
       {/* Transformation Story - Before → After */}
-      <section id="transformation" className="py-28 px-4 bg-gradient-to-b from-muted/30 to-background relative overflow-hidden">
+      <section id="transformation" className="py-28 px-4 md:px-6 bg-gradient-to-b from-muted/30 to-background relative overflow-hidden">
         {/* Decorative background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/4 left-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
@@ -1143,20 +1143,20 @@ const Landing = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-16"
+            className="text-center mb-20"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6 border border-emerald-500/20 dark:border-emerald-500/30">
               The Solution
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
               How SoloWipe Transforms Your Day
             </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
+            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
               From manual chaos to automated wealth—here's what changes
             </p>
           </motion.div>
 
-          <div className="space-y-6">
+          <div className="space-y-6 md:space-y-8">
             {transformations.map((transformation, index) => (
               <motion.div
                 key={index}
@@ -1175,7 +1175,7 @@ const Landing = () => {
                   transition: { duration: 0.3 }
                 }}
                 className={cn(
-                  "relative rounded-2xl p-8 md:p-10 border-2 border-border shadow-depth-3 hover:shadow-depth-4 overflow-hidden group transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] card-premium",
+                  "relative rounded-2xl p-8 md:p-10 lg:p-12 border-2 border-border/60 dark:border-border/80 shadow-depth-3 hover:shadow-depth-4 overflow-hidden group transition-all duration-300 ease-out card-premium",
                   transformation.bgColor
                 )}
               >
@@ -1278,7 +1278,7 @@ const Landing = () => {
       </section>
 
       {/* Features Section - Premium Bento Grid */}
-      <section id="features" className="py-28 px-4 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
+      <section id="features" className="py-28 px-4 md:px-6 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
         {/* Decorative background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
@@ -1293,19 +1293,19 @@ const Landing = () => {
             transition={{ duration: 0.4, ease: "easeOut" }}
             className="text-center mb-20"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-sm font-semibold mb-6 border border-primary/20 dark:border-primary/30">
               <Zap className="w-4 h-4" />
               Powerful Features
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-6 leading-tight">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
               All-in-One Round Control
             </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
+            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
               Every feature addresses a real pain point we discovered through months of research with local window cleaners
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             {features.map((feature, index) => (
               <motion.div
                 key={index}
@@ -1324,7 +1324,7 @@ const Landing = () => {
                   transition: { duration: 0.3 }
                 }}
                 className={cn(
-                  "relative rounded-2xl p-6 md:p-8 border-2 border-border transition-all overflow-hidden group bg-card card-award transform-3d-premium",
+                  "relative rounded-2xl p-6 md:p-8 lg:p-10 border-2 border-border/60 dark:border-border/80 transition-all duration-300 ease-out overflow-hidden group bg-card card-award transform-3d-premium",
                   feature.bgColor
                 )}
               >
@@ -1351,10 +1351,10 @@ const Landing = () => {
                   >
                     <feature.icon className={cn("w-9 h-9", feature.color)} />
                   </div>
-                  <h3 className="text-xl md:text-2xl font-black text-foreground mb-4 group-hover:text-gradient-award transition-all leading-tight">
+                  <h3 className="text-xl md:text-2xl font-black text-foreground mb-4 group-hover:text-gradient-award transition-all leading-tight tracking-tight">
                     {feature.title}
                   </h3>
-                  <p className="text-muted-foreground leading-relaxed text-base group-hover:text-foreground/95 transition-colors font-medium">
+                  <p className="text-muted-foreground dark:text-muted-foreground/90 leading-relaxed text-base md:text-lg group-hover:text-foreground/95 transition-colors font-medium">
                     {feature.description}
                   </p>
                 </div>
@@ -1365,7 +1365,7 @@ const Landing = () => {
       </section>
 
       {/* How It Works - 3-Step Flow */}
-      <section id="how-it-works" className="py-28 px-4 bg-gradient-to-b from-muted/30 to-background relative overflow-hidden">
+      <section id="how-it-works" className="py-28 px-4 md:px-6 bg-gradient-to-b from-muted/30 to-background relative overflow-hidden">
         {/* Decorative background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/2 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
@@ -1379,19 +1379,19 @@ const Landing = () => {
             transition={{ duration: 0.4, ease: "easeOut" }}
             className="text-center mb-20"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-sm font-semibold mb-6 border border-primary/20 dark:border-primary/30">
               <Target className="w-4 h-4" />
               Simple Process
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-6 leading-tight">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
               How SoloWipe Fits Into Your Day
             </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
+            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
               Set up once. Work from your phone. SoloWipe handles the rest.
             </p>
           </motion.div>
 
-          <div className="space-y-8">
+          <div className="space-y-8 md:space-y-10">
             {[
               {
                 step: 1,
@@ -1428,7 +1428,7 @@ const Landing = () => {
                   scale: 1.01,
                   transition: { duration: 0.3 }
                 }}
-                className="relative bg-card rounded-2xl p-8 md:p-10 border-2 border-border shadow-depth-3 hover:shadow-depth-4 transition-all duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] group card-premium"
+                className="relative bg-card rounded-2xl p-8 md:p-10 lg:p-12 border-2 border-border/60 dark:border-border/80 shadow-depth-3 hover:shadow-depth-4 transition-all duration-300 ease-out group card-premium"
               >
                 <div className="flex items-start gap-6">
                   <motion.div 
@@ -1443,8 +1443,8 @@ const Landing = () => {
                     <span className="text-3xl font-extrabold text-primary relative z-10">{step.step}</span>
                   </motion.div>
                   <div className="flex-1">
-                    <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-4 leading-tight">{step.title}</h3>
-                    <p className="text-muted-foreground text-lg leading-relaxed group-hover:text-foreground/90 transition-colors">{step.description}</p>
+                    <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-4 leading-tight tracking-tight">{step.title}</h3>
+                    <p className="text-muted-foreground dark:text-muted-foreground/90 text-lg md:text-xl leading-relaxed group-hover:text-foreground/90 transition-colors">{step.description}</p>
                   </div>
                 </div>
               </motion.div>
@@ -1454,7 +1454,7 @@ const Landing = () => {
       </section>
 
       {/* Comparison Section */}
-      <section id="comparison" className="py-28 px-4 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
+      <section id="comparison" className="py-28 px-4 md:px-6 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
         {/* Decorative background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
@@ -1466,26 +1466,26 @@ const Landing = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-12"
+            className="text-center mb-20"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6 border border-emerald-500/20 dark:border-emerald-500/30">
               The Comparison
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
               SoloWipe vs. Paper Diaries & Excel
             </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
+            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
               See why SoloWipe gives you a higher likelihood of success than running your round on paper or spreadsheets.
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-6 md:gap-8">
             <motion.div
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="rounded-2xl border-2 border-emerald-500/30 bg-card p-8 shadow-xl hover:shadow-2xl transition-all"
+              className="rounded-2xl border-2 border-emerald-500/30 dark:border-emerald-500/40 bg-card p-8 md:p-10 shadow-xl hover:shadow-2xl transition-all duration-300 ease-out"
             >
               <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
                 <img 
@@ -1520,7 +1520,7 @@ const Landing = () => {
                 whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="rounded-2xl border-2 border-border/70 bg-muted/40 p-8 shadow-lg"
+              className="rounded-2xl border-2 border-border/70 dark:border-border/80 bg-muted/40 dark:bg-muted/60 p-8 md:p-10 shadow-lg"
             >
               <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-sm font-bold border-2 border-border">
@@ -1549,7 +1549,7 @@ const Landing = () => {
       </section>
 
       {/* Pricing Section - Risk Reversal */}
-      <section id="pricing" className="py-28 px-4 bg-gradient-to-b from-muted/30 via-background to-background relative overflow-hidden" style={{ position: 'relative', zIndex: 20 }}>
+      <section id="pricing" className="py-28 px-4 md:px-6 bg-gradient-to-b from-muted/30 via-background to-background relative overflow-hidden" style={{ position: 'relative', zIndex: 20 }}>
         {/* Decorative background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
@@ -1562,28 +1562,28 @@ const Landing = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-16"
+            className="text-center mb-20"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6 border border-emerald-500/20 dark:border-emerald-500/30">
               <ShieldCheck className="w-4 h-4" />
               Risk-Free Start
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
               Automate Your First 10 Jobs Free
             </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium">
+            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
               No credit card required. No setup fees. See exactly how SoloWipe transforms your round before you pay anything.
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-8 mb-12 relative z-20">
+          <div className="grid md:grid-cols-2 gap-8 md:gap-10 mb-16 relative z-20">
             {/* Free Tier */}
             <motion.div
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="bg-card rounded-2xl p-8 md:p-10 border-2 border-primary/30 shadow-xl hover:shadow-2xl relative overflow-hidden group transition-all"
+              className="bg-card rounded-2xl p-8 md:p-10 lg:p-12 border-2 border-primary/30 dark:border-primary/40 shadow-xl hover:shadow-2xl relative overflow-hidden group transition-all duration-300 ease-out"
             >
               <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform" />
               <div className="relative z-10">
@@ -1636,7 +1636,7 @@ const Landing = () => {
                 whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6 }}
-              className="bg-gradient-to-br from-primary/5 to-emerald-500/5 rounded-2xl p-8 md:p-10 border-2 border-primary shadow-2xl hover:shadow-primary/20 hover:-translate-y-1 relative overflow-hidden group transition-all duration-300 ease-out"
+              className="bg-gradient-to-br from-primary/5 to-emerald-500/5 dark:from-primary/10 dark:to-emerald-500/10 rounded-2xl p-8 md:p-10 lg:p-12 border-2 border-primary dark:border-primary/60 shadow-2xl hover:shadow-primary/20 hover:-translate-y-1 relative overflow-hidden group transition-all duration-300 ease-out"
             >
               <div className="absolute top-0 right-0 w-48 h-48 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative z-10">
@@ -1707,7 +1707,7 @@ const Landing = () => {
       </section>
 
       {/* FAQ Section */}
-      <section id="faq" className="py-28 px-4 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
+      <section id="faq" className="py-28 px-4 md:px-6 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
         {/* Decorative background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
@@ -1719,21 +1719,21 @@ const Landing = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-16"
+            className="text-center mb-20"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-semibold mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-sm font-semibold mb-6 border border-primary/20 dark:border-primary/30">
               <MessageSquare className="w-4 h-4" />
               Questions & Answers
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-6 leading-tight">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
               Frequently Asked Questions
             </h2>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
+            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
               Everything you need to know before you start automating your round.
             </p>
           </motion.div>
 
-          <div className="space-y-4">
+          <div className="space-y-4 md:space-y-6">
             {faqItems.map((item, index) => (
               <motion.div
                 key={index}
@@ -1751,7 +1751,7 @@ const Landing = () => {
                   scale: 1.01,
                   transition: { duration: 0.2 }
                 }}
-                className="rounded-xl border-2 border-border bg-card p-6 md:p-7 shadow-depth-2 hover:shadow-depth-3 transition-all duration-300 ease-out group card-premium"
+                className="rounded-xl border-2 border-border/60 dark:border-border/80 bg-card p-6 md:p-8 shadow-depth-2 hover:shadow-depth-3 transition-all duration-300 ease-out group card-premium"
               >
                 <h3 className="text-base md:text-lg font-bold text-foreground mb-4 flex items-start gap-3 leading-snug">
                   <span className="mt-0.5 text-primary text-xl font-extrabold flex-shrink-0">Q.</span>
@@ -1785,7 +1785,7 @@ const Landing = () => {
       </section>
 
       {/* Final CTA Section - Premium Design */}
-      <section className="py-28 px-4 bg-gradient-to-br from-primary/10 via-emerald-500/10 to-primary/10 relative overflow-hidden" style={{ position: 'relative', zIndex: 30 }}>
+      <section className="py-28 px-4 md:px-6 bg-gradient-to-br from-primary/10 via-emerald-500/10 to-primary/10 relative overflow-hidden" style={{ position: 'relative', zIndex: 30 }}>
         {/* Simplified background effects */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 1 }}>
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/15 rounded-full blur-3xl opacity-60" />
@@ -1801,14 +1801,14 @@ const Landing = () => {
             className="relative z-40"
             style={{ position: 'relative', zIndex: 40 }}
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 text-primary text-sm font-semibold mb-6 border border-primary/30">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 dark:bg-primary/30 text-primary text-sm font-semibold mb-6 border border-primary/30 dark:border-primary/40">
               <Sparkles className="w-4 h-4" />
               Get Started Today
             </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground mb-4 leading-tight">
+            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
               Ready to Transform Your Business?
             </h2>
-            <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-2xl mx-auto font-medium">
+            <p className="text-xl md:text-2xl lg:text-3xl text-muted-foreground mb-12 max-w-2xl mx-auto font-medium leading-relaxed">
               Be among the first to experience a window cleaning app built from real conversations with cleaners like you
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center relative z-50" style={{ position: 'relative', zIndex: 50 }}>
@@ -1850,7 +1850,7 @@ const Landing = () => {
 
       {/* Footer - Premium Design */}
       <footer 
-        className="py-16 px-4 border-t border-border/50 bg-gradient-to-b from-muted/30 to-background relative z-40"
+        className="py-20 px-4 md:px-6 border-t border-border/50 dark:border-border/60 bg-gradient-to-b from-muted/30 to-background relative z-40"
         style={{ position: 'relative', zIndex: 40 }}
         role="contentinfo"
       >
@@ -1861,7 +1861,7 @@ const Landing = () => {
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="mb-12 pb-12 border-b border-border/50"
+            className="mb-16 pb-16 border-b border-border/50 dark:border-border/60"
           >
             <div className="max-w-md mx-auto text-center">
               <h3 className="text-xl font-bold text-foreground mb-2">

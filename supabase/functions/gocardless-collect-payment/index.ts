@@ -165,18 +165,39 @@ serve(async (req) => {
       });
     }
 
+    // CRITICAL SECURITY: Validate that the customer belongs to the authenticated user
+    // This prevents users from collecting payments for other users' customers
     const { data: customer, error: customerError } = await adminClient
       .from('customers')
-      .select('gocardless_id, name')
+      .select('id, profile_id, gocardless_id, name')
       .eq('id', customerId)
       .single();
 
-    if (customerError || !customer?.gocardless_id) {
+    if (customerError || !customer) {
+      return new Response(JSON.stringify({ error: 'Customer not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (customer.profile_id !== user.id) {
+      console.error('[GC-COLLECT] ❌ SECURITY: Customer ownership mismatch');
+      console.error('[GC-COLLECT] Customer profile_id:', customer.profile_id);
+      console.error('[GC-COLLECT] Authenticated user id:', user.id);
+      return new Response(JSON.stringify({ error: 'Unauthorized: Customer does not belong to you' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!customer.gocardless_id) {
       return new Response(JSON.stringify({ error: 'Customer does not have an active Direct Debit mandate' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    console.log('[GC-COLLECT] ✅ Customer ownership validated');
 
     const accessToken = await decryptToken(profile.gocardless_access_token_encrypted);
     const environment = Deno.env.get('GOCARDLESS_ENVIRONMENT') || 'sandbox';
@@ -296,8 +317,38 @@ serve(async (req) => {
     console.log('[GC-COLLECT] Amount:', paymentData.payments.amount, 'pence');
     console.log('[GC-COLLECT] App Fee:', appFee, 'pence');
 
+    // CRITICAL SECURITY: Validate that the job belongs to the authenticated user
+    // This prevents users from updating other users' jobs
+    console.log('[GC-COLLECT] Step 3: Validating job ownership...');
+    const { data: job, error: jobCheckError } = await adminClient
+      .from('jobs')
+      .select('id, customer_id')
+      .eq('id', jobId)
+      .single();
+
+    if (jobCheckError || !job) {
+      console.error('[GC-COLLECT] ❌ Job not found:', jobCheckError);
+      return new Response(JSON.stringify({ error: 'Job not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verify job belongs to the same customer we validated earlier
+    if (job.customer_id !== customerId) {
+      console.error('[GC-COLLECT] ❌ SECURITY: Job customer mismatch');
+      console.error('[GC-COLLECT] Job customer_id:', job.customer_id);
+      console.error('[GC-COLLECT] Requested customer_id:', customerId);
+      return new Response(JSON.stringify({ error: 'Unauthorized: Job does not belong to this customer' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('[GC-COLLECT] ✅ Job ownership validated');
+
     // Update job with payment info
-    console.log('[GC-COLLECT] Step 3: Updating job record...');
+    console.log('[GC-COLLECT] Step 4: Updating job record...');
     const { error: updateError } = await adminClient
       .from('jobs')
       .update({

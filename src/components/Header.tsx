@@ -21,14 +21,14 @@ export function Header({ showLogo = true, title, rightContent, showWeather = fal
   }).format(new Date());
 
   return (
-    <header className="sticky top-0 z-40 bg-background/98 backdrop-premium border-b border-border/60 shadow-lg">
-      <div className="flex items-center justify-between h-16 px-4 max-w-lg mx-auto">
+    <header className="sticky top-0 z-40 bg-background/98 dark:bg-background/95 backdrop-premium border-b border-border/60 dark:border-border/80 shadow-lg">
+      <div className="flex items-center justify-between h-16 md:h-18 px-4 md:px-6 max-w-lg mx-auto">
         <div className="flex items-center gap-3">
           {showLogo ? (
             <motion.img 
               src="/SoloLogo.jpg" 
               alt="SoloWipe" 
-              className="h-8 w-auto transition-transform hover:scale-105"
+              className="h-8 md:h-10 w-auto transition-transform hover:scale-105"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             />
@@ -41,10 +41,10 @@ export function Header({ showLogo = true, title, rightContent, showWeather = fal
           {showWeather && <WeatherWidget />}
           {rightContent || (
             <motion.span 
-              className="text-sm font-semibold text-muted-foreground"
+              className="text-sm md:text-base font-semibold text-muted-foreground dark:text-muted-foreground/90"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
+              transition={{ delay: 0.2, duration: 0.3 }}
             >
               {today}
             </motion.span>

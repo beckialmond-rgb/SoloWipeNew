@@ -86,8 +86,12 @@ serve(async (req) => {
     
     console.log('=== GoCardless OAuth Debug ===');
     console.log('Client ID:', clientId);
+    console.log('Client ID length:', clientId?.length || 0);
     console.log('Environment:', environment);
+    console.log('Environment from env var:', Deno.env.get('GOCARDLESS_ENVIRONMENT'));
     console.log('Redirect URL from client:', clientRedirectUrl);
+    console.log('Redirect URL length:', clientRedirectUrl?.length || 0);
+    console.log('Redirect URL encoded check:', encodeURIComponent(clientRedirectUrl) === clientRedirectUrl ? 'No encoding needed' : 'Needs encoding');
     
     if (!clientId) {
       return new Response(JSON.stringify({ error: 'GoCardless not configured' }), {
@@ -125,7 +129,17 @@ serve(async (req) => {
     
     console.log('OAuth base URL:', baseUrl);
     
-    const state = btoa(JSON.stringify({ userId: user.id, timestamp: Date.now() }));
+    // CRITICAL FIX: Include redirect_uri in state parameter to ensure consistency
+    // This ensures the same redirect_uri is used in both authorization and token exchange
+    const stateData = {
+      userId: user.id,
+      redirectUri: redirectUrl,
+      timestamp: Date.now(),
+    };
+    const state = btoa(JSON.stringify(stateData));
+    
+    console.log('[GC-CONNECT] State parameter contents:', JSON.stringify(stateData));
+    console.log('[GC-CONNECT] State parameter (base64):', state);
     
     const authUrl = new URL(`${baseUrl}/oauth/authorize`);
     authUrl.searchParams.set('client_id', clientId);
@@ -135,8 +149,23 @@ serve(async (req) => {
     authUrl.searchParams.set('state', state);
     authUrl.searchParams.set('initial_view', 'login');
 
+    // Extract redirect_uri from constructed URL to verify it matches
+    const redirectUriFromUrl = authUrl.searchParams.get('redirect_uri');
+    console.log('=== REDIRECT URI VERIFICATION ===');
+    console.log('Redirect URI we set:', redirectUrl);
+    console.log('Redirect URI in OAuth URL:', redirectUriFromUrl);
+    console.log('Match:', redirectUrl === redirectUriFromUrl ? '✅ YES' : '❌ NO - MISMATCH!');
+    console.log('Expected in Dashboard:', redirectUrl);
+    console.log('⚠️ CRITICAL: Verify this URL is registered in GoCardless Dashboard');
+    console.log('⚠️ CRITICAL: Environment must match -', environment === 'live' ? 'LIVE Client ID → LIVE Dashboard' : 'SANDBOX Client ID → SANDBOX Dashboard');
+    console.log('⚠️ CRITICAL: If using SANDBOX, use: https://manage-sandbox.gocardless.com/settings/api');
+    console.log('⚠️ CRITICAL: If using LIVE, use: https://manage.gocardless.com/settings/api');
+    console.log('=== END REDIRECT URI VERIFICATION ===');
+    
     console.log('Full OAuth URL:', authUrl.toString());
     console.log(`➡️ Generated Redirect URL: ${redirectUrl}`);
+    console.log('OAuth Base URL:', baseUrl);
+    console.log('Environment:', environment);
     console.log('=== End Debug ===');
 
     return new Response(JSON.stringify({ url: authUrl.toString(), state }), {

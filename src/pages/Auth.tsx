@@ -573,36 +573,45 @@ const Auth = () => {
                 <Checkbox
                   id="acceptTerms"
                   checked={acceptedTerms}
-                  onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
-                  className="h-5 w-5 mt-0.5"
+                  onCheckedChange={(checked) => {
+                    setAcceptedTerms(checked === true);
+                  }}
+                  className="h-5 w-5 mt-0.5 flex-shrink-0"
                 />
-                <label 
-                  htmlFor="acceptTerms" 
-                  className="text-sm text-muted-foreground cursor-pointer select-none leading-tight"
-                >
-                  I agree to the{' '}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate('/terms');
-                    }}
-                    className="text-primary hover:underline"
-                  >
-                    Terms of Service
-                  </button>{' '}
-                  and{' '}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate('/privacy');
-                    }}
-                    className="text-primary hover:underline"
-                  >
-                    Privacy Policy
-                  </button>
-                </label>
+                <div className="flex-1">
+                  <div className="text-sm text-muted-foreground leading-tight">
+                    <label 
+                      htmlFor="acceptTerms" 
+                      className="cursor-pointer select-none"
+                    >
+                      I agree to the{' '}
+                    </label>
+                    <Link
+                      to="/terms"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                      className="text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded"
+                    >
+                      Terms of Service
+                    </Link>
+                    <label 
+                      htmlFor="acceptTerms" 
+                      className="cursor-pointer select-none"
+                    >
+                      {' '}and{' '}
+                    </label>
+                    <Link
+                      to="/privacy"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                      }}
+                      className="text-primary hover:underline focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 rounded"
+                    >
+                      Privacy Policy
+                    </Link>
+                  </div>
+                </div>
               </div>
             )}
 

@@ -18,22 +18,33 @@ const ForgotPassword = forwardRef<HTMLDivElement>((_, ref) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate email before submission
+    if (!emailValidation.isValid) {
+      return;
+    }
+    
     setLoading(true);
 
     try {
+      // Always show success message (even for invalid emails) to prevent email enumeration
+      // This is an industry best practice for security
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
 
+      // Always show success to prevent email enumeration attacks
+      // Supabase will only send email if the email exists, but we don't reveal this
+      setSent(true);
+      
       if (error) {
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive',
-        });
-      } else {
-        setSent(true);
+        // Log error but don't show to user (security best practice)
+        console.error('[ForgotPassword] Error sending reset email:', error);
       }
+    } catch (error) {
+      // Log unexpected errors but still show success message
+      console.error('[ForgotPassword] Unexpected error:', error);
+      setSent(true);
     } finally {
       setLoading(false);
     }

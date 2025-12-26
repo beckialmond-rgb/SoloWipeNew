@@ -27,20 +27,32 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
   useEffect(() => {
     // Check if we have a valid session from the reset link
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // If there's a session but it's from a normal login (not password recovery), redirect to dashboard
-      if (session && !window.location.hash.includes('type=recovery')) {
-        navigate('/dashboard', { replace: true });
-        return;
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('[ResetPassword] Session check error:', sessionError);
+          setError('Unable to verify reset link. Please request a new one.');
+          setCheckingSession(false);
+          return;
+        }
+        
+        // If there's a session but it's from a normal login (not password recovery), redirect to dashboard
+        if (session && !window.location.hash.includes('type=recovery')) {
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+        
+        // If no session and not a recovery link, show error
+        if (!session) {
+          setError('Invalid or expired reset link. Please request a new one.');
+        }
+      } catch (err) {
+        console.error('[ResetPassword] Unexpected error checking session:', err);
+        setError('An error occurred. Please request a new reset link.');
+      } finally {
+        setCheckingSession(false);
       }
-      
-      // If no session and not a recovery link, show error
-      if (!session) {
-        setError('Invalid or expired reset link. Please request a new one.');
-      }
-      
-      setCheckingSession(false);
     };
     checkSession();
   }, [navigate]);
@@ -48,6 +60,7 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate passwords match
     if (password !== confirmPassword) {
       toast({
         title: 'Passwords do not match',
@@ -57,6 +70,7 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
       return;
     }
 
+    // Validate password strength (industry standard: min 8 chars, good strength)
     if (password.length < 8) {
       toast({
         title: 'Password too short',
@@ -66,9 +80,32 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
       return;
     }
 
+    if (passwordStrength.score < 3) {
+      toast({
+        title: 'Password too weak',
+        description: 'Please choose a stronger password.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
+      // Verify we still have a valid session before updating password
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (!currentSession) {
+        toast({
+          title: 'Session expired',
+          description: 'Your reset link has expired. Please request a new one.',
+          variant: 'destructive',
+        });
+        setError('Session expired. Please request a new reset link.');
+        setLoading(false);
+        return;
+      }
+
       const { error } = await supabase.auth.updateUser({
         password: password,
       });
@@ -86,11 +123,18 @@ const ResetPassword = forwardRef<HTMLDivElement>((_, ref) => {
           description: 'You can now sign in with your new password.',
         });
         
-        // Redirect to dashboard after 2 seconds
+        // Small delay to show success message, then redirect to login
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate('/auth');
         }, 2000);
       }
+    } catch (err) {
+      console.error('[ResetPassword] Unexpected error:', err);
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }

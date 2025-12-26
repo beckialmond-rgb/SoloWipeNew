@@ -1284,6 +1284,11 @@ export function useSupabaseData() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['completedToday'] });
+      queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['paidThisWeek'] });
+      queryClient.invalidateQueries({ queryKey: ['weeklyEarnings'] });
       toast({
         title: 'Customer updated!',
       });

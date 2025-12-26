@@ -186,6 +186,33 @@ serve(async (req) => {
       });
     }
 
+    // CRITICAL SECURITY: Validate that the customer belongs to the authenticated user
+    // This prevents users from modifying other users' customers
+    const { data: customer, error: customerError } = await adminClient
+      .from('customers')
+      .select('id, profile_id')
+      .eq('id', customerId)
+      .single();
+
+    if (customerError || !customer) {
+      return new Response(JSON.stringify({ error: 'Customer not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (customer.profile_id !== user.id) {
+      console.error('[GC-MANDATE] ❌ SECURITY: Customer ownership mismatch');
+      console.error('[GC-MANDATE] Customer profile_id:', customer.profile_id);
+      console.error('[GC-MANDATE] Authenticated user id:', user.id);
+      return new Response(JSON.stringify({ error: 'Unauthorized: Customer does not belong to you' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    console.log('[GC-MANDATE] ✅ Customer ownership validated');
+
     const accessToken = await decryptToken(profile.gocardless_access_token_encrypted);
     const environment = Deno.env.get('GOCARDLESS_ENVIRONMENT') || 'sandbox';
     const apiUrl = environment === 'live'

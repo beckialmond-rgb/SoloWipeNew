@@ -1031,8 +1031,9 @@ const Index = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
               className={cn(
-                "relative rounded-2xl p-6 shadow-2xl overflow-hidden mb-6",
+                "relative rounded-2xl p-6 md:p-8 shadow-2xl overflow-hidden mb-6",
                 "bg-gradient-to-br from-slate-800 via-slate-700 to-slate-800",
                 "dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-800 dark:to-slate-900",
                 "border-2 border-slate-600 dark:border-slate-600"
@@ -1042,10 +1043,10 @@ const Index = () => {
               <div className="absolute top-0 right-0 w-32 h-32 bg-primary/15 dark:bg-primary/10 rounded-full blur-3xl pointer-events-none" />
               
               <div className="relative z-10">
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between mb-8">
                   <div>
-                    <p className="text-slate-200 dark:text-slate-300 text-sm font-semibold mb-1 uppercase tracking-wide">Today's Run</p>
-                    <p className="text-3xl font-extrabold text-white dark:text-white">
+                    <p className="text-slate-200 dark:text-slate-300 text-sm font-semibold mb-2 uppercase tracking-wide">Today's Run</p>
+                    <p className="text-3xl md:text-4xl font-extrabold text-white dark:text-white leading-tight">
                       {new Intl.DateTimeFormat('en-GB', {
                         timeZone: timezone,
                         weekday: 'long',
@@ -1054,32 +1055,32 @@ const Index = () => {
                       }).format(new Date())}
                     </p>
                   </div>
-                  <div className="w-14 h-14 rounded-full bg-white/20 dark:bg-white/15 backdrop-blur-sm flex items-center justify-center border-2 border-white/40 dark:border-white/30">
-                    <Clock className="w-7 h-7 text-white dark:text-white" strokeWidth={2.5} />
+                  <div className="w-16 h-16 md:w-18 md:h-18 rounded-full bg-white/20 dark:bg-white/15 backdrop-blur-sm flex items-center justify-center border-2 border-white/40 dark:border-white/30 shadow-lg">
+                    <Clock className="w-8 h-8 md:w-9 md:h-9 text-white dark:text-white" strokeWidth={2.5} />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 border-2 border-white/30 dark:border-white/20 shadow-lg">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-blue-500 dark:bg-blue-500 flex items-center justify-center mb-3 shadow-md">
-                      <Clock className="w-6 h-6 text-white dark:text-white" />
+                <div className="grid grid-cols-3 gap-4 md:gap-6">
+                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 md:p-5 border-2 border-white/30 dark:border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 ease-out">
+                    <div className="w-12 h-12 md:w-14 md:h-14 mx-auto rounded-full bg-blue-500 dark:bg-blue-500 flex items-center justify-center mb-3 shadow-md">
+                      <Clock className="w-6 h-6 md:w-7 md:h-7 text-white dark:text-white" />
                     </div>
-                    <p className="text-3xl font-extrabold text-white dark:text-white text-center leading-tight">{localJobs.length}</p>
-                    <p className="text-slate-200 dark:text-slate-200 text-xs font-semibold text-center mt-2 uppercase tracking-wide">Pending</p>
+                    <p className="text-3xl md:text-4xl font-extrabold text-white dark:text-white text-center leading-tight">{localJobs.length}</p>
+                    <p className="text-slate-200 dark:text-slate-200 text-xs md:text-sm font-semibold text-center mt-2 uppercase tracking-wide">Pending</p>
                   </div>
-                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 border-2 border-white/30 dark:border-white/20 shadow-lg">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-emerald-500 dark:bg-emerald-500 flex items-center justify-center mb-3 shadow-md">
-                      <CheckCircle className="w-6 h-6 text-white dark:text-white" />
+                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 md:p-5 border-2 border-white/30 dark:border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 ease-out">
+                    <div className="w-12 h-12 md:w-14 md:h-14 mx-auto rounded-full bg-emerald-500 dark:bg-emerald-500 flex items-center justify-center mb-3 shadow-md">
+                      <CheckCircle className="w-6 h-6 md:w-7 md:h-7 text-white dark:text-white" />
                     </div>
-                    <p className="text-3xl font-extrabold text-white dark:text-white text-center leading-tight">{completedToday.length}</p>
-                    <p className="text-slate-200 dark:text-slate-200 text-xs font-semibold text-center mt-2 uppercase tracking-wide">Done</p>
+                    <p className="text-3xl md:text-4xl font-extrabold text-white dark:text-white text-center leading-tight">{completedToday.length}</p>
+                    <p className="text-slate-200 dark:text-slate-200 text-xs md:text-sm font-semibold text-center mt-2 uppercase tracking-wide">Done</p>
                   </div>
-                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 border-2 border-white/30 dark:border-white/20 shadow-lg">
-                    <div className="w-12 h-12 mx-auto rounded-full bg-green-500 dark:bg-green-500 flex items-center justify-center mb-3 shadow-md">
-                      <PoundSterling className="w-6 h-6 text-white dark:text-white" />
+                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 md:p-5 border-2 border-white/30 dark:border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 ease-out">
+                    <div className="w-12 h-12 md:w-14 md:h-14 mx-auto rounded-full bg-green-500 dark:bg-green-500 flex items-center justify-center mb-3 shadow-md">
+                      <PoundSterling className="w-6 h-6 md:w-7 md:h-7 text-white dark:text-white" />
                     </div>
-                    <p className="text-3xl font-extrabold text-green-200 dark:text-green-300 text-center leading-tight">£{todayEarnings}</p>
-                    <p className="text-slate-200 dark:text-slate-200 text-xs font-semibold text-center mt-2 uppercase tracking-wide">Earned</p>
+                    <p className="text-3xl md:text-4xl font-extrabold text-green-200 dark:text-green-300 text-center leading-tight">£{todayEarnings}</p>
+                    <p className="text-slate-200 dark:text-slate-200 text-xs md:text-sm font-semibold text-center mt-2 uppercase tracking-wide">Earned</p>
                   </div>
                 </div>
               </div>
@@ -1105,37 +1106,40 @@ const Index = () => {
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
                 className="mb-6 flex items-center justify-between gap-4"
               >
-                <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary/15 dark:bg-primary/20 text-primary dark:text-primary rounded-xl border-2 border-primary/40 dark:border-primary/40 shadow-md">
-                  <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-extrabold shadow-sm">
+                <div className="inline-flex items-center gap-3 px-4 md:px-5 py-2.5 md:py-3 bg-primary/15 dark:bg-primary/20 text-primary dark:text-primary rounded-xl border-2 border-primary/40 dark:border-primary/40 shadow-md hover:shadow-lg transition-all duration-300 ease-out">
+                  <span className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-base md:text-lg font-extrabold shadow-sm">
                     {localJobs.length}
                   </span>
-                  <span className="font-semibold text-foreground dark:text-foreground">
+                  <span className="font-semibold text-base md:text-lg text-foreground dark:text-foreground">
                     {localJobs.length === 1 ? 'job' : 'jobs'} today
                   </span>
                 </div>
                 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 md:gap-4">
                   <Button
                     variant="outline"
                     size="default"
                     onClick={() => setQuickAddOpen(true)}
                     disabled={completingJobId !== null || isSkippingAll}
-                    className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
+                    className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ease-out"
                   >
-                    <UserPlus className="w-4 h-4" />
-                    Quick Add
+                    <UserPlus className="w-4 h-4 md:w-5 md:h-5" />
+                    <span className="hidden sm:inline">Quick Add</span>
+                    <span className="sm:hidden">Add</span>
                   </Button>
                   <Button
                     variant="outline"
                     size="default"
                     onClick={handleSkipAllRequest}
                     disabled={isSkippingAll || completingJobId !== null}
-                    className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
+                    className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ease-out"
                   >
-                    <SkipForward className="w-4 h-4" />
-                    {isSkippingAll ? 'Skipping...' : 'Skip All'}
+                    <SkipForward className="w-4 h-4 md:w-5 md:h-5" />
+                    {isSkippingAll ? 'Skipping...' : <span className="hidden sm:inline">Skip All</span>}
+                    {!isSkippingAll && <span className="sm:hidden">Skip</span>}
                   </Button>
                 </div>
               </motion.div>
@@ -1149,7 +1153,7 @@ const Index = () => {
             )}
 
             {/* Jobs list - Drag to reorder */}
-            <Reorder.Group axis="y" values={localJobs} onReorder={handleReorder} className="space-y-4">
+            <Reorder.Group axis="y" values={localJobs} onReorder={handleReorder} className="space-y-4 md:space-y-6">
               <AnimatePresence mode="popLayout">
                 {localJobs.map((job, index) => (
                   <JobCard
@@ -1192,8 +1196,8 @@ const Index = () => {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="mt-8"
+                transition={{ delay: 0.3, duration: 0.4, ease: "easeOut" }}
+                className="mt-10 md:mt-12"
               >
                 <button
                   onClick={() => {
@@ -1208,7 +1212,7 @@ const Index = () => {
                   className="flex items-center justify-between w-full py-2 mb-4"
                   aria-label={tomorrowJobsHidden ? "Show tomorrow's jobs" : "Hide tomorrow's jobs"}
                 >
-                  <h2 className="text-lg font-semibold text-foreground">
+                  <h2 className="text-lg md:text-xl font-bold text-foreground tracking-tight">
                     Tomorrow's Jobs ({tomorrowJobs.length})
                   </h2>
                   {tomorrowJobsHidden ? (
@@ -1266,7 +1270,7 @@ const Index = () => {
                       </div>
                     )}
 
-                    <div className="space-y-3">
+                    <div className="space-y-3 md:space-y-4">
                       {tomorrowJobs.map((job, index) => {
                         const customerName = job.customer?.name || 'Customer';
                         const isInQueue = smsQueue?.jobIds.includes(job.id);
@@ -1279,8 +1283,8 @@ const Index = () => {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.05 }}
                             className={cn(
-                              "bg-card rounded-xl border border-border p-4",
-                              isCurrentInQueue && "ring-2 ring-primary"
+                              "bg-card rounded-xl border-2 border-border/60 dark:border-border/80 p-4 md:p-5 shadow-sm hover:shadow-md transition-all duration-300 ease-out",
+                              isCurrentInQueue && "ring-2 ring-primary shadow-md"
                             )}
                           >
                             <div className="flex items-start justify-between gap-4">
@@ -1324,14 +1328,14 @@ const Index = () => {
 
             {/* Completed Today Section */}
             {completedToday.length > 0 && (
-              <Collapsible open={completedOpen} onOpenChange={setCompletedOpen} className="mt-8">
-                <CollapsibleTrigger className="flex items-center justify-between w-full py-2">
-                  <h2 className="text-lg font-semibold text-foreground">
+              <Collapsible open={completedOpen} onOpenChange={setCompletedOpen} className="mt-10 md:mt-12">
+                <CollapsibleTrigger className="flex items-center justify-between w-full py-2 hover:opacity-80 transition-opacity duration-300">
+                  <h2 className="text-lg md:text-xl font-bold text-foreground tracking-tight">
                     Completed Today ({completedToday.length})
                   </h2>
                   <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${completedOpen ? 'rotate-180' : ''}`} />
                 </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3 mt-3 pb-24">
+                <CollapsibleContent className="space-y-3 md:space-y-4 mt-4 pb-24">
                   {/* Send All Service Receipts Button */}
                   {completedToday.filter(job => job.customer?.mobile_phone && !sentReceipts.has(job.id)).length > 1 && (
                     <div className="mb-4">

@@ -194,34 +194,38 @@ export function SetTargetModal({
                         <Label htmlFor="target-input" className="text-xs text-muted-foreground mb-1 block">
                           Or enter exact amount:
                         </Label>
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">£</span>
-                        <Input
-                          id="target-input"
-                          type="number"
-                          min={minValue}
-                          max={maxValue}
-                          step={step}
-                          value={targetValue}
-                          onChange={(e) => handleInputChange(e.target.value)}
-                          className="pl-8 h-12 text-lg font-semibold touch-sm"
-                        />
+                        <div className="relative flex items-center">
+                          <span className="absolute left-3 text-muted-foreground font-semibold text-lg leading-[48px] pointer-events-none">£</span>
+                          <Input
+                            id="target-input"
+                            type="number"
+                            min={minValue}
+                            max={maxValue}
+                            step={step}
+                            value={targetValue}
+                            onChange={(e) => handleInputChange(e.target.value)}
+                            className="pl-8 h-12 text-lg font-semibold touch-sm leading-[48px]"
+                          />
+                        </div>
                       </div>
                     </div>
                   ) : (
                     /* Number Input for Monthly Goal */
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">£</span>
-                      <Input
-                        id="target"
-                        type="number"
-                        min="0"
-                        step="10"
-                        value={targetValue}
-                        onChange={(e) => handleInputChange(e.target.value)}
-                        className="pl-8 h-12 text-lg font-semibold touch-sm"
-                        placeholder="0"
-                        autoFocus
-                      />
+                      <div className="relative flex items-center">
+                        <span className="absolute left-3 text-muted-foreground font-semibold text-lg leading-[48px] pointer-events-none">£</span>
+                        <Input
+                          id="target"
+                          type="number"
+                          min="0"
+                          step="10"
+                          value={targetValue}
+                          onChange={(e) => handleInputChange(e.target.value)}
+                          className="pl-8 h-12 text-lg font-semibold touch-sm leading-[48px]"
+                          placeholder="0"
+                          autoFocus
+                        />
+                      </div>
                     </div>
                   )}
                 </div>

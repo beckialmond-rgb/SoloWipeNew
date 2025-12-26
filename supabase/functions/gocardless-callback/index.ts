@@ -116,7 +116,89 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { code, redirectUrl } = body;
+    const { code, redirectUrl, state: stateParam } = body;
+    
+    console.log('[GC-CALLBACK] === CALLBACK PROCESSING START ===');
+    console.log('[GC-CALLBACK] Received code:', code ? `${code.substring(0, 10)}...` : 'MISSING');
+    console.log('[GC-CALLBACK] Received redirectUrl from body:', redirectUrl || 'MISSING');
+    console.log('[GC-CALLBACK] Received state parameter:', stateParam ? `${stateParam.substring(0, 20)}...` : 'MISSING');
+    
+    // CRITICAL SECURITY FIX: Validate state parameter to prevent CSRF attacks
+    // The state parameter must contain the authenticated user's ID to prevent
+    // an attacker from tricking a user into connecting the attacker's GoCardless account
+    if (!stateParam) {
+      console.error('[GC-CALLBACK] ❌ SECURITY: Missing state parameter - rejecting to prevent CSRF');
+      return new Response(JSON.stringify({ error: 'Missing state parameter. Please restart the connection process.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    let stateData: { userId?: string; redirectUri?: string; timestamp?: number } | null = null;
+    try {
+      stateData = JSON.parse(atob(stateParam));
+      console.log('[GC-CALLBACK] State parameter decoded:', JSON.stringify(stateData));
+    } catch (e) {
+      console.error('[GC-CALLBACK] ❌ SECURITY: Invalid state parameter format - rejecting to prevent CSRF');
+      return new Response(JSON.stringify({ error: 'Invalid state parameter. Please restart the connection process.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // CRITICAL: Verify the state parameter contains the authenticated user's ID
+    if (!stateData.userId || stateData.userId !== user.id) {
+      console.error('[GC-CALLBACK] ❌ SECURITY: State parameter userId mismatch - rejecting to prevent CSRF');
+      console.error('[GC-CALLBACK] Expected userId:', user.id);
+      console.error('[GC-CALLBACK] State userId:', stateData.userId);
+      return new Response(JSON.stringify({ error: 'State parameter validation failed. Please restart the connection process.' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Optional: Validate state timestamp to prevent replay attacks (state should be recent, e.g., within 1 hour)
+    if (stateData.timestamp) {
+      const stateAge = Date.now() - stateData.timestamp;
+      const maxAge = 60 * 60 * 1000; // 1 hour
+      if (stateAge > maxAge) {
+        console.error('[GC-CALLBACK] ❌ SECURITY: State parameter expired - rejecting to prevent replay attacks');
+        return new Response(JSON.stringify({ error: 'Connection session expired. Please restart the connection process.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    console.log('[GC-CALLBACK] ✅ State parameter validated - userId matches authenticated user');
+    
+    // CRITICAL FIX: Determine redirect_uri deterministically
+    // Priority: 1. State parameter (most reliable), 2. Request body redirectUrl, 3. Construct from same logic as connect function
+    let redirectUriToUse: string | null = null;
+    
+    // Extract redirect_uri from validated state parameter
+    if (stateData.redirectUri && typeof stateData.redirectUri === 'string') {
+      redirectUriToUse = stateData.redirectUri;
+      console.log('[GC-CALLBACK] ✅ Extracted redirect_uri from state parameter:', redirectUriToUse);
+    }
+    
+    // Fallback to redirectUrl from request body
+    if (!redirectUriToUse && redirectUrl && typeof redirectUrl === 'string') {
+      redirectUriToUse = redirectUrl;
+      console.log('[GC-CALLBACK] ⚠️ Using redirectUrl from request body (fallback):', redirectUriToUse);
+    }
+    
+    // Final fallback: construct using same deterministic logic as connect function
+    // This ensures consistency even if state and redirectUrl are both missing
+    if (!redirectUriToUse) {
+      // Use the same logic as gocardless-connect function to construct redirect URI
+      // This is the production URL - in a real deployment, you might want to determine this from environment
+      // For now, we'll use the production URL as the default
+      redirectUriToUse = 'https://solowipe.co.uk/gocardless-callback';
+      console.log('[GC-CALLBACK] ⚠️ Using constructed redirect_uri (final fallback):', redirectUriToUse);
+    }
+    
+    console.log('[GC-CALLBACK] ✅ Final redirect_uri to use:', redirectUriToUse);
     
     // Input validation
     if (!code || typeof code !== 'string' || code.length > 500) {
@@ -127,15 +209,13 @@ serve(async (req) => {
       });
     }
 
-    if (redirectUrl && (typeof redirectUrl !== 'string' || redirectUrl.length > 500)) {
-      console.error('[GC-CALLBACK] Invalid redirect URL');
+    if (redirectUriToUse.length > 500) {
+      console.error('[GC-CALLBACK] Invalid redirect URL (too long)');
       return new Response(JSON.stringify({ error: 'Invalid redirect URL' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    console.log('[GC-CALLBACK] Processing authorization code, redirectUrl:', redirectUrl);
 
     const clientId = Deno.env.get('GOCARDLESS_CLIENT_ID');
     const clientSecret = Deno.env.get('GOCARDLESS_CLIENT_SECRET');
@@ -150,13 +230,22 @@ serve(async (req) => {
     }
 
     console.log('[GC-CALLBACK] Environment:', environment);
+    console.log('[GC-CALLBACK] Client ID:', clientId ? `${clientId.substring(0, 8)}...` : 'MISSING');
 
     // Exchange authorization code for access token
     const tokenUrl = environment === 'live'
       ? 'https://connect.gocardless.com/oauth/access_token'
       : 'https://connect-sandbox.gocardless.com/oauth/access_token';
 
-    console.log('[GC-CALLBACK] Exchanging code for token at:', tokenUrl);
+    console.log('[GC-CALLBACK] === TOKEN EXCHANGE REQUEST ===');
+    console.log('[GC-CALLBACK] Token URL:', tokenUrl);
+    console.log('[GC-CALLBACK] Using redirect_uri:', redirectUriToUse);
+    console.log('[GC-CALLBACK] ⚠️ CRITICAL: This redirect_uri MUST exactly match what was used in the OAuth authorization request');
+    console.log('[GC-CALLBACK] ⚠️ CRITICAL: It must also match what is registered in GoCardless Dashboard');
+    console.log('[GC-CALLBACK] Environment:', environment === 'live' ? 'LIVE' : 'SANDBOX');
+    console.log('[GC-CALLBACK] Dashboard URL:', environment === 'live' 
+      ? 'https://manage.gocardless.com/settings/api'
+      : 'https://manage-sandbox.gocardless.com/settings/api');
 
     const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
@@ -167,14 +256,47 @@ serve(async (req) => {
         grant_type: 'authorization_code',
         client_id: clientId,
         client_secret: clientSecret,
-        redirect_uri: redirectUrl,
+        redirect_uri: redirectUriToUse, // Use redirect_uri from state (ensures exact match)
         code: code,
       }),
     });
 
     if (!tokenResponse.ok) {
       const errorText = await tokenResponse.text();
-      console.error('[GC-CALLBACK] Token exchange failed:', errorText);
+      console.error('[GC-CALLBACK] ❌ Token exchange failed');
+      console.error('[GC-CALLBACK] Status:', tokenResponse.status, tokenResponse.statusText);
+      console.error('[GC-CALLBACK] Error response:', errorText);
+      console.error('[GC-CALLBACK] Redirect URI used:', redirectUriToUse);
+      console.error('[GC-CALLBACK] Environment:', environment);
+      
+      // Check for redirect_uri mismatch error
+      if (errorText.includes('redirect_uri') || errorText.includes('redirect URI')) {
+        console.error('[GC-CALLBACK] ❌ REDIRECT URI MISMATCH ERROR');
+        console.error('[GC-CALLBACK] This means the redirect_uri used in token exchange does not match:');
+        console.error('[GC-CALLBACK] 1. The redirect_uri used in the OAuth authorization request, OR');
+        console.error('[GC-CALLBACK] 2. The redirect_uri registered in GoCardless Dashboard');
+        console.error('[GC-CALLBACK] Redirect URI that was used:', redirectUriToUse);
+        console.error('[GC-CALLBACK] ⚠️ ACTION REQUIRED:');
+        console.error('[GC-CALLBACK] 1. Verify this exact URL is registered in GoCardless Dashboard');
+        console.error('[GC-CALLBACK] 2. Dashboard URL:', environment === 'live' 
+          ? 'https://manage.gocardless.com/settings/api'
+          : 'https://manage-sandbox.gocardless.com/settings/api');
+        console.error('[GC-CALLBACK] 3. Make sure: NO trailing slash, correct protocol (https for production), correct domain');
+        console.error('[GC-CALLBACK] 4. Verify environment matches (sandbox Client ID → sandbox Dashboard, live Client ID → live Dashboard)');
+        
+        return new Response(JSON.stringify({ 
+          error: 'Redirect URI mismatch',
+          details: `The redirect URI used does not match what's registered in GoCardless Dashboard. Used: ${redirectUriToUse}. Check browser console for detailed instructions.`,
+          redirectUri: redirectUriToUse,
+          environment,
+          dashboardUrl: environment === 'live' 
+            ? 'https://manage.gocardless.com/settings/api'
+            : 'https://manage-sandbox.gocardless.com/settings/api'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
       
       // Check if it's a "code already used" error - this means a previous call succeeded
       if (errorText.includes('already been used') || errorText.includes('invalid_grant')) {
@@ -199,11 +321,19 @@ serve(async (req) => {
         }
       }
       
-      return new Response(JSON.stringify({ error: 'Failed to exchange authorization code', details: errorText }), {
+      console.error('[GC-CALLBACK] === END ERROR DETAILS ===');
+      return new Response(JSON.stringify({ 
+        error: 'Failed to exchange authorization code', 
+        details: errorText,
+        redirectUri: redirectUriToUse
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+    
+    console.log('[GC-CALLBACK] ✅ Token exchange successful');
+    console.log('[GC-CALLBACK] === END TOKEN EXCHANGE REQUEST ===');
 
     const tokenData = await tokenResponse.json();
     const accessToken = tokenData.access_token;

@@ -30,7 +30,7 @@ export function EarningsCard({ amount, label, className }: EarningsCardProps) {
           </div>
           <span className="text-sm font-semibold text-white/90">{label}</span>
         </div>
-        <p className="text-4xl font-bold text-white drop-shadow-sm">
+        <p className="text-4xl font-bold text-white drop-shadow-sm min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
           £{amount.toFixed(2)}
         </p>
       </div>
