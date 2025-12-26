@@ -8,7 +8,10 @@ const corsHeaders = {
 
 // Encryption key derived from a secret - in production this should use Supabase Vault
 async function getEncryptionKey(): Promise<CryptoKey> {
-  const secret = Deno.env.get('SERVICE_ROLE_KEY') || 'fallback-secret-key';
+  const secret = Deno.env.get('SERVICE_ROLE_KEY');
+  if (!secret) {
+    throw new Error('SERVICE_ROLE_KEY environment variable is required but not set');
+  }
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',

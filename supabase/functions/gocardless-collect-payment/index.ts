@@ -8,7 +8,10 @@ const corsHeaders = {
 
 // Encryption key derived from a secret - matches gocardless-callback
 async function getEncryptionKey(): Promise<CryptoKey> {
-  const secret = Deno.env.get('SERVICE_ROLE_KEY') || 'fallback-secret-key';
+  const secret = Deno.env.get('SERVICE_ROLE_KEY');
+  if (!secret) {
+    throw new Error('SERVICE_ROLE_KEY environment variable is required but not set');
+  }
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -355,7 +358,7 @@ serve(async (req) => {
         gocardless_payment_id: paymentId,
         gocardless_payment_status: paymentStatus,
         payment_method: 'gocardless',
-        payment_status: 'paid', // Mark as paid immediately for DD
+        payment_status: 'processing', // Mark as processing until paid_out (funds arrive in 3-5 days)
       })
       .eq('id', jobId);
 

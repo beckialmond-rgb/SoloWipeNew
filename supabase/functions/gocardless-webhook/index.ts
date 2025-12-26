@@ -219,22 +219,32 @@ async function handlePaymentEvent(adminClient: SupabaseClient, event: GoCardless
 
   const status = action ? statusMap[action] : undefined;
   if (status) {
+    // Prepare update data
+    const updateData: { gocardless_payment_status: string; payment_status?: string; payment_date?: string } = {
+      gocardless_payment_status: status,
+    };
+
+    // When payment is paid_out, mark as paid and set payment_date
+    if (action === 'paid_out') {
+      updateData.payment_status = 'paid';
+      updateData.payment_date = new Date().toISOString();
+      console.log(`✅ Payment paid out: ${paymentId} - marking as paid`);
+    }
+
+    // If payment failed, update payment_status to unpaid
+    if (action === 'failed' || action === 'cancelled' || action === 'charged_back') {
+      updateData.payment_status = 'unpaid';
+      console.log(`⚠️ Payment ${action}: ${paymentId} - marking as unpaid`);
+    }
+
     await adminClient
       .from('jobs')
-      .update({ gocardless_payment_status: status })
+      .update(updateData)
       .eq('gocardless_payment_id', paymentId);
 
     // Log payment confirmation
     if (action === 'confirmed' || action === 'paid_out') {
       console.log(`✅ Payment confirmed: ${paymentId}`);
-    }
-
-    // If payment failed, update payment_status to unpaid
-    if (action === 'failed' || action === 'cancelled' || action === 'charged_back') {
-      await adminClient
-        .from('jobs')
-        .update({ payment_status: 'unpaid' })
-        .eq('gocardless_payment_id', paymentId);
     }
   }
 }
