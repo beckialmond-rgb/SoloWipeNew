@@ -73,3 +73,7 @@ https://solowipe.co.uk/gocardless-callback
 
 (without the `code` parameter), then the redirect URI is still not registered correctly.
 
+
+
+
+

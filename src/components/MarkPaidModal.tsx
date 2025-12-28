@@ -24,13 +24,19 @@ export function MarkPaidModal({ isOpen, job, onClose, onConfirm }: MarkPaidModal
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
-  // Reset state when modal opens or closes
+  // Reset state when modal opens or closes, and pre-select preferred payment method
   useEffect(() => {
     if (!isOpen) {
       setSelectedMethod(null);
       setIsSubmitting(false);
+    } else if (job?.customer?.preferred_payment_method) {
+      // Pre-select preferred payment method (only if cash or transfer - modal only shows these)
+      const preferred = job.customer.preferred_payment_method;
+      if (preferred === 'cash' || preferred === 'transfer') {
+        setSelectedMethod(preferred);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, job?.customer?.preferred_payment_method]);
 
   const handleConfirm = async () => {
     if (!selectedMethod || isSubmitting) return;

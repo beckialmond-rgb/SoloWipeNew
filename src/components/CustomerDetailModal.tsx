@@ -21,6 +21,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useSMSTemplateContext } from '@/contexts/SMSTemplateContext';
 import { openSMSApp, prepareSMSContext } from '@/utils/openSMS';
 import { AskForReviewButton } from '@/components/AskForReviewButton';
+import { ToastAction } from '@/components/ui/toast';
+import { useSupabaseData } from '@/hooks/useSupabaseData';
 
 interface CustomerDetailModalProps {
   customer: Customer | null;
@@ -34,7 +36,8 @@ interface CustomerDetailModalProps {
 }
 
 export function CustomerDetailModal({ customer, businessName, profile, onClose, onEdit, onArchive, onViewHistory, onRefresh }: CustomerDetailModalProps) {
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
+  const { unarchiveCustomer } = useSupabaseData();
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
   const [isArchiving, setIsArchiving] = useState(false);
   const [showDirectDebitSetup, setShowDirectDebitSetup] = useState(false);
@@ -171,12 +174,40 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
         
         console.log('[CustomerDetailModal] Archive completed successfully');
         
-        // FIX #2: Hard refresh after successful archive to prevent state sync deadlock
-        // This ensures UI reflects database changes even if React state gets stuck
-        setTimeout(() => {
-          console.log('[CustomerDetailModal] Refreshing page after successful archive');
-          window.location.reload();
-        }, 500); // Small delay to let toast show
+        // Show toast with undo button
+        const customerName = customer?.name || 'Customer';
+        const { id: toastId } = toast({
+          title: 'Customer archived',
+          description: `${customerName} has been moved to Archive.`,
+          duration: 5000,
+          action: (
+            <ToastAction
+              altText="Undo"
+              onClick={async () => {
+                dismiss(toastId);
+                try {
+                  await unarchiveCustomer(customerId);
+                  toast({
+                    title: 'Archive undone',
+                    description: `${customerName} has been restored.`,
+                  });
+                  // Refresh to show updated customer list
+                  if (onRefresh) {
+                    onRefresh();
+                  }
+                } catch (error) {
+                  toast({
+                    title: 'Error',
+                    description: 'Failed to undo archive',
+                    variant: 'destructive',
+                  });
+                }
+              }}
+            >
+              Undo
+            </ToastAction>
+          ),
+        });
         
       } catch (error) {
         console.error('[CustomerDetailModal] Archive error:', error);
@@ -847,7 +878,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                   <>
                     {/* Mandate Status Display */}
                     {hasActiveMandate && customer?.gocardless_mandate_status === 'active' ? (
-                      <div className="flex items-center gap-3 p-3 bg-success/10 dark:bg-success/20 rounded-lg border border-success/30 dark:border-success/40 mb-3">
+                      <div className="flex items-center gap-3 p-4 bg-success/10 dark:bg-success/20 rounded-xl border border-success/30 dark:border-success/40 mb-3">
                         <CheckCircle2 className="w-5 h-5 text-success dark:text-success shrink-0" />
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-success dark:text-success">Direct Debit Ready</p>
@@ -855,7 +886,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                         </div>
                       </div>
                     ) : customer?.gocardless_mandate_status === 'pending' ? (
-                      <div className="flex items-center gap-3 p-3 bg-warning/10 dark:bg-warning/20 rounded-lg border border-warning/30 dark:border-warning/40 mb-3">
+                      <div className="flex items-center gap-3 p-4 bg-warning/10 dark:bg-warning/20 rounded-xl border border-warning/30 dark:border-warning/40 mb-3">
                         <Loader2 className="w-5 h-5 text-warning dark:text-warning shrink-0 animate-spin" />
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-warning dark:text-warning">Direct Debit Pending</p>
@@ -866,7 +897,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="mt-2 text-xs h-7"
+                            className="mt-2 text-xs touch-sm min-h-[44px]"
                             onClick={async () => {
                               if (!customer?.id) return;
                               
@@ -916,7 +947,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                         </div>
                       </div>
                     ) : customer?.gocardless_mandate_status === 'cancelled' || customer?.gocardless_mandate_status === 'expired' || customer?.gocardless_mandate_status === 'failed' ? (
-                      <div className="flex items-center gap-3 p-3 bg-destructive/10 dark:bg-destructive/20 rounded-lg border border-destructive/30 dark:border-destructive/40 mb-3">
+                      <div className="flex items-center gap-3 p-4 bg-destructive/10 dark:bg-destructive/20 rounded-xl border border-destructive/30 dark:border-destructive/40 mb-3">
                         <AlertCircle className="w-5 h-5 text-destructive dark:text-destructive shrink-0" />
                         <div className="flex-1">
                           <p className="text-sm font-semibold text-destructive dark:text-destructive">Direct Debit {customer.gocardless_mandate_status}</p>
@@ -953,7 +984,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                           )}
                         </Button>
                       ) : (
-                        <div className="p-3 bg-muted/50 rounded-lg border border-border">
+                        <div className="p-4 bg-muted/50 rounded-xl border border-border">
                           <p className="text-sm text-muted-foreground text-center">
                             Add a phone number to send Direct Debit invites via SMS
                           </p>
@@ -965,7 +996,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                         onClick={() => setShowDirectDebitSetup(true)}
                         variant="outline"
                         className={cn(
-                          "w-full rounded-lg touch-sm min-h-[44px] gap-2",
+                          "w-full rounded-xl touch-sm min-h-[44px] gap-2",
                           "border-border text-foreground",
                           "hover:bg-muted/50"
                         )}
@@ -986,7 +1017,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                     onClick={() => onViewHistory(customer)}
                     variant="outline"
                     className={cn(
-                      "w-full rounded-lg touch-sm min-h-[44px] gap-2",
+                      "w-full rounded-xl touch-sm min-h-[44px] gap-2",
                       "border-border text-foreground",
                       "hover:bg-muted"
                     )}
@@ -1001,7 +1032,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                   <Button
                     onClick={sendSmsReminder}
                     className={cn(
-                      "w-full rounded-lg touch-sm min-h-[44px] gap-2",
+                      "w-full rounded-xl touch-sm min-h-[44px] gap-2",
                       "bg-primary hover:bg-primary/90 text-primary-foreground"
                     )}
                   >
@@ -1013,7 +1044,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                     disabled
                     variant="outline"
                     className={cn(
-                      "w-full rounded-lg touch-sm min-h-[44px] gap-2",
+                      "w-full rounded-xl touch-sm min-h-[44px] gap-2",
                       "opacity-50 cursor-not-allowed"
                     )}
                     title="No phone number available"
@@ -1037,7 +1068,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                       });
                     }}
                     className={cn(
-                      "w-full rounded-lg touch-sm min-h-[44px] gap-2",
+                      "w-full rounded-xl touch-sm min-h-[44px] gap-2",
                       "bg-amber-500/15 dark:bg-amber-500/20",
                       "text-amber-700 dark:text-amber-300",
                       "border border-amber-500/30 dark:border-amber-500/40",
@@ -1057,7 +1088,7 @@ export function CustomerDetailModal({ customer, businessName, profile, onClose, 
                     onClick={() => setShowArchiveConfirm(true)}
                     variant="outline"
                     className={cn(
-                      "w-full rounded-lg touch-sm min-h-[44px] gap-2",
+                      "w-full rounded-xl touch-sm min-h-[44px] gap-2",
                       "border-destructive text-destructive",
                       "hover:bg-destructive/10"
                     )}

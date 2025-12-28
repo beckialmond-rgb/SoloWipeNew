@@ -242,3 +242,7 @@ The Stripe integration is now:
 
 The sign-up and subscription flow is now seamless, clear, and ready to provide a great experience for window cleaners signing up for SoloWipe.
 
+
+
+
+

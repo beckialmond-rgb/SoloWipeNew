@@ -311,13 +311,22 @@ export function CompletedJobItem({ job, index, businessName = 'SoloWipe', onMark
                 }
               }
               
-              // Format payment method for receipt
-              const formatPaymentMethod = (method: string | null): string => {
-                if (!method) return 'Not specified';
-                if (method === 'gocardless') return 'Direct Debit';
-                if (method === 'cash') return 'Cash';
-                if (method === 'transfer') return 'Bank Transfer';
-                return method.charAt(0).toUpperCase() + method.slice(1);
+              // Format payment method for receipt - use actual, fallback to preferred
+              const formatPaymentMethod = (method: string | null, preferredMethod: string | null): string => {
+                // Actual payment method set - use it
+                if (method) {
+                  if (method === 'gocardless') return 'Direct Debit';
+                  if (method === 'cash') return 'Cash';
+                  if (method === 'transfer') return 'Bank Transfer';
+                  return method.charAt(0).toUpperCase() + method.slice(1);
+                }
+                
+                // No actual method - try preferred as fallback
+                if (preferredMethod === 'gocardless') return 'Direct Debit (Expected)';
+                if (preferredMethod === 'cash') return 'Cash (Expected)';
+                if (preferredMethod === 'transfer') return 'Bank Transfer (Expected)';
+                
+                return 'Not specified';
               };
               
               // Prepare context matching exactly what receipt templates expect:
@@ -335,7 +344,7 @@ export function CompletedJobItem({ job, index, businessName = 'SoloWipe', onMark
                 completedDate: completedDateFormatted,
                 photoUrl: photoUrl, // This becomes {{photo_url}} in templates
                 businessName, // This becomes {{business_name}} in templates
-                paymentMethod: formatPaymentMethod(job.payment_method), // Payment method for receipt
+                paymentMethod: formatPaymentMethod(job.payment_method, job.customer.preferred_payment_method), // Payment method for receipt
               });
               
               const phone = job.customer.mobile_phone || '';
@@ -345,7 +354,7 @@ export function CompletedJobItem({ job, index, businessName = 'SoloWipe', onMark
                   if (onReceiptSent) {
                     onReceiptSent(job.id);
                   }
-                  openSMSApp(phone, message, user?.id);
+                  openSMSApp(phone, message, user?.id, job.id);
                 });
               }
             }}

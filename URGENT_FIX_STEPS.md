@@ -119,3 +119,7 @@ If there's a mismatch:
 
 **The key is: the redirect URI sent must match EXACTLY (character-for-character) what's registered in GoCardless Dashboard.**
 
+
+
+
+

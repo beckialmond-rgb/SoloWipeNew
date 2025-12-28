@@ -46,3 +46,7 @@ If it shows "Connected", then it's working! The error you're seeing might be fro
 
 The state parameter should be extracted from the URL and passed to the callback function. Let me check the callback page code to ensure it's doing this correctly.
 
+
+
+
+

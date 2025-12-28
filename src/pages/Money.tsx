@@ -691,7 +691,7 @@ const Money = () => {
               <Clock className="w-4 h-4" />
               Unpaid ({sortedUnpaidJobs.length})
               {overdueCount > 0 && (
-                <span className="px-1.5 py-0.5 bg-destructive/20 text-destructive rounded-full text-xs font-bold">
+                <span className="px-2 py-0.5 bg-destructive/15 dark:bg-destructive/25 text-destructive dark:text-destructive rounded-full text-xs font-bold border border-destructive/30 dark:border-destructive/40">
                   {overdueCount}
                 </span>
               )}

@@ -127,3 +127,7 @@ If you don't have access to Supabase dashboard:
 
 **Add the environment variables and redeploy - that will fix it!** 🚀
 
+
+
+
+

@@ -15,8 +15,10 @@ interface AuthContextType {
   signUp: (
     email: string,
     password: string,
-    businessName: string
+    businessName?: string
   ) => Promise<{ error: Error | null; needsEmailConfirmation: boolean }>;
+  signInWithMagicLink: (email: string) => Promise<{ error: Error | null; isNewUser?: boolean }>;
+  checkEmailExists: (email: string) => Promise<{ exists: boolean; isHelper?: boolean; isPlaceholder?: boolean; ownerName?: string }>;
   signInWithOAuth: (provider: Provider) => Promise<{ error: Error | null }>;
   resendVerificationEmail: (email: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -60,20 +62,103 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           provider: nextSession?.user?.app_metadata?.provider,
         });
         
-        // Handle OAuth sign-up - ensure profile exists and has business_name
+        // Handle new signups - match placeholder helpers and check business name
         if (event === 'SIGNED_IN' && nextSession?.user) {
-          // Check if this is a Google OAuth user
-          const isOAuthUser = nextSession.user.app_metadata?.provider === 'google';
+          const userEmail = nextSession.user.email;
+          const userId = nextSession.user.id;
+          
+          // Small delay to ensure profile trigger has completed
+          setTimeout(async () => {
+            try {
+              // 1. Check if this user should be matched to a placeholder helper
+              if (userEmail) {
+                // PRIORITY 1: Check for exact email match in team_members (most reliable)
+                // This happens when owner provided the helper's real email
+                const { data: exactMatch } = await supabase
+                  .from('team_members')
+                  .select('id, helper_id, helper_email, helper_name, owner_id')
+                  .eq('helper_email', userEmail.toLowerCase())
+                  .maybeSingle();
 
-          if (isOAuthUser) {
-            // Small delay to ensure profile trigger has completed
-            setTimeout(async () => {
-              try {
+                // PRIORITY 2: Check for placeholder match (name matches email prefix)
+                // This is a fallback for when owner only provided a name
+                const emailPrefix = userEmail.split('@')[0].toLowerCase();
+                const { data: placeholderMatch } = await supabase
+                  .from('team_members')
+                  .select('id, helper_id, helper_email, helper_name, owner_id')
+                  .ilike('helper_email', `${emailPrefix}@temp.helper`)
+                  .maybeSingle();
+
+                // Prioritize exact email match over placeholder match
+                const match = exactMatch || placeholderMatch;
+                
+                // Match if:
+                // 1. Match found AND helper_id is different from current user ID
+                // 2. helper_id is a placeholder (doesn't exist in auth.users) OR matches placeholder pattern
+                if (match && match.helper_id !== userId) {
+                  // Additional check: verify helper_id is actually a placeholder
+                  // Check if helper_id exists in auth.users by trying to query profiles
+                  // If profile doesn't exist, it's likely a placeholder
+                  const { data: profileCheck } = await supabase
+                    .from('profiles')
+                    .select('id')
+                    .eq('id', match.helper_id)
+                    .maybeSingle();
+                  
+                  // If profile doesn't exist, this is definitely a placeholder
+                  // OR if it's a temp email pattern, treat as placeholder
+                  const isPlaceholder = !profileCheck || match.helper_email.endsWith('@temp.helper');
+                  
+                  if (isPlaceholder) {
+                    console.log('[Helper Matching] Found placeholder match:', match);
+                    
+                    const { error: updateError } = await supabase
+                      .from('team_members')
+                      .update({
+                        helper_id: userId,
+                        helper_email: userEmail,
+                      })
+                      .eq('id', match.id);
+
+                    if (!updateError) {
+                      console.log('[Helper Matching] Successfully matched helper to user');
+                      // Store flag to show celebration
+                      sessionStorage.setItem('helper_matched', 'true');
+                      if (match.owner_id) {
+                        sessionStorage.setItem('helper_owner_id', match.owner_id);
+                      }
+                      // Get owner name from profiles for celebration message
+                      if (match.owner_id) {
+                        const { data: ownerProfile } = await supabase
+                          .from('profiles')
+                          .select('business_name')
+                          .eq('id', match.owner_id)
+                          .maybeSingle();
+                        if (ownerProfile?.business_name) {
+                          sessionStorage.setItem('helper_owner_name', ownerProfile.business_name);
+                        }
+                      }
+                    } else {
+                      console.error('[Helper Matching] Failed to update:', updateError);
+                      // Store error for potential user notification
+                      sessionStorage.setItem('helper_match_error', updateError.message);
+                    }
+                  } else {
+                    // Real user with different ID - log but don't update (might be a different person)
+                    console.warn('[Helper Matching] Found match but helper_id belongs to existing user - skipping update');
+                  }
+                }
+              }
+
+              // 2. Check if this is a Google OAuth user and needs business name
+              const isOAuthUser = nextSession.user.app_metadata?.provider === 'google';
+
+              if (isOAuthUser) {
                 // Verify profile exists and check business_name
                 const { data: profile, error } = await supabase
                   .from('profiles')
                   .select('business_name')
-                  .eq('id', nextSession.user.id)
+                  .eq('id', userId)
                   .maybeSingle();
 
                 // If profile exists but business_name is default, mark for update
@@ -83,11 +168,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                   // Trigger a custom event to notify components
                   window.dispatchEvent(new Event('needs-business-name'));
                 }
-              } catch (err) {
-                console.error('Error checking profile after OAuth:', err);
               }
-            }, 500);
-          }
+            } catch (err) {
+              console.error('Error checking profile after signin:', err);
+            }
+          }, 500);
         }
 
         setSession(nextSession);
@@ -203,9 +288,105 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, businessName: string) => {
+  // Check if email exists and detect role (helper vs owner)
+  // Note: We can't directly check auth.users from client, so we check team_members
+  // and infer existence. Magic link will handle actual signup/signin.
+  const checkEmailExists = async (email: string) => {
+    if (supabaseError) return { exists: false };
+    try {
+      const normalizedEmail = email.toLowerCase().trim();
+      
+      // Check if email exists in team_members as placeholder helper
+      const { data: teamMemberData } = await supabase
+        .from('team_members')
+        .select('helper_email, helper_name, helper_id, owner_id')
+        .eq('helper_email', normalizedEmail)
+        .maybeSingle();
+
+      // Also check for placeholder helpers with temp email pattern
+      // e.g., if user types "john@email.com" but placeholder is "john@temp.helper"
+      const emailPrefix = normalizedEmail.split('@')[0].toLowerCase();
+      const { data: placeholderData } = await supabase
+        .from('team_members')
+        .select('helper_email, helper_name, helper_id, owner_id')
+        .ilike('helper_email', `${emailPrefix}@temp.helper`)
+        .maybeSingle();
+
+      // Get owner name if helper found
+      let ownerName: string | undefined;
+      const helperData = teamMemberData || placeholderData;
+      
+      if (helperData?.owner_id) {
+        const { data: ownerProfile } = await supabase
+          .from('profiles')
+          .select('business_name')
+          .eq('id', helperData.owner_id)
+          .maybeSingle();
+        ownerName = ownerProfile?.business_name;
+      }
+
+      const isHelper = !!helperData;
+      
+      // Check if helper is a placeholder (doesn't have a real profile)
+      let isPlaceholder = false;
+      if (isHelper && helperData.helper_id) {
+        const { data: profileCheck } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', helperData.helper_id)
+          .maybeSingle();
+        isPlaceholder = !profileCheck || helperData.helper_email.endsWith('@temp.helper');
+      }
+      
+      // We can't definitively check if user exists in auth.users from client
+      // Magic link will handle this - if user exists, it signs in; if not, it signs up
+      return {
+        exists: false, // Will be determined by magic link response
+        isHelper,
+        isPlaceholder: isHelper ? isPlaceholder : undefined,
+        ownerName: isHelper ? ownerName : undefined,
+      };
+    } catch (err) {
+      console.error('[checkEmailExists] Error:', err);
+      return { exists: false };
+    }
+  };
+
+  // Magic link authentication (email-first, passwordless)
+  const signInWithMagicLink = async (email: string) => {
+    if (supabaseError) return { error: supabaseError, isNewUser: false };
+    try {
+      const redirectUrl = `${window.location.origin}/dashboard`;
+      
+      // Note: We can't reliably determine if user is new from client-side
+      // Supabase will handle signup vs signin automatically with shouldCreateUser: true
+      // We'll set isNewUser based on whether they have a profile after signin
+      const isNewUser = false; // Will be determined after signin
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: redirectUrl,
+          shouldCreateUser: true, // Allow signup via magic link
+        },
+      });
+
+      if (error) {
+        return { error: new Error(error.message), isNewUser: false };
+      }
+
+      return { error: null, isNewUser: false }; // Will be updated after signin
+    } catch (err) {
+      return { 
+        error: err instanceof Error ? err : new Error('Failed to send magic link'),
+        isNewUser: false,
+      };
+    }
+  };
+
+  const signUp = async (email: string, password: string, businessName?: string) => {
     if (supabaseError) return { error: supabaseError, needsEmailConfirmation: false };
-    const redirectUrl = `${window.location.origin}/`;
+    const redirectUrl = `${window.location.origin}/dashboard`;
     
     try {
       console.log('[SignUp] Attempting signup for:', email);
@@ -215,7 +396,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: {
           emailRedirectTo: redirectUrl,
           data: {
-            business_name: businessName,
+            // Only include business_name if provided (optional)
+            ...(businessName ? { business_name: businessName } : {}),
           },
         },
       });
@@ -405,6 +587,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isSupabaseConfigured: !supabaseError,
       signIn,
       signUp,
+      signInWithMagicLink,
+      checkEmailExists,
       signInWithOAuth,
       resendVerificationEmail,
       signOut,

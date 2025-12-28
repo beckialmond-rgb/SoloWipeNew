@@ -313,3 +313,7 @@ The GoCardless integration is now truly 5-star quality with:
 
 **The integration is ready for production use and will not let window cleaners down!** 🎉
 
+
+
+
+

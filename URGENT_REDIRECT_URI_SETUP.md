@@ -68,3 +68,7 @@ https://solowipe.co.uk/gocardless-callback
 
 **That's it! This is purely a GoCardless Dashboard configuration step.**
 
+
+
+
+

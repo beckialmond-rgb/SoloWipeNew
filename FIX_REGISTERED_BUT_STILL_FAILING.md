@@ -108,3 +108,7 @@ Based on your setup, the most likely issue is:
 
 **Fix:** Make sure the exact production URI (`https://solowipe.co.uk/gocardless-callback`) is registered, matching character-for-character with what's being sent.
 
+
+
+
+

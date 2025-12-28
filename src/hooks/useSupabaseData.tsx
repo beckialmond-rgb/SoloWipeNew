@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Customer, JobWithCustomer } from '@/types/database';
+import { Customer, JobWithCustomer, JobWithCustomerAndAssignment, JobAssignmentWithUser, TeamMember, Helper } from '@/types/database';
 import { format, addWeeks, startOfWeek, subWeeks } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { mutationQueue, localData } from '@/lib/offlineStorage';
@@ -109,6 +109,7 @@ export function useSupabaseData() {
   });
 
   // Fetch pending jobs for today (and overdue) - exclude jobs from archived customers
+  // Includes assignment data for Owner view
   const { data: pendingJobs = [], isLoading: jobsLoading } = useQuery({
     queryKey: ['pendingJobs', user?.id, today],
     queryFn: async () => {
@@ -119,7 +120,14 @@ export function useSupabaseData() {
           .from('jobs')
           .select(`
             *,
-            customer:customers(*)
+            customer:customers(*),
+            assignments:job_assignments(
+              id,
+              assigned_to_user_id,
+              assigned_by_user_id,
+              assigned_at,
+              created_at
+            )
           `)
           .eq('status', 'pending')
           .is('cancelled_at', null)
@@ -138,10 +146,19 @@ export function useSupabaseData() {
         });
         
         const jobs = sortedData
-          .map(job => ({
-            ...job,
-            customer: job.customer as Customer,
-          }))
+          .map(job => {
+            const assignments = (job.assignments && Array.isArray(job.assignments) 
+              ? job.assignments 
+              : []) as JobAssignmentWithUser[];
+            
+            return {
+              ...job,
+              customer: job.customer as Customer,
+              assignments: assignments,
+              // Backward compatibility: keep assignment as first assignment
+              assignment: assignments.length > 0 ? assignments[0] : undefined
+            };
+          })
           .filter(job => {
             // CRITICAL: Exclude jobs from archived customers - must check both null and false
             // Also exclude scrubbed customers
@@ -150,7 +167,7 @@ export function useSupabaseData() {
             if (customer.is_archived === true) return false; // Archived = exclude
             if (customer.is_scrubbed === true) return false; // Scrubbed = exclude
             return true; // Active customer = include
-          }) as JobWithCustomer[];
+          }) as JobWithCustomerAndAssignment[];
         
         // Jobs loaded successfully
         return jobs;
@@ -211,7 +228,14 @@ export function useSupabaseData() {
           .from('jobs')
           .select(`
             *,
-            customer:customers(*)
+            customer:customers(*),
+            assignments:job_assignments(
+              id,
+              assigned_to_user_id,
+              assigned_by_user_id,
+              assigned_at,
+              created_at
+            )
           `)
           .eq('status', 'pending')
           .is('cancelled_at', null)
@@ -230,10 +254,19 @@ export function useSupabaseData() {
         });
         
         const jobs = sortedData
-          .map(job => ({
-            ...job,
-            customer: job.customer as Customer,
-          }))
+          .map(job => {
+            const assignments = (job.assignments && Array.isArray(job.assignments) 
+              ? job.assignments 
+              : []) as JobAssignmentWithUser[];
+            
+            return {
+              ...job,
+              customer: job.customer as Customer,
+              assignments: assignments,
+              // Backward compatibility: keep assignment as first assignment
+              assignment: assignments.length > 0 ? assignments[0] : undefined
+            };
+          })
           .filter(job => {
             // CRITICAL: Exclude jobs from archived customers - must check both null and false
             // Also exclude scrubbed customers
@@ -242,7 +275,7 @@ export function useSupabaseData() {
             if (customer.is_archived === true) return false; // Archived = exclude
             if (customer.is_scrubbed === true) return false; // Scrubbed = exclude
             return true; // Active customer = include
-          }) as JobWithCustomer[];
+          }) as JobWithCustomerAndAssignment[];
         
         // Upcoming jobs loaded successfully - ALL future jobs are now visible (excluding archived customers)
         return jobs;
@@ -252,6 +285,216 @@ export function useSupabaseData() {
       }
     },
     enabled: !!user,
+  });
+
+  // Fetch assigned jobs (for Helpers - jobs assigned to current user)
+  const { data: assignedJobs = [], isLoading: assignedJobsLoading } = useQuery({
+    queryKey: ['assignedJobs', user?.id, today],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      try {
+        // First get assignments for this user
+        const { data: assignments, error: assignmentsError } = await supabase
+          .from('job_assignments')
+          .select('job_id')
+          .eq('assigned_to_user_id', user.id);
+        
+        if (assignmentsError) {
+          console.error('[Assigned Jobs Query Error - Assignments]', assignmentsError);
+          throw assignmentsError;
+        }
+        
+        if (!assignments || assignments.length === 0) {
+          return [];
+        }
+        
+      const jobIds = assignments.map(a => a.job_id);
+      
+      // Then fetch the jobs
+      // NOTE: Only fetch PENDING jobs - completed jobs are removed from assignments
+      // when they're completed (see completeJobMutation cleanup logic)
+      // This ensures helpers only see active assignments, not completed ones
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          *,
+          customer:customers(*),
+          assignments:job_assignments(
+            id,
+            assigned_to_user_id,
+            assigned_by_user_id,
+            assigned_at,
+            created_at
+          )
+        `)
+        .in('id', jobIds)
+        .eq('status', 'pending')  // Only pending jobs - assignments are cleaned up on completion
+        .is('cancelled_at', null)
+        .lte('scheduled_date', today)
+        .order('scheduled_date', { ascending: true });
+        
+        if (error) {
+          console.error('[Assigned Jobs Query Error - Jobs]', error);
+          throw error;
+        }
+        
+        const jobs = (data || []).map(job => {
+          const assignments = (job.assignments && Array.isArray(job.assignments) 
+            ? job.assignments 
+            : []) as JobAssignmentWithUser[];
+          
+          return {
+            ...job,
+            customer: job.customer as Customer,
+            assignments: assignments,
+            // Backward compatibility: keep assignment as first assignment
+            assignment: assignments.length > 0 ? assignments[0] : undefined
+          };
+        }) as JobWithCustomerAndAssignment[];
+        
+        return jobs;
+      } catch (error) {
+        console.error('[Assigned Jobs Query] Failed to fetch assigned jobs:', error);
+        // Return empty array instead of throwing to prevent infinite loading
+        return [];
+      }
+    },
+    enabled: !!user,
+    staleTime: 30 * 1000, // Cache for 30 seconds
+  });
+
+  // Check if current user is a helper (has team memberships)
+  // This helps determine helper status even when no current assignments exist
+  const { data: teamMemberships = [], isLoading: teamMembershipsLoading } = useQuery({
+    queryKey: ['teamMemberships', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      try {
+        const { data, error } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('helper_id', user.id)
+          .limit(1);
+        
+        if (error) {
+          console.warn('[Team Memberships Query] Error:', error);
+          return [];
+        }
+        
+        return data || [];
+      } catch (error) {
+        console.warn('[Team Memberships Query] Exception:', error);
+        return [];
+      }
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Fetch helpers from two sources:
+  // 1. Team members (proactively added by owner)
+  // 2. Users who have received assignments (discovered helpers)
+  const { data: helpers = [], isLoading: helpersLoading } = useQuery({
+    queryKey: ['helpers', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      try {
+        // Source 1: Get team members (proactively added helpers)
+        const { data: teamMembers, error: teamError } = await supabase
+          .from('team_members')
+          .select('*')
+          .eq('owner_id', user.id);
+        
+        if (teamError) {
+          console.error('[Helpers Query Error - Team Members]', teamError);
+          // If table doesn't exist yet, continue with discovered helpers
+        }
+        
+        // Source 2: Get discovered helpers (from assignments)
+        const { data: allAssignments, error: assignmentsError } = await supabase
+          .from('job_assignments')
+          .select(`
+            assigned_to_user_id,
+            job_id,
+            jobs(
+              customer_id,
+              customers(profile_id)
+            )
+          `);
+        
+        if (assignmentsError) {
+          console.error('[Helpers Query Error - Assignments]', assignmentsError);
+          // Continue with team members only if assignments fail
+        }
+        
+        // Filter assignments where current user is the owner
+        const myAssignments = (allAssignments || []).filter((assignment: any) => {
+          const job = assignment.jobs;
+          if (!job || !job.customers) return false;
+          return job.customers.profile_id === user.id;
+        });
+        
+        // Extract unique user IDs from assignments
+        const discoveredHelperIds = Array.from(
+          new Set(
+            myAssignments
+              .map((a: any) => a.assigned_to_user_id)
+              .filter(Boolean)
+          )
+        ) as string[];
+        
+        // Combine team members and discovered helpers
+        const helperMap = new Map<string, Helper>();
+        
+        // Add team members first (they have better data)
+        (teamMembers || []).forEach((member: TeamMember) => {
+          const initials = member.helper_name
+            ? member.helper_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+            : member.helper_email.split('@')[0].slice(0, 2).toUpperCase();
+        
+          // Detect placeholder: 
+          // 1. If email ends with @temp.helper, definitely a placeholder
+          // 2. If helper_id is NOT in discoveredHelperIds, they haven't signed up yet (placeholder)
+          //    (discoveredHelperIds come from assignments, which require real auth.users)
+          const isTempEmail = member.helper_email.endsWith('@temp.helper');
+          const hasSignedUp = discoveredHelperIds.includes(member.helper_id);
+          const isPlaceholder = isTempEmail || !hasSignedUp;
+        
+          helperMap.set(member.helper_id, {
+            id: member.helper_id,
+            email: member.helper_email,
+            name: member.helper_name || undefined,
+            initials,
+            isTeamMember: true,
+            isPlaceholder: isPlaceholder,
+          });
+        });
+        
+        // Add discovered helpers (only if not already in team members)
+        // These are always real users (can't assign to placeholders)
+        discoveredHelperIds.forEach(userId => {
+          if (!helperMap.has(userId)) {
+            const placeholderEmail = userId.slice(0, 8) + '...';
+            helperMap.set(userId, {
+              id: userId,
+              email: placeholderEmail,
+              initials: userId.slice(0, 2).toUpperCase().replace(/[^A-Z0-9]/g, '') || '?',
+              isTeamMember: false,
+              isPlaceholder: false, // Discovered helpers are always real users
+            });
+          }
+        });
+        
+        return Array.from(helperMap.values());
+      } catch (error) {
+        console.error('[Helpers Query] Failed to fetch helpers:', error);
+        return [];
+      }
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
   // Fetch weekly earnings (last 8 weeks of completed jobs)
@@ -498,8 +741,25 @@ export function useSupabaseData() {
           }
         }
 
-        const job = pendingJobs.find(j => j.id === jobId);
-        if (!job) throw new Error('Job not found');
+        // Fetch job directly from database (works for both Owners and Helpers)
+        // RLS ensures user can only access jobs they own or are assigned to
+        const { data: jobData, error: jobError } = await supabase
+          .from('jobs')
+          .select(`
+            *,
+            customer:customers(*)
+          `)
+          .eq('id', jobId)
+          .single();
+        
+        if (jobError || !jobData) {
+          throw new Error('Job not found or access denied');
+        }
+        
+        const job = {
+          ...jobData,
+          customer: jobData.customer as Customer,
+        } as JobWithCustomer;
 
         const now = new Date();
         const completedAt = now.toISOString();
@@ -514,6 +774,14 @@ export function useSupabaseData() {
         } catch (dateError) {
           console.error(`[Reschedule Error] Invalid scheduled_date for customer "${job.customer.name}" (ID: ${job.customer_id}):`, job.scheduled_date, dateError);
           throw new Error(`Invalid scheduled date for job. Customer: ${job.customer.name}`);
+        }
+        
+        // Prevent completing jobs scheduled for future dates
+        const todayDate = new Date();
+        todayDate.setHours(0, 0, 0, 0); // Set to start of today
+        scheduledDate.setHours(0, 0, 0, 0); // Set to start of scheduled date for accurate comparison
+        if (scheduledDate > todayDate) {
+          throw new Error(`Cannot complete a job scheduled for the future. Scheduled date: ${format(scheduledDate, 'yyyy-MM-dd')}`);
         }
 
         // Check for frequency - if missing or null, treat as 'One-off' and don't reschedule
@@ -544,7 +812,9 @@ export function useSupabaseData() {
           }
         }
 
-        const isGoCardless = !!job.customer.gocardless_id;
+        // Check if customer has ACTIVE Direct Debit mandate (not just gocardless_id)
+        const hasActiveMandate = job.customer.gocardless_mandate_status === 'active' && !!job.customer.gocardless_id;
+        const isGoCardless = hasActiveMandate;
         const paymentStatus = isGoCardless ? 'processing' : 'unpaid';
         const paymentMethod = isGoCardless ? 'gocardless' : null;
         const paymentDate = null; // Only set when payment is paid_out (via webhook)
@@ -563,6 +833,7 @@ export function useSupabaseData() {
                 frequency_weeks: frequencyWeeks ?? null,
                 price: job.customer.price,
                 gocardless_id: job.customer.gocardless_id,
+                gocardless_mandate_status: job.customer.gocardless_mandate_status,
                 scheduled_date: job.scheduled_date,
               },
             },
@@ -633,12 +904,32 @@ export function useSupabaseData() {
           throw new Error('Failed to complete job. Counter was incremented - please contact support if this persists.');
         }
 
+        // Clean up assignment - job is completed, assignment no longer needed
+        // This prevents orphaned assignments and ensures helper's list updates correctly
+        try {
+          const { error: assignmentError } = await supabase
+            .from('job_assignments')
+            .delete()
+            .eq('job_id', jobId);
+          
+          if (assignmentError) {
+            // Non-critical - log but don't fail job completion
+            console.warn('[Complete Job] Failed to cleanup assignment:', assignmentError);
+          } else {
+            // Invalidate assignedJobs query so helper's list updates immediately
+            queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+          }
+        } catch (assignmentError) {
+          // Non-critical - log but don't fail job completion
+          console.warn('[Complete Job] Exception during assignment cleanup:', assignmentError);
+        }
+
         // If customer has Direct Debit, collect payment automatically
         let ddRequiresReconnect = false;
         let ddCollectionError: string | null = null;
         let ddRequiresNewMandate = false;
         
-        if (isGoCardless && job.customer.gocardless_id) {
+        if (isGoCardless) {
           try {
             const { data: collectData, error: collectError } = await supabase.functions.invoke('gocardless-collect-payment', {
               body: {
@@ -918,15 +1209,17 @@ export function useSupabaseData() {
           console.log(`[Complete Job] Adding new job ${data.newJobId} to upcomingJobs optimistically`);
           
           // Fetch the newly created job to add to cache
-          supabase
-            .from('jobs')
-            .select(`
-              *,
-              customer:customers(*)
-            `)
-            .eq('id', data.newJobId)
-            .single()
-            .then(({ data: newJob, error }) => {
+          (async () => {
+            try {
+              const { data: newJob, error } = await supabase
+                .from('jobs')
+                .select(`
+                  *,
+                  customer:customers(*)
+                `)
+                .eq('id', data.newJobId)
+                .single();
+              
               if (error) {
                 console.error(`[Complete Job] Failed to fetch new job ${data.newJobId}:`, error);
                 return;
@@ -958,10 +1251,10 @@ export function useSupabaseData() {
                 
                 console.log(`[Complete Job] Successfully added new job ${data.newJobId} to upcomingJobs cache`);
               }
-            })
-            .catch((error) => {
+            } catch (error: unknown) {
               console.error(`[Complete Job] Error fetching new job for cache update:`, error);
-            });
+            }
+          })();
         }
       }
       
@@ -1081,9 +1374,10 @@ export function useSupabaseData() {
       if (context?.previousCompletedToday) {
         queryClient.setQueryData(['completedToday', user?.id, today], context.previousCompletedToday);
       }
+      const friendlyMessage = getUserFriendlyError(err, { operation: 'Mark job paid' });
       toast({
         title: 'Error',
-        description: err.message,
+        description: friendlyMessage,
         variant: 'destructive',
       });
     },
@@ -1163,9 +1457,10 @@ export function useSupabaseData() {
       if (context?.previousUnpaid) {
         queryClient.setQueryData(['unpaidJobs', user?.id], context.previousUnpaid);
       }
+      const friendlyMessage = getUserFriendlyError(err, { operation: 'Batch mark paid' });
       toast({
         title: 'Error',
-        description: err.message,
+        description: friendlyMessage,
         variant: 'destructive',
       });
     },
@@ -1191,6 +1486,7 @@ export function useSupabaseData() {
       price: number;
       frequency_weeks: number;
       first_clean_date: string;
+      preferred_payment_method?: 'gocardless' | 'cash' | 'transfer' | null;
       notes?: string;
     }) => {
       if (!user) throw new Error('Not authenticated');
@@ -1208,6 +1504,7 @@ export function useSupabaseData() {
             mobile_phone: data.mobile_phone || null,
             price: data.price,
             frequency_weeks: data.frequency_weeks,
+            preferred_payment_method: data.preferred_payment_method || null,
             status: 'active',
             notes: data.notes || null,
           })
@@ -1268,6 +1565,7 @@ export function useSupabaseData() {
         mobile_phone: string | null;
         price: number;
         frequency_weeks: number;
+        preferred_payment_method?: 'gocardless' | 'cash' | 'transfer' | null;
         notes?: string | null;
       };
     }) => {
@@ -1294,9 +1592,10 @@ export function useSupabaseData() {
       });
     },
     onError: (error) => {
+      const friendlyMessage = getUserFriendlyError(error, { operation: 'Update customer', entity: 'customer' });
       toast({
         title: 'Error',
-        description: error.message,
+        description: friendlyMessage,
         variant: 'destructive',
       });
     },
@@ -1375,18 +1674,8 @@ export function useSupabaseData() {
         }
       }, QUERY_INVALIDATION_DELAY_MS);
       
-      // Show toast AFTER query invalidation to avoid blocking
-      setTimeout(() => {
-        try {
-          toast({
-            title: 'Customer archived',
-            description: `${data.name || 'Customer'} has been moved to Archive.`,
-          });
-          console.log("[archiveCustomer] Toast shown");
-        } catch (toastError) {
-          console.error("[archiveCustomer] Toast failed:", toastError);
-        }
-      }, TOAST_DELAY_MS);
+      // Toast is now shown by the caller (e.g., CustomerDetailModal) with undo functionality
+      // This allows the caller to add custom actions like undo button
       
       console.log("[archiveCustomer] END SUCCESS");
     } catch (error) {
@@ -1395,9 +1684,10 @@ export function useSupabaseData() {
       // Show error toast after a delay
       setTimeout(() => {
         try {
+          const friendlyMessage = getUserFriendlyError(error, { operation: 'Archive customer', entity: 'customer' });
           toast({
             title: 'Error',
-            description: error instanceof Error ? error.message : 'Failed to archive customer',
+            description: friendlyMessage,
             variant: 'destructive',
           });
         } catch (toastError) {
@@ -1839,6 +2129,26 @@ export function useSupabaseData() {
 
       if (error) throw error;
 
+      // Clean up assignment if it exists - skipped jobs shouldn't have assignments
+      // (They'll be rescheduled, so assignment should be removed)
+      try {
+        const { error: assignmentError } = await supabase
+          .from('job_assignments')
+          .delete()
+          .eq('job_id', jobId);
+        
+        if (assignmentError) {
+          // Non-critical - log but don't fail skip operation
+          console.warn('[Skip Job] Failed to cleanup assignment:', assignmentError);
+        } else {
+          // Invalidate assignedJobs query so helper's list updates
+          queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+        }
+      } catch (assignmentError) {
+        // Non-critical - log but don't fail skip operation
+        console.warn('[Skip Job] Exception during assignment cleanup:', assignmentError);
+      }
+
       return {
         jobId,
         originalDate,
@@ -2108,6 +2418,758 @@ export function useSupabaseData() {
     },
   });
 
+  // Assign job to helper mutation
+  const assignJobMutation = useMutation({
+    mutationFn: async ({ jobId, userId }: { jobId: string; userId: string }) => {
+      if (!user) throw new Error('User not authenticated');
+      
+      await validateSession(user.id);
+      
+      // Basic validation: check if userId is a valid UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(userId)) {
+        throw new Error('Invalid helper ID');
+      }
+      
+      // PROACTIVE CHECK: Verify helper exists in auth.users before attempting assignment
+      // This prevents foreign key constraint errors and provides better UX
+      try {
+        const { data: teamMember } = await supabase
+          .from('team_members')
+          .select('helper_id, helper_name, helper_email')
+          .eq('helper_id', userId)
+          .eq('owner_id', user.id)
+          .maybeSingle();
+        
+        if (teamMember) {
+          // Check if this helper actually exists in auth.users by checking profiles
+          // (We can't query auth.users directly, but profiles requires auth.users)
+          const { data: profileCheck } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', userId)
+            .maybeSingle();
+          
+          // If profile doesn't exist, this is a placeholder helper
+          if (!profileCheck) {
+            const helperName = teamMember.helper_name || 'This helper';
+            const helperEmail = teamMember.helper_email;
+            const isTempEmail = helperEmail.endsWith('@temp.helper');
+            
+            if (isTempEmail) {
+              throw new Error(
+                `"${helperName}" needs to sign up first before you can assign jobs. ` +
+                `They're already added to your team! Once they create an account, you'll be able to assign jobs immediately.`
+              );
+            } else {
+              throw new Error(
+                `"${helperName}" needs to sign up first before you can assign jobs. ` +
+                `They're already added to your team! Once they create an account with ${helperEmail}, you'll be able to assign jobs immediately.`
+              );
+            }
+          }
+        }
+        // If not in team_members, that's OK - they'll be auto-added
+        // But we can still proceed with assignment
+      } catch (validationError) {
+        // If it's our custom error, re-throw it
+        if (validationError instanceof Error && validationError.message.includes('needs to sign up')) {
+          throw validationError;
+        }
+        // Other errors are non-critical - proceed with assignment anyway
+        console.warn('[Assign Job] Team member validation failed:', validationError);
+      }
+
+      // Insert assignment (multiple assignments per job now allowed)
+      // Use upsert with job_id + assigned_to_user_id to prevent duplicates
+      console.log('[Assign Job] Attempting to assign job', { jobId, userId, assignedBy: user.id });
+      const { data, error } = await supabase
+        .from('job_assignments')
+        .upsert({
+          job_id: jobId,
+          assigned_to_user_id: userId,
+          assigned_by_user_id: user.id,
+        }, {
+          onConflict: 'job_assignments_job_user_unique' // Use constraint name for reliability
+        })
+        .select();
+
+      if (error) {
+        console.error('[Assign Job Error]', error);
+        // Check if it's a foreign key constraint error (helper doesn't exist in auth.users)
+        if (error.code === '23503' || error.message.includes('foreign key') || error.message.includes('violates foreign key')) {
+          // Check if this is a placeholder helper (exists in team_members but not in auth.users)
+          const { data: teamMember } = await supabase
+            .from('team_members')
+            .select('helper_name, helper_email')
+            .eq('helper_id', userId)
+            .eq('owner_id', user.id)
+            .maybeSingle();
+          
+          if (teamMember) {
+            // Helper exists in team_members but not in auth.users - they need to sign up
+            const helperName = teamMember.helper_name || 'This helper';
+            const helperEmail = teamMember.helper_email;
+            const isTempEmail = helperEmail.endsWith('@temp.helper');
+            
+            if (isTempEmail) {
+              throw new Error(
+                `"${helperName}" needs to sign up first. ` +
+                `They're already added to your team! Once they create an account, you'll be able to assign jobs to them immediately.`
+              );
+            } else {
+              // Real email provided but helper hasn't signed up yet
+              throw new Error(
+                `"${helperName}" needs to sign up first. ` +
+                `They're already added to your team! Once they create an account with ${helperEmail}, you'll be able to assign jobs immediately. ` +
+                `You can send them an invite or they can sign up directly.`
+              );
+            }
+          }
+          throw new Error('This helper needs to sign up first. They\'ll appear in your list once they create an account.');
+        }
+        throw error;
+      }
+
+      console.log('[Assign Job] Assignment successful', { data });
+
+      // Auto-populate team_members if not already there
+      // This auto-discovers helpers and adds them to the team
+      try {
+        const { data: existingMember } = await supabase
+          .from('team_members')
+          .select('id')
+          .eq('owner_id', user.id)
+          .eq('helper_id', userId)
+          .maybeSingle();
+        
+        if (!existingMember) {
+          // Try to get email from existing team member or use placeholder
+          // First check if helper is already in team_members with different owner
+          const { data: existingHelper } = await supabase
+            .from('team_members')
+            .select('helper_email, helper_name')
+            .eq('helper_id', userId)
+            .limit(1)
+            .maybeSingle();
+          
+          const helperEmail = existingHelper?.helper_email || userId.slice(0, 8) + '...';
+          const helperName = existingHelper?.helper_name || null;
+          
+          await supabase
+            .from('team_members')
+            .insert({
+              owner_id: user.id,
+              helper_id: userId,
+              helper_email: helperEmail,
+              helper_name: helperName
+            })
+            .catch(err => {
+              // Ignore errors - might already exist or RLS issue
+              // This is non-critical, just log
+              console.warn('[Auto-add team member]', err);
+            });
+        }
+      } catch (err) {
+        // Non-critical - just log
+        console.warn('[Auto-add team member failed]', err);
+      }
+    },
+    onMutate: async ({ jobId, userId }) => {
+      // Optimistic update
+      await queryClient.cancelQueries({ queryKey: ['pendingJobs'] });
+      await queryClient.cancelQueries({ queryKey: ['upcomingJobs'] });
+      await queryClient.cancelQueries({ queryKey: ['assignedJobs'] });
+
+      const previousPending = queryClient.getQueryData(['pendingJobs', user?.id, today]);
+      const previousUpcoming = queryClient.getQueryData(['upcomingJobs', user?.id, today]);
+      const previousAssigned = queryClient.getQueryData(['assignedJobs', user?.id, today]);
+
+      // Create new assignment for optimistic update
+      const newAssignment: JobAssignmentWithUser = {
+        id: '',
+        job_id: jobId,
+        assigned_to_user_id: userId,
+        assigned_by_user_id: user!.id,
+        assigned_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      } as JobAssignmentWithUser;
+
+      // Update pending jobs
+      queryClient.setQueryData(['pendingJobs', user?.id, today], (old: JobWithCustomerAndAssignment[] = []) => {
+        return old.map(job => {
+          if (job.id === jobId) {
+            const existingAssignments = job.assignments || [];
+            // Add new assignment if not already present
+            const updatedAssignments = existingAssignments.find(a => a.assigned_to_user_id === userId)
+              ? existingAssignments
+              : [...existingAssignments, newAssignment];
+            return {
+              ...job,
+              assignments: updatedAssignments,
+              assignment: updatedAssignments[0] // Backward compatibility
+            };
+          }
+          return job;
+        });
+      });
+
+      // Update upcoming jobs
+      queryClient.setQueryData(['upcomingJobs', user?.id, today], (old: JobWithCustomerAndAssignment[] = []) => {
+        return old.map(job => {
+          if (job.id === jobId) {
+            const existingAssignments = job.assignments || [];
+            const updatedAssignments = existingAssignments.find(a => a.assigned_to_user_id === userId)
+              ? existingAssignments
+              : [...existingAssignments, newAssignment];
+            return {
+              ...job,
+              assignments: updatedAssignments,
+              assignment: updatedAssignments[0]
+            };
+          }
+          return job;
+        });
+      });
+
+      // Update assignedJobs if the job is assigned to current user (helper view)
+      if (userId === user?.id) {
+        queryClient.setQueryData(['assignedJobs', user.id, today], (old: JobWithCustomerAndAssignment[] = []) => {
+          // Check if job is already in the list
+          const existingIndex = old.findIndex(j => j.id === jobId);
+          if (existingIndex >= 0) {
+            // Update existing job's assignment
+            return old.map(job => 
+              job.id === jobId 
+                ? { ...job, assignment: { id: '', job_id: jobId, assigned_to_user_id: userId, assigned_by_user_id: user!.id, assigned_at: new Date().toISOString(), created_at: new Date().toISOString() } as JobAssignmentWithUser }
+                : job
+            );
+          } else {
+            // Job might not be in assignedJobs yet (if it was just assigned)
+            // Try to find it in pendingJobs and add it
+            const pendingJob = pendingJobs.find(j => j.id === jobId);
+            if (pendingJob) {
+              return [...old, {
+                ...pendingJob,
+                assignment: { id: '', job_id: jobId, assigned_to_user_id: userId, assigned_by_user_id: user!.id, assigned_at: new Date().toISOString(), created_at: new Date().toISOString() } as JobAssignmentWithUser
+              } as JobWithCustomerAndAssignment];
+            }
+            // If not found, return old - real data will come from invalidation
+            return old;
+          }
+        });
+      }
+
+      return { previousPending, previousUpcoming, previousAssigned };
+    },
+    onError: (err, variables, context) => {
+      // Rollback optimistic update
+      if (context?.previousPending) {
+        queryClient.setQueryData(['pendingJobs', user?.id, today], context.previousPending);
+      }
+      if (context?.previousUpcoming) {
+        queryClient.setQueryData(['upcomingJobs', user?.id, today], context.previousUpcoming);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['helpers'] });
+    },
+  });
+
+  // Assign multiple users to a job mutation
+  const assignMultipleUsersMutation = useMutation({
+    mutationFn: async ({ jobId, userIds }: { jobId: string; userIds: string[] }) => {
+      if (!user) throw new Error('User not authenticated');
+      
+      await validateSession(user.id);
+      
+      if (!userIds || userIds.length === 0) {
+        throw new Error('At least one user must be selected');
+      }
+      
+      // Validate all user IDs are valid UUIDs
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const invalidIds = userIds.filter(id => !uuidRegex.test(id));
+      if (invalidIds.length > 0) {
+        throw new Error('Invalid helper ID(s)');
+      }
+      
+      // Insert all assignments (upsert to prevent duplicates)
+      const assignments = userIds.map(userId => ({
+        job_id: jobId,
+        assigned_to_user_id: userId,
+        assigned_by_user_id: user.id,
+      }));
+      
+      console.log('[Assign Multiple Users] Attempting to assign job to multiple users', { jobId, userIds, assignedBy: user.id });
+      const { data, error } = await supabase
+        .from('job_assignments')
+        .upsert(assignments, {
+          onConflict: 'job_assignments_job_user_unique' // Use constraint name for reliability
+        })
+        .select();
+
+      if (error) {
+        console.error('[Assign Multiple Users Error]', error);
+        // Check for foreign key constraint errors (placeholder helpers)
+        if (error.code === '23503' || error.message.includes('foreign key')) {
+          // Find which helpers are placeholders (exist in team_members but not in auth.users)
+          const { data: teamMembers } = await supabase
+            .from('team_members')
+            .select('helper_id, helper_name, helper_email')
+            .eq('owner_id', user.id)
+            .in('helper_id', userIds);
+          
+          // All helpers in team_members that don't exist in auth.users are placeholders
+          // (The foreign key constraint fails because helper_id doesn't exist in auth.users)
+          const placeholderHelpers = teamMembers || [];
+          
+          if (placeholderHelpers.length > 0) {
+            const names = placeholderHelpers.map(h => h.helper_name || 'Helper').join(', ');
+            const hasRealEmails = placeholderHelpers.some(h => !h.helper_email.endsWith('@temp.helper'));
+            
+            if (hasRealEmails) {
+              const emails = placeholderHelpers
+                .filter(h => !h.helper_email.endsWith('@temp.helper'))
+                .map(h => h.helper_email)
+                .join(', ');
+              throw new Error(
+                `The following helper${placeholderHelpers.length > 1 ? 's' : ''} need to sign up first: ${names}. ` +
+                `They're already added to your team! Once they create accounts${emails ? ` with ${emails}` : ''}, you'll be able to assign jobs immediately.`
+              );
+            } else {
+              throw new Error(
+                `The following helper${placeholderHelpers.length > 1 ? 's' : ''} need to sign up first: ${names}. ` +
+                `They're already added to your team! Once they create accounts, you'll be able to assign jobs immediately.`
+              );
+            }
+          }
+          throw new Error('One or more helpers need to sign up first before assignments can be made.');
+        }
+        throw error;
+      }
+
+      console.log('[Assign Multiple Users] Assignments successful', { data });
+      
+      // Auto-populate team_members for any new helpers
+      // (non-critical, can fail silently)
+      for (const userId of userIds) {
+        try {
+          const { data: existingMember } = await supabase
+            .from('team_members')
+            .select('id')
+            .eq('owner_id', user.id)
+            .eq('helper_id', userId)
+            .maybeSingle();
+          
+          if (!existingMember) {
+            const { data: existingHelper } = await supabase
+              .from('team_members')
+              .select('helper_email, helper_name')
+              .eq('helper_id', userId)
+              .limit(1)
+              .maybeSingle();
+            
+            const helperEmail = existingHelper?.helper_email || userId.slice(0, 8) + '...';
+            const helperName = existingHelper?.helper_name || null;
+            
+            await supabase
+              .from('team_members')
+              .insert({
+                owner_id: user.id,
+                helper_id: userId,
+                helper_email: helperEmail,
+                helper_name: helperName
+              })
+              .catch(() => {
+                // Ignore errors - non-critical
+              });
+          }
+        } catch (err) {
+          // Ignore errors - non-critical
+        }
+      }
+    },
+    onMutate: async ({ jobId, userIds }) => {
+      await queryClient.cancelQueries({ queryKey: ['pendingJobs'] });
+      await queryClient.cancelQueries({ queryKey: ['upcomingJobs'] });
+      await queryClient.cancelQueries({ queryKey: ['assignedJobs'] });
+
+      const previousPending = queryClient.getQueryData(['pendingJobs', user?.id, today]);
+      const previousUpcoming = queryClient.getQueryData(['upcomingJobs', user?.id, today]);
+      const previousAssigned = queryClient.getQueryData(['assignedJobs', user?.id, today]);
+
+      // Create assignments array for optimistic update
+      const newAssignments: JobAssignmentWithUser[] = userIds.map(userId => ({
+        id: '',
+        job_id: jobId,
+        assigned_to_user_id: userId,
+        assigned_by_user_id: user!.id,
+        assigned_at: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      } as JobAssignmentWithUser));
+
+      // Update pending jobs
+      queryClient.setQueryData(['pendingJobs', user?.id, today], (old: JobWithCustomerAndAssignment[] = []) => {
+        return old.map(job => {
+          if (job.id === jobId) {
+            const existingAssignments = job.assignments || [];
+            // Merge with new assignments, avoiding duplicates
+            const merged = [...existingAssignments];
+            userIds.forEach(userId => {
+              if (!merged.find(a => a.assigned_to_user_id === userId)) {
+                merged.push(newAssignments.find(a => a.assigned_to_user_id === userId)!);
+              }
+            });
+            return {
+              ...job,
+              assignments: merged,
+              assignment: merged[0] // Backward compatibility
+            };
+          }
+          return job;
+        });
+      });
+
+      // Update upcoming jobs
+      queryClient.setQueryData(['upcomingJobs', user?.id, today], (old: JobWithCustomerAndAssignment[] = []) => {
+        return old.map(job => {
+          if (job.id === jobId) {
+            const existingAssignments = job.assignments || [];
+            const merged = [...existingAssignments];
+            userIds.forEach(userId => {
+              if (!merged.find(a => a.assigned_to_user_id === userId)) {
+                merged.push(newAssignments.find(a => a.assigned_to_user_id === userId)!);
+              }
+            });
+            return {
+              ...job,
+              assignments: merged,
+              assignment: merged[0]
+            };
+          }
+          return job;
+        });
+      });
+
+      return { previousPending, previousUpcoming, previousAssigned };
+    },
+    onError: (err, variables, context) => {
+      // Rollback optimistic update for all affected queries
+      if (context?.previousPending) {
+        queryClient.setQueryData(['pendingJobs', user?.id, today], context.previousPending);
+      }
+      if (context?.previousUpcoming) {
+        queryClient.setQueryData(['upcomingJobs', user?.id, today], context.previousUpcoming);
+      }
+      if (context?.previousAssigned) {
+        queryClient.setQueryData(['assignedJobs', user?.id, today], context.previousAssigned);
+      }
+      
+      // Log error for debugging
+      console.error('[Assign Multiple Users] Optimistic update rollback:', err);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['helpers'] });
+    },
+  });
+
+  // Unassign job mutation (supports unassigning specific user or all users)
+  const unassignJobMutation = useMutation({
+    mutationFn: async ({ jobId, userId }: { jobId: string; userId?: string }) => {
+      if (!user) throw new Error('User not authenticated');
+      
+      await validateSession(user.id);
+
+      // If userId provided, unassign only that user; otherwise unassign all
+      const query = supabase
+        .from('job_assignments')
+        .delete()
+        .eq('job_id', jobId);
+      
+      if (userId) {
+        query.eq('assigned_to_user_id', userId);
+      }
+
+      const { error } = await query;
+
+      if (error) {
+        console.error('[Unassign Job Error]', error);
+        throw error;
+      }
+    },
+    onMutate: async ({ jobId, userId }) => {
+      // Optimistic update
+      await queryClient.cancelQueries({ queryKey: ['pendingJobs'] });
+      await queryClient.cancelQueries({ queryKey: ['upcomingJobs'] });
+      await queryClient.cancelQueries({ queryKey: ['assignedJobs'] });
+
+      const previousPending = queryClient.getQueryData(['pendingJobs', user?.id, today]);
+      const previousUpcoming = queryClient.getQueryData(['upcomingJobs', user?.id, today]);
+
+      // Remove assignment(s) from pending jobs
+      queryClient.setQueryData(['pendingJobs', user?.id, today], (old: JobWithCustomerAndAssignment[] = []) => {
+        return old.map(job => {
+          if (job.id === jobId) {
+            const assignments = job.assignments || [];
+            if (userId) {
+              // Remove specific user assignment
+              const filtered = assignments.filter(a => a.assigned_to_user_id !== userId);
+              return {
+                ...job,
+                assignments: filtered,
+                assignment: filtered[0] // Backward compatibility
+              };
+            } else {
+              // Remove all assignments
+              return {
+                ...job,
+                assignments: [],
+                assignment: undefined
+              };
+            }
+          }
+          return job;
+        });
+      });
+
+      // Remove assignment(s) from upcoming jobs
+      queryClient.setQueryData(['upcomingJobs', user?.id, today], (old: JobWithCustomerAndAssignment[] = []) => {
+        return old.map(job => {
+          if (job.id === jobId) {
+            const assignments = job.assignments || [];
+            if (userId) {
+              const filtered = assignments.filter(a => a.assigned_to_user_id !== userId);
+              return {
+                ...job,
+                assignments: filtered,
+                assignment: filtered[0]
+              };
+            } else {
+              return {
+                ...job,
+                assignments: [],
+                assignment: undefined
+              };
+            }
+          }
+          return job;
+        });
+      });
+
+      return { previousPending, previousUpcoming, previousAssigned };
+    },
+    onError: (err, variables, context) => {
+      // Rollback optimistic update for all affected queries
+      if (context?.previousPending) {
+        queryClient.setQueryData(['pendingJobs', user?.id, today], context.previousPending);
+      }
+      if (context?.previousUpcoming) {
+        queryClient.setQueryData(['upcomingJobs', user?.id, today], context.previousUpcoming);
+      }
+      if (context?.previousAssigned) {
+        queryClient.setQueryData(['assignedJobs', user?.id, today], context.previousAssigned);
+      }
+      
+      // Log error for debugging
+      console.error('[Unassign Job] Optimistic update rollback:', err);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+      queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+    },
+  });
+
+  // Create helper mutation (Just-in-Time helper creation)
+  const createHelperMutation = useMutation({
+    mutationFn: async ({ name, email }: { name: string; email?: string }) => {
+      if (!user) throw new Error('User not authenticated');
+      
+      await validateSession(user.id);
+      
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        throw new Error('Helper name cannot be empty');
+      }
+      
+      // Validate email format if provided
+      const trimmedEmail = email?.trim().toLowerCase();
+      if (trimmedEmail) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(trimmedEmail)) {
+          throw new Error('Please enter a valid email address');
+        }
+      }
+      
+      // Check for duplicate by name (case-insensitive)
+      const { data: existingHelpers } = await supabase
+        .from('team_members')
+        .select('helper_id, helper_name, helper_email')
+        .eq('owner_id', user.id)
+        .ilike('helper_name', trimmedName);
+      
+      if (existingHelpers && existingHelpers.length > 0) {
+        throw new Error(`A helper named "${trimmedName}" already exists`);
+      }
+      
+      // Check for duplicate by email if provided
+      if (trimmedEmail) {
+        const { data: existingByEmail } = await supabase
+          .from('team_members')
+          .select('helper_id, helper_email, helper_name')
+          .eq('owner_id', user.id)
+          .eq('helper_email', trimmedEmail)
+          .maybeSingle();
+        
+        if (existingByEmail) {
+          throw new Error(`A helper with email "${trimmedEmail}" already exists`);
+        }
+      }
+      
+      // Generate a placeholder ID and email for the new helper
+      const helperId = crypto.randomUUID();
+      const sanitizedName = trimmedName.toLowerCase().replace(/\s+/g, '_');
+      // Use provided email OR generate temp email
+      const helperEmail = trimmedEmail || `${sanitizedName}@temp.helper`;
+      // IMPORTANT: Always mark as placeholder - helper hasn't signed up yet!
+      // They'll become "real" when they sign up and we match them via email
+      const isPlaceholder = true;
+      
+      const { data, error } = await supabase
+        .from('team_members')
+        .insert({
+          owner_id: user.id,
+          helper_id: helperId,
+          helper_email: helperEmail,
+          helper_name: trimmedName,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[Create Helper Error]', error);
+        // Handle unique constraint violation
+        if (error.code === '23505') {
+          throw new Error(`A helper with this information already exists`);
+        }
+        throw error;
+      }
+      
+      return {
+        id: helperId,
+        email: helperEmail,
+        name: trimmedName,
+        initials: trimmedName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?',
+        isTeamMember: true,
+        isPlaceholder: isPlaceholder, // Always true - helper hasn't signed up yet
+      };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['helpers'] });
+      queryClient.invalidateQueries({ queryKey: ['teamMemberships'] });
+    },
+  });
+
+  const createHelper = async (name: string, email?: string) => {
+    return createHelperMutation.mutateAsync({ name, email });
+  };
+
+  // Match placeholder helper with real user when they sign up
+  // This should be called when a helper signs up (via Edge Function or trigger)
+  const matchPlaceholderHelperMutation = useMutation({
+    mutationFn: async ({ placeholderHelperId, realUserId }: { placeholderHelperId: string; realUserId: string }) => {
+      if (!user) throw new Error('User not authenticated');
+      
+      await validateSession(user.id);
+      
+      // Update all team_members entries with this placeholder ID to the real user ID
+      const { error } = await supabase
+        .from('team_members')
+        .update({ helper_id: realUserId })
+        .eq('helper_id', placeholderHelperId)
+        .eq('owner_id', user.id);
+      
+      if (error) {
+        console.error('[Match Placeholder Helper Error]', error);
+        throw error;
+      }
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['helpers'] });
+      queryClient.invalidateQueries({ queryKey: ['teamMemberships'] });
+    },
+  });
+
+  const matchPlaceholderHelper = async (placeholderHelperId: string, realUserId: string) => {
+    return matchPlaceholderHelperMutation.mutateAsync({ placeholderHelperId, realUserId });
+  };
+
+  // Real-time subscription for job assignments
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('job_assignments_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'job_assignments',
+          filter: `assigned_to_user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('[Real-time] Assignment change detected:', payload);
+          // Invalidate queries to refresh data
+          queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
+          queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
+          queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
+          queryClient.invalidateQueries({ queryKey: ['helpers'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, queryClient]);
+
+  // Remove helper from team (delete team_members entry)
+  const removeHelperMutation = useMutation({
+    mutationFn: async (helperId: string) => {
+      if (!user) throw new Error('User not authenticated');
+      
+      await validateSession(user.id);
+      
+      // Delete the team_members entry
+      const { error } = await supabase
+        .from('team_members')
+        .delete()
+        .eq('helper_id', helperId)
+        .eq('owner_id', user.id);
+      
+      if (error) {
+        console.error('[Remove Helper Error]', error);
+        throw error;
+      }
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['helpers'] });
+      queryClient.invalidateQueries({ queryKey: ['teamMemberships'] });
+    },
+  });
+
+  const removeHelper = async (helperId: string) => {
+    return removeHelperMutation.mutateAsync(helperId);
+  };
+
   const completeJob = (jobId: string, customAmount?: number, photoUrl?: string) => {
     return completeJobMutation.mutateAsync({ jobId, customAmount, photoUrl });
   };
@@ -2119,6 +3181,7 @@ export function useSupabaseData() {
     price: number;
     frequency_weeks: number;
     first_clean_date: string;
+    preferred_payment_method?: 'gocardless' | 'cash' | 'transfer' | null;
     notes?: string;
   }) => {
     return addCustomerMutation.mutateAsync(data);
@@ -2130,6 +3193,7 @@ export function useSupabaseData() {
     mobile_phone: string | null;
     price: number;
     frequency_weeks: number;
+    preferred_payment_method?: 'gocardless' | 'cash' | 'transfer' | null;
     notes?: string | null;
   }) => {
     return updateCustomerMutation.mutateAsync({ id, data });
@@ -2173,6 +3237,18 @@ export function useSupabaseData() {
     return updateJobOrderMutation.mutateAsync({ jobOrders });
   };
 
+  const assignJob = (jobId: string, userId: string) => {
+    return assignJobMutation.mutateAsync({ jobId, userId });
+  };
+
+  const assignMultipleUsers = (jobId: string, userIds: string[]) => {
+    return assignMultipleUsersMutation.mutateAsync({ jobId, userIds });
+  };
+
+  const unassignJob = (jobId: string, userId?: string) => {
+    return unassignJobMutation.mutateAsync({ jobId, userId });
+  };
+
   const undoCompleteJob = (jobId: string, newJobId: string) => {
     return undoCompleteJobMutation.mutateAsync({ jobId, newJobId });
   };
@@ -2208,6 +3284,7 @@ export function useSupabaseData() {
     customers,
     pendingJobs,
     upcomingJobs,
+    assignedJobs,
     completedToday,
     todayEarnings,
     weeklyEarnings,
@@ -2218,6 +3295,9 @@ export function useSupabaseData() {
     allArchivedCustomers,
     businessName,
     profile,
+    helpers,
+    helpersLoading,
+    teamMemberships,
     completeJob,
     addCustomer,
     updateCustomer,
@@ -2232,11 +3312,17 @@ export function useSupabaseData() {
     batchMarkPaid,
     updateJobNotes,
     updateJobOrder,
+    assignJob,
+    assignMultipleUsers,
+    unassignJob,
+    createHelper,
+    removeHelper,
+    matchPlaceholderHelper,
     undoCompleteJob,
     undoMarkPaid,
     undoSkipJob,
     refetchAll,
-    isLoading,
+    isLoading: isLoading || assignedJobsLoading || helpersLoading || teamMembershipsLoading,
     isOnline,
     userEmail: user?.email || '',
     isMarkingPaid: markJobPaidMutation.isPending,

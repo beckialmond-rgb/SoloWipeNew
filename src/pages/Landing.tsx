@@ -260,10 +260,10 @@ const Landing = () => {
   }, []);
 
   const trustStats = [
-    { icon: PoundSterling, label: '£0 Setup Fees', value: '£0' },
-    { icon: Zap, label: '30-Second SMS', value: '30s' },
-    { icon: ShieldCheck, label: 'UK GDPR Compliant', value: 'GDPR' },
-    { icon: CreditCard, label: 'GoCardless Ready', value: 'DD' },
+    { icon: ShieldCheck, label: 'GDPR Compliant', value: '100%' },
+    { icon: CreditCard, label: 'GoCardless Ready', value: 'Direct Debit' },
+    { icon: MapPin, label: 'UK Based', value: 'Made Here' },
+    { icon: Zap, label: 'Setup Time', value: '30s' },
   ];
 
   const painPoints = [
@@ -387,6 +387,14 @@ const Landing = () => {
       glowColor: 'from-blue-500/20 to-transparent',
     },
     {
+      icon: Users,
+      title: 'Assign Jobs to Helpers',
+      description: 'Build your team. Assign jobs to helpers and track who\'s doing what. Perfect for growing businesses and team coordination.',
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50 dark:bg-purple-950/20',
+      glowColor: 'from-purple-500/20 to-transparent',
+    },
+    {
       icon: CreditCard,
       title: 'Automatic Payment Collection',
       description: 'Connect GoCardless once. When you complete a job, Direct Debit collection starts automatically so you never chase payments.',
@@ -426,6 +434,22 @@ const Landing = () => {
       bgColor: 'bg-slate-50 dark:bg-slate-950/20',
       glowColor: 'from-slate-500/20 to-transparent',
     },
+    {
+      icon: MessageSquare,
+      title: 'SMS Lead Generation',
+      description: 'Built-in referral SMS templates turn every customer into a lead generator. One tap sends professional referral messages that grow your round automatically.',
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-50 dark:bg-emerald-950/20',
+      glowColor: 'from-emerald-500/20 to-transparent',
+    },
+    {
+      icon: TrendingUp,
+      title: 'Automated Price Increases',
+      description: 'Increase prices across your entire round in seconds. Send professional SMS notifications automatically. No awkward conversations—just professional, automated communication.',
+      color: 'text-amber-600',
+      bgColor: 'bg-amber-50 dark:bg-amber-950/20',
+      glowColor: 'from-amber-500/20 to-transparent',
+    },
   ];
 
   const faqItems = [
@@ -452,7 +476,12 @@ const Landing = () => {
     {
       question: 'What happens after my first 10 free jobs?',
       answer:
-        'You can keep all your data. To continue automating new jobs and SMS, you can subscribe to Pro and get a 7-day free trial with full access.',
+        'You can keep all your data. To continue automating new jobs and SMS, you can subscribe to Pro (£25/month or £250/year) for unlimited access. You can also register interest for our special 60-day free trial offer.',
+    },
+    {
+      question: 'How does the 60-day free trial work?',
+      answer:
+        'The 60-day free trial is a special offer for our unlimited Pro subscription (£25/month or £250/year). First, start with your 10 free jobs (no credit card required). When you\'re ready to upgrade, register your interest for the 60-day trial. If selected, you\'ll receive a coupon code via email. Use the code when subscribing to get 60 days free of unlimited access. After 60 days, your subscription automatically continues at your chosen rate. Subject to availability.',
     },
     {
       question: 'Can I cancel anytime?',
@@ -627,9 +656,22 @@ const Landing = () => {
               <span className="text-white">Jobs, payments, and customer texts in one app.</span>
             </h1>
             
-            <p className="text-base md:text-lg text-white/90 mb-6 max-w-2xl mx-auto font-medium leading-snug">
-              Works offline. Built from real conversations with cleaners.
+            <p className="text-base md:text-lg text-white/90 mb-4 max-w-2xl mx-auto font-medium leading-snug">
+              Automate reminders, receipts, and price increases. Works offline. Assign jobs to helpers. Built from real conversations with UK window cleaners.
             </p>
+            
+            {/* Special Offer Badge - 60 Day Trial */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="mb-6"
+            >
+              <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-emerald-500/95 via-emerald-600/95 to-emerald-500/95 text-white text-sm font-bold shadow-xl border-2 border-white/40 backdrop-blur-md hover:scale-105 transition-transform duration-300">
+                <Sparkles className="w-4 h-4 animate-pulse" />
+                <span>🎉 Start Free Today • 60-Day Trial Available When You Upgrade</span>
+              </div>
+            </motion.div>
             
             {/* Primary CTA - Compact */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-3 relative z-30">
@@ -658,19 +700,19 @@ const Landing = () => {
                 variant="outline"
                 size="lg"
                 onClick={() => {
-                  scrollToSection('how-it-works');
+                  scrollToSection('pricing');
                 }}
                 className="w-full sm:w-auto h-12 text-sm bg-white/20 backdrop-blur-md border-white/50 text-white font-semibold hover:bg-white/30 hover:border-white/70 active:scale-95 transition-all duration-300 ease-out shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-white/50 focus:ring-offset-2 z-30"
                 style={{ position: 'relative', zIndex: 30 }}
-                aria-label="See How SoloWipe Works"
+                aria-label="See Pricing & Special Offers"
               >
-                See How It Works
+                See Pricing & Offers
               </Button>
             </div>
 
             {/* Compact Risk Reversal */}
             <p className="text-xs text-white/85 font-medium mb-4">
-              <strong className="text-white">No credit card.</strong> No setup fees. Cancel anytime. <strong className="text-white">New to market.</strong>
+              <strong className="text-white">No credit card.</strong> No setup fees. Cancel anytime. <strong className="text-white">Start with 10 free jobs.</strong>
             </p>
             
             {/* Compact Email Capture */}
@@ -1239,27 +1281,97 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Email Capture - Mid-Page */}
+      {/* Lead Magnets Section */}
       <section className="py-16 px-4 bg-gradient-to-br from-primary/10 via-emerald-500/10 to-primary/10 relative overflow-hidden">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
           <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
         </div>
         
-        <div className="max-w-2xl mx-auto text-center relative">
+        <div className="max-w-4xl mx-auto relative">
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.4, ease: "easeOut" }}
+            className="text-center mb-12"
           >
             <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
-              Get Tips to Grow Your Business
+              Free Resources to Help You Succeed
             </h2>
             <p className="text-muted-foreground mb-6">
-              Sign up to receive helpful tips for window cleaning businesses
+              Practical tools and guides to help you start and grow your window cleaning business
             </p>
-              <EmailCaptureForm
+          </motion.div>
+
+          <div className="grid md:grid-cols-2 gap-6 mb-8">
+            {/* ROI Calculator */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+              className="bg-card rounded-2xl border-2 border-border p-6 hover:border-primary/50 transition-all"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-bold text-foreground">ROI Calculator</h3>
+              </div>
+              <p className="text-muted-foreground mb-4">
+                Calculate how much time and money SoloWipe can save your business. Enter your current metrics and see your potential savings.
+              </p>
+              <Button
+                onClick={() => navigate('/roi-calculator')}
+                variant="outline"
+                className="w-full"
+              >
+                Calculate Your Savings
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </motion.div>
+
+            {/* Setup Checklist */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: 0.2 }}
+              className="bg-card rounded-2xl border-2 border-border p-6 hover:border-primary/50 transition-all"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-emerald-600" />
+                </div>
+                <h3 className="text-xl font-bold text-foreground">Setup Checklist</h3>
+              </div>
+              <p className="text-muted-foreground mb-4">
+                A comprehensive checklist to help you start your window cleaning business the right way. Covers legal, equipment, marketing, and more.
+              </p>
+              <Button
+                onClick={() => navigate('/setup-checklist')}
+                variant="outline"
+                className="w-full"
+              >
+                View Checklist
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </motion.div>
+          </div>
+
+          {/* Email Capture */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+            className="text-center"
+          >
+            <p className="text-muted-foreground mb-4">
+              Get weekly tips delivered to your inbox
+            </p>
+            <EmailCaptureForm
               variant="inline"
               placeholder="Enter your email"
               buttonText="Subscribe to Tips"
@@ -1453,6 +1565,103 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* SMS Lead Generation Section */}
+      <section className="py-28 px-4 md:px-6 bg-gradient-to-br from-emerald-50/50 via-primary/10 to-emerald-50/50 dark:from-emerald-950/20 dark:via-primary/5 dark:to-emerald-950/20">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-12"
+          >
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6 border border-emerald-500/20 dark:border-emerald-500/30">
+              <MessageSquare className="w-4 h-4" />
+              Lead Generation
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              Turn Every Customer Into a Lead Generator
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Built-in referral SMS templates help your customers bring you new business. 
+              One tap sends professional referral messages that grow your round automatically.
+            </p>
+          </motion.div>
+              
+          <div className="grid md:grid-cols-2 gap-8">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="bg-card rounded-2xl p-8 border-2 border-border"
+            >
+              <MessageSquare className="w-12 h-12 text-primary mb-4" />
+              <h3 className="text-xl font-bold text-foreground mb-3">
+                Referral SMS Templates
+              </h3>
+              <p className="text-muted-foreground">
+                Pre-written messages that make it easy for customers to refer friends. 
+                Track referrals and watch your round grow.
+              </p>
+            </motion.div>
+                  
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              className="bg-card rounded-2xl p-8 border-2 border-border"
+            >
+              <TrendingUp className="w-12 h-12 text-emerald-600 mb-4" />
+              <h3 className="text-xl font-bold text-foreground mb-3">
+                Automated Price Increases
+              </h3>
+              <p className="text-muted-foreground">
+                Increase prices across your round in seconds. Send professional SMS notifications 
+                automatically. No awkward conversations needed.
+              </p>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Modern Design Section */}
+      <section className="py-28 px-4 md:px-6">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            Designed for 2026, Built for Real Life
+          </h2>
+          <p className="text-lg text-muted-foreground mb-8">
+            Modern, mobile-first design that works offline. No complicated setup. 
+            No technical knowledge required. Just simple, powerful tools that save you time.
+          </p>
+              
+          <div className="grid md:grid-cols-3 gap-6">
+            <div className="bg-card rounded-xl p-6 border-2 border-border">
+              <Smartphone className="w-10 h-10 text-primary mx-auto mb-4" />
+              <h3 className="font-bold text-foreground mb-2">Mobile-First</h3>
+              <p className="text-sm text-muted-foreground">
+                Designed for your phone. Works perfectly on the go.
+              </p>
+            </div>
+                  
+            <div className="bg-card rounded-xl p-6 border-2 border-border">
+              <WifiOff className="w-10 h-10 text-primary mx-auto mb-4" />
+              <h3 className="font-bold text-foreground mb-2">Works Offline</h3>
+              <p className="text-sm text-muted-foreground">
+                No signal? No problem. Complete jobs anywhere.
+              </p>
+            </div>
+                  
+            <div className="bg-card rounded-xl p-6 border-2 border-border">
+              <Zap className="w-10 h-10 text-primary mx-auto mb-4" />
+              <h3 className="font-bold text-foreground mb-2">30-Second Setup</h3>
+              <p className="text-sm text-muted-foreground">
+                Add your first customer in seconds. No training needed.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Comparison Section */}
       <section id="comparison" className="py-28 px-4 md:px-6 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
         {/* Decorative background */}
@@ -1569,10 +1778,10 @@ const Landing = () => {
               Risk-Free Start
             </div>
             <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
-              Automate Your First 10 Jobs Free
+              Start Free, Then Choose Your Plan
             </h2>
             <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
-              No credit card required. No setup fees. See exactly how SoloWipe transforms your round before you pay anything.
+              Automate your first 10 jobs completely free. No credit card required. Then upgrade to unlimited access when you're ready.
             </p>
           </motion.div>
 
@@ -1589,7 +1798,7 @@ const Landing = () => {
               <div className="relative z-10">
                 <div className="text-center mb-8">
                   <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/15 text-primary text-sm font-semibold mb-5 border border-primary/20">
-                    Risk-Free Start
+                    Always Free
                   </div>
                   <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-3">Free Usage</h3>
                   <div className="text-6xl font-bold text-foreground mb-2 bg-gradient-to-r from-primary to-emerald-600 bg-clip-text text-transparent">£0</div>
@@ -1601,7 +1810,7 @@ const Landing = () => {
                     'First 10 SMS messages free',
                     'All features included',
                     'No time limit',
-                    'Perfect for seasonal workers',
+                    'Perfect for trying SoloWipe',
                   ].map((item, i) => (
                     <li key={i} className="flex items-start gap-3">
                       <CheckCircle className="w-6 h-6 text-primary mt-0.5 flex-shrink-0" />
@@ -1638,23 +1847,53 @@ const Landing = () => {
               transition={{ duration: 0.6 }}
               className="bg-gradient-to-br from-primary/5 to-emerald-500/5 dark:from-primary/10 dark:to-emerald-500/10 rounded-2xl p-8 md:p-10 lg:p-12 border-2 border-primary dark:border-primary/60 shadow-2xl hover:shadow-primary/20 hover:-translate-y-1 relative overflow-hidden group transition-all duration-300 ease-out"
             >
+              {/* Special Offer Badge */}
+              <div className="absolute top-4 right-4 z-20">
+                <motion.div
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  whileInView={{ scale: 1, opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+                  className="px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-bold shadow-lg border border-white/20"
+                >
+                  Special Offer
+                </motion.div>
+              </div>
+              
               <div className="absolute top-0 right-0 w-48 h-48 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
               <div className="relative z-10">
                 <div className="text-center mb-8">
                   <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-3">Pro Subscription</h3>
                   <div className="text-6xl font-bold text-foreground mb-2 bg-gradient-to-r from-primary to-emerald-600 bg-clip-text text-transparent">
-                    £{SUBSCRIPTION_TIERS.monthly.price}
+                    £25
                     <span className="text-xl text-muted-foreground font-normal">/month</span>
                   </div>
-                  <p className="text-muted-foreground font-medium">or £{SUBSCRIPTION_TIERS.annual.price}/year</p>
+                  <p className="text-muted-foreground font-medium">or £250/year (save £50)</p>
+                  
+                  {/* 60-Day Trial Offer */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.4, duration: 0.5 }}
+                    className="mt-4 inline-flex flex-col items-center gap-2"
+                  >
+                    <div className="px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold border border-emerald-500/20 dark:border-emerald-500/30 shadow-sm">
+                      <Clock className="w-4 h-4 inline mr-2" />
+                      <span>60-Day Free Trial Available</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground max-w-xs text-center leading-relaxed">
+                      Register interest to receive coupon code (subject to availability)
+                    </p>
+                  </motion.div>
                 </div>
                 <ul className="space-y-4 mb-8">
                   {[
                     'Unlimited jobs and customers',
+                    'Assign jobs to helpers & team members',
                     'Unlimited SMS templates',
                     'Direct Debit integration',
                     'Route optimization',
-                    '7-day free trial after signup',
                     'Priority support',
                   ].map((item, i) => (
                     <li key={i} className="flex items-start gap-3">
@@ -1664,10 +1903,17 @@ const Landing = () => {
                   ))}
                 </ul>
                 <div className="bg-white/50 dark:bg-slate-800/50 rounded-xl p-5 mb-6 border border-primary/20">
-                  <p className="text-sm text-muted-foreground text-center font-medium">
-                    <strong className="text-foreground">Start with 10 free jobs</strong>, then subscribe for unlimited access. 
-                    When you subscribe, you'll receive a <strong className="text-foreground">7-day free trial</strong>—no payment charged during trial. 
-                    Cancel anytime from Settings.
+                  <p className="text-sm text-muted-foreground text-center font-medium space-y-2">
+                    <div>
+                      <strong className="text-foreground">Start with 10 free jobs</strong>, then subscribe for unlimited access at £25/month or £250/year.
+                    </div>
+                    <div>
+                      <strong className="text-foreground">Special Offer:</strong> Register interest to receive a 60-day free trial coupon (subject to availability). 
+                      After 60 days, your subscription continues at your chosen rate (£25/month or £250/year).
+                    </div>
+                    <div className="text-xs pt-2 text-muted-foreground/80">
+                      Cancel anytime from Settings—no emails, no calls.
+                    </div>
                   </p>
                 </div>
                 <Button
@@ -1684,13 +1930,53 @@ const Landing = () => {
                   }}
                   className="w-full h-14 text-base font-semibold shadow-xl bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90 text-white border-0 hover:scale-105 active:scale-95 transition-all duration-300 ease-out focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 relative z-20"
                   style={{ position: 'relative', zIndex: 20 }}
-                  aria-label="Subscribe with 7-Day Free Trial"
+                  aria-label="Subscribe - Register Interest for 60-Day Trial"
                 >
-                  Subscribe with 7-Day Free Trial
+                  Subscribe - Register for 60-Day Trial
                 </Button>
               </div>
             </motion.div>
           </div>
+
+          {/* Special Offer Explanation */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
+            className="bg-gradient-to-br from-emerald-50/50 via-primary/10 to-emerald-50/50 dark:from-emerald-950/20 dark:via-primary/10 dark:to-emerald-950/20 rounded-2xl p-8 md:p-10 border-2 border-emerald-500/20 dark:border-emerald-500/30 mb-12 shadow-lg"
+          >
+            <div className="text-center">
+              <motion.div
+                initial={{ scale: 0.9 }}
+                whileInView={{ scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.3 }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6 border border-emerald-500/20"
+              >
+                <Sparkles className="w-4 h-4" />
+                Special 60-Day Free Trial Offer
+              </motion.div>
+              <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-4 flex items-center justify-center gap-2">
+                <span>How It Works</span>
+              </h3>
+              <div className="text-base md:text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed space-y-4">
+                <p>
+                  We're offering a <strong className="text-foreground">60-day free trial</strong> of our unlimited Pro subscription (£25/month or £250/year) 
+                  to the first customers who register interest.
+                </p>
+                <p>
+                  <strong className="text-foreground">How it works:</strong> Start with your 10 free jobs. When you're ready to upgrade, 
+                  register your interest for the 60-day trial. If selected, you'll receive a coupon code via email. 
+                  Use the code when subscribing to get 60 days free of unlimited access.
+                </p>
+                <p className="text-sm pt-2 text-muted-foreground/90">
+                  After 60 days, your subscription automatically continues at your chosen rate (£25/month or £250/year). 
+                  Subject to availability. No credit card required until after the trial period.
+                </p>
+              </div>
+            </div>
+          </motion.div>
 
           <motion.div
             initial={{ opacity: 0 }}
@@ -1699,9 +1985,9 @@ const Landing = () => {
             transition={{ duration: 0.4, ease: "easeOut" }}
             className="text-center text-sm text-muted-foreground space-y-2"
           >
-            <p><strong className="text-foreground">No setup fees.</strong> No credit card. No commitment.</p>
+            <p><strong className="text-foreground">No setup fees.</strong> No credit card required for free tier. No commitment.</p>
             <p>Cancel anytime from inside Settings—no emails, no calls.</p>
-            <p className="pt-4"><strong className="text-foreground">New to market, built from research.</strong> GDPR compliant. GoCardless Direct Debit ready.</p>
+            <p className="pt-4"><strong className="text-foreground">£25/month or £250/year.</strong> 60-day free trial available to first customers who register interest (subject to availability). GDPR compliant. GoCardless Direct Debit ready.</p>
           </motion.div>
         </div>
       </section>
@@ -1808,9 +2094,22 @@ const Landing = () => {
             <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
               Ready to Transform Your Business?
             </h2>
-            <p className="text-xl md:text-2xl lg:text-3xl text-muted-foreground mb-12 max-w-2xl mx-auto font-medium leading-relaxed">
-              Be among the first to experience a window cleaning app built from real conversations with cleaners like you
+            <p className="text-xl md:text-2xl lg:text-3xl text-muted-foreground mb-8 max-w-2xl mx-auto font-medium leading-relaxed">
+              Start with 10 free jobs. Register interest for a 60-day unlimited trial. No credit card required.
             </p>
+            
+            {/* Special Offer Reminder */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="mb-8 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold border border-emerald-500/20 dark:border-emerald-500/30"
+            >
+              <Clock className="w-4 h-4" />
+              <span>60-Day Free Trial Available - Register Interest Now</span>
+            </motion.div>
+            
             <div className="flex flex-col sm:flex-row gap-4 justify-center relative z-50" style={{ position: 'relative', zIndex: 50 }}>
               <Button
                 size="xl"
@@ -1835,13 +2134,13 @@ const Landing = () => {
                 variant="outline"
                 size="xl"
                 onClick={() => {
-                  scrollToSection('how-it-works');
+                  scrollToSection('pricing');
                 }}
                 className="w-full sm:w-auto h-14 text-base border-2 hover:scale-105 active:scale-95 transition-all duration-300 ease-out font-semibold focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 relative z-50"
                 style={{ position: 'relative', zIndex: 50 }}
-                aria-label="See How SoloWipe Works"
+                aria-label="See Pricing & Special Offers"
               >
-                See How It Works
+                See Pricing & Offers
               </Button>
             </div>
           </motion.div>

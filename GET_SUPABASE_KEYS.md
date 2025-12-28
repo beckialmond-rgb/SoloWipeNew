@@ -101,3 +101,7 @@ If you don't have a Supabase project yet:
 
 **Go to Supabase Dashboard and get your keys - that's what's missing!** 🔑
 
+
+
+
+

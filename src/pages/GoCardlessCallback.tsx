@@ -126,7 +126,7 @@ export function GoCardlessCallback() {
               description: 'Your account is already connected.',
             });
             refetchAll().catch(() => {});
-            setTimeout(() => navigate('/settings', { replace: true }), 1500);
+            setTimeout(() => navigate('/settings?connection_attempt=true', { replace: true }), 1500);
             return;
           }
           
@@ -160,9 +160,9 @@ export function GoCardlessCallback() {
             description: 'Your account has been connected successfully.',
           });
           
-          // Refresh and redirect
+          // Refresh and redirect with connection_attempt flag
           refetchAll().catch(() => {});
-          setTimeout(() => navigate('/settings', { replace: true }), 1500);
+          setTimeout(() => navigate('/settings?connection_attempt=true', { replace: true }), 1500);
           return;
         }
 
@@ -188,7 +188,7 @@ export function GoCardlessCallback() {
             if (profile?.gocardless_access_token_encrypted) {
               // Connection exists - silent success
               console.log('[GC-CALLBACK] ✅ Connection exists despite error - redirecting');
-              navigate('/settings', { replace: true });
+              navigate('/settings?connection_attempt=true', { replace: true });
               return;
             }
           }

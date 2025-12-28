@@ -10,10 +10,53 @@ export interface ErrorContext {
 }
 
 /**
+ * Extract error message from various error types
+ */
+function extractErrorMessage(error: unknown): string {
+  // Standard Error object
+  if (error instanceof Error) {
+    return error.message;
+  }
+  
+  // Supabase PostgrestError (has message property)
+  if (error && typeof error === 'object' && 'message' in error) {
+    const msg = (error as { message?: string }).message;
+    if (typeof msg === 'string' && msg) {
+      return msg;
+    }
+  }
+  
+  // Check for common error object shapes
+  if (error && typeof error === 'object') {
+    // Try to extract from various possible properties
+    const errorObj = error as Record<string, unknown>;
+    if (typeof errorObj.message === 'string') return errorObj.message;
+    if (typeof errorObj.error === 'string') return errorObj.error;
+    if (typeof errorObj.details === 'string') return errorObj.details;
+    if (typeof errorObj.hint === 'string') return errorObj.hint;
+    
+    // If it's an object with a single key, try that value
+    const keys = Object.keys(errorObj);
+    if (keys.length === 1 && typeof errorObj[keys[0]] === 'string') {
+      return errorObj[keys[0]] as string;
+    }
+  }
+  
+  // Last resort: try String conversion
+  const stringError = String(error);
+  if (stringError !== '[object Object]') {
+    return stringError;
+  }
+  
+  // Final fallback
+  return 'An unexpected error occurred';
+}
+
+/**
  * Convert technical error messages into user-friendly, actionable messages
  */
 export function getUserFriendlyError(error: unknown, context?: ErrorContext): string {
-  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorMessage = extractErrorMessage(error);
   const lowerMessage = errorMessage.toLowerCase();
 
   // Network errors
@@ -67,6 +110,16 @@ export function getUserFriendlyError(error: unknown, context?: ErrorContext): st
   // Database errors (generic)
   if (lowerMessage.includes('database') || lowerMessage.includes('sql') || lowerMessage.includes('constraint')) {
     return 'A database error occurred. Please try again. If the problem persists, contact support.';
+  }
+
+  // Schema cache errors (Supabase client cache issue)
+  if (lowerMessage.includes('schema cache') || lowerMessage.includes('could not find') && lowerMessage.includes('column')) {
+    return 'Database schema cache error. Please refresh the page. If the problem persists, contact support.';
+  }
+
+  // Column/field errors (specific database errors)
+  if (lowerMessage.includes('column') && (lowerMessage.includes('does not exist') || lowerMessage.includes('cannot be found'))) {
+    return 'Database schema error. Please refresh the page. If the problem persists, contact support.';
   }
 
   // Job completion limit
@@ -137,7 +190,7 @@ export function getActionableError(error: unknown, context?: ErrorContext): {
   action?: string;
   actionLabel?: string;
 } {
-  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorMessage = extractErrorMessage(error);
   const lowerMessage = errorMessage.toLowerCase();
 
   // GoCardless not connected

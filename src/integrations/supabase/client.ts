@@ -96,8 +96,10 @@ function createPlaceholderClient(): SupabaseClient {
         } 
       }),
       signInWithPassword: () => Promise.resolve({ data: { session: null, user: null }, error: { message: 'Supabase not configured' } }),
+      signInWithOtp: () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } }),
       signUp: () => Promise.resolve({ data: { session: null, user: null }, error: { message: 'Supabase not configured' } }),
       signInWithOAuth: () => Promise.resolve({ data: { provider: null, url: null }, error: { message: 'Supabase not configured' } }),
+      resend: () => Promise.resolve({ data: null, error: { message: 'Supabase not configured' } }),
       signOut: () => Promise.resolve({ error: null }),
     },
     from: createQueryBuilder,

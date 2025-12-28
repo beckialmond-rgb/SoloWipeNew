@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, MapPin, Phone, PoundSterling, Repeat, FileText } from 'lucide-react';
+import { X, User, MapPin, Phone, PoundSterling, Repeat, FileText, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ interface EditCustomerModalProps {
     mobile_phone: string | null;
     price: number;
     frequency_weeks: number;
+    preferred_payment_method?: 'gocardless' | 'cash' | 'transfer' | null;
     notes: string | null;
   }) => Promise<void>;
 }
@@ -28,6 +29,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
   const [mobilePhone, setMobilePhone] = useState('');
   const [price, setPrice] = useState('20');
   const [frequencyWeeks, setFrequencyWeeks] = useState('4');
+  const [preferredPaymentMethod, setPreferredPaymentMethod] = useState<'gocardless' | 'cash' | 'transfer' | null>(null);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -40,6 +42,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
       setMobilePhone(customer.mobile_phone || '');
       setPrice(customer.price.toString());
       setFrequencyWeeks(customer.frequency_weeks.toString());
+      setPreferredPaymentMethod(customer.preferred_payment_method || null);
       setNotes(customer.notes || '');
       setErrors({});
     }
@@ -79,6 +82,7 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
         mobile_phone: cleanPhoneNumber(validation.data.mobile_phone),
         price: validation.data.price,
         frequency_weeks: validation.data.frequency_weeks,
+        preferred_payment_method: preferredPaymentMethod,
         notes: validation.data.notes || null,
       });
       onClose();
@@ -141,6 +145,8 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
                 error={errors.name}
               >
                 <input
+                  id="edit-customer-name-input"
+                  name="customer_name"
                   type="text"
                   value={name}
                   onChange={(e) => {
@@ -160,6 +166,8 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
                 error={errors.address}
               >
                 <input
+                  id="edit-customer-address-input"
+                  name="customer_address"
                   type="text"
                   value={address}
                   onChange={(e) => {
@@ -178,6 +186,8 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
                 error={errors.mobile_phone}
               >
                 <input
+                  id="edit-customer-phone-input"
+                  name="customer_mobile_phone"
                   type="tel"
                   value={mobilePhone}
                   onChange={(e) => {
@@ -227,6 +237,28 @@ export function EditCustomerModal({ customer, isOpen, onClose, onSubmit }: EditC
                   </select>
                 </FormField>
               </div>
+
+              {/* Preferred Payment Method */}
+              <FormField 
+                label="Preferred Payment Method" 
+                icon={<CreditCard className="w-4 h-4" />}
+              >
+                <select
+                  value={preferredPaymentMethod || ''}
+                  onChange={(e) => setPreferredPaymentMethod(e.target.value === '' ? null : e.target.value as 'gocardless' | 'cash' | 'transfer')}
+                  className={getInputClassName(false)}
+                >
+                  <option value="">Select preferred method (optional)</option>
+                  <option value="gocardless">Direct Debit (Recommended)</option>
+                  <option value="transfer">Bank Transfer</option>
+                  <option value="cash">Cash</option>
+                </select>
+                {preferredPaymentMethod === 'gocardless' && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Note: Direct Debit requires setting up a mandate separately
+                  </p>
+                )}
+              </FormField>
 
               {/* Notes */}
               <FormField 

@@ -9,8 +9,8 @@ const corsHeaders = {
 
 // SoloWipe Pro Subscription Pricing
 const PRICES = {
-  monthly: "price_1SdstJ4hy5D3Fg1bnepMLpw6", // £15/month
-  annual: "price_1SdstJ4hy5D3Fg1bliu55p34",  // £150/year (save £30)
+  monthly: "price_1SdstJ4hy5D3Fg1bnepMLpw6", // £25/month
+  annual: "price_1SdstJ4hy5D3Fg1bliu55p34",  // £250/year (save £50)
 };
 
 const logStep = (step: string, details?: Record<string, unknown>) => {
@@ -44,18 +44,44 @@ serve(async (req) => {
     if (!user?.email) throw new Error("User not authenticated or email not available");
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    // Parse request body for price type
+    // Check if user is a helper (helpers don't need subscriptions - access is managed by owner)
+    const { data: teamMemberships } = await supabaseClient
+      .from('team_members')
+      .select('id')
+      .eq('helper_id', user.id)
+      .limit(1);
+
+    const { data: userCustomers } = await supabaseClient
+      .from('customers')
+      .select('id')
+      .eq('profile_id', user.id)
+      .limit(1);
+
+    const isHelper = (teamMemberships?.length ?? 0) > 0 && (userCustomers?.length ?? 0) === 0;
+
+    if (isHelper) {
+      logStep("Helper detected - blocking subscription", { userId: user.id });
+      return new Response(JSON.stringify({ 
+        error: "Helpers don't need a subscription. Your access is managed by your team owner." 
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 403,
+      });
+    }
+
+    // Parse request body for price type and coupon code
     const body = await req.json().catch(() => ({}));
     const priceType = body.priceType || "monthly";
+    const couponCode = body.couponCode || null;
     
     if (!PRICES[priceType as keyof typeof PRICES]) {
       throw new Error(`Invalid price type: ${priceType}`);
     }
     
     const priceId = PRICES[priceType as keyof typeof PRICES];
-    logStep("Price selected", { priceType, priceId });
+    logStep("Price selected", { priceType, priceId, couponCode: couponCode || "none" });
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+    const stripe = new Stripe(stripeKey);
     
     // Check if customer exists
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
@@ -87,25 +113,50 @@ serve(async (req) => {
 
     const origin = req.headers.get("origin") || "https://solowipe.lovable.app";
     
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      customer_email: customerId ? undefined : user.email,
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
+    let session;
+    try {
+      const sessionParams: Stripe.Checkout.SessionCreateParams = {
+        customer: customerId,
+        customer_email: customerId ? undefined : user.email,
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        mode: "subscription",
+        subscription_data: {
+          trial_period_days: 7,
         },
-      ],
-      mode: "subscription",
-      subscription_data: {
-        trial_period_days: 7,
-      },
-      success_url: `${origin}/settings?subscription=success`,
-      cancel_url: `${origin}/settings?subscription=cancelled`,
-      metadata: {
-        user_id: user.id,
-      },
-    });
+        success_url: `${origin}/settings?subscription=success`,
+        cancel_url: `${origin}/settings?subscription=cancelled`,
+        metadata: {
+          user_id: user.id,
+        },
+      };
+
+      // Add coupon code if provided
+      if (couponCode && couponCode.trim().length > 0) {
+        sessionParams.discounts = [{ coupon: couponCode.trim() }];
+        logStep("Coupon code applied", { couponCode: couponCode.trim() });
+      }
+
+      session = await stripe.checkout.sessions.create(sessionParams);
+    } catch (stripeError) {
+      const stripeErrorMessage = stripeError instanceof Error ? stripeError.message : String(stripeError);
+      logStep("ERROR: Stripe API call failed", { error: stripeErrorMessage });
+      throw new Error(`Failed to create Stripe checkout session: ${stripeErrorMessage}`);
+    }
+
+    if (!session || !session.id) {
+      logStep("ERROR: Stripe session creation returned invalid response", { session });
+      throw new Error("Stripe checkout session creation failed: Invalid response from Stripe");
+    }
+
+    if (!session.url) {
+      logStep("ERROR: Stripe session created but missing URL", { sessionId: session.id, session });
+      throw new Error("Stripe checkout session created but no URL returned. Please check Stripe configuration.");
+    }
 
     logStep("Checkout session created", { sessionId: session.id, url: session.url, trial: true });
 

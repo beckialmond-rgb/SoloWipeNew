@@ -72,3 +72,7 @@ If you see these logs, the connection flow started correctly.
 
 **Remember:** Always start from Settings → Click "Connect GoCardless" button. Never navigate directly to the callback URL.
 
+
+
+
+

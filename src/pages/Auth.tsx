@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Building, Loader2 } from 'lucide-react';
+import { Building, Loader2, Mail, Lock, CheckCircle } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,9 +11,11 @@ import { useEmailValidation } from '@/hooks/useEmailValidation';
 import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
 import { PasswordInput } from '@/components/PasswordInput';
 import { EmailInput } from '@/components/EmailInput';
+import { MagicLinkSent } from '@/components/MagicLinkSent';
 import { cn } from '@/lib/utils';
 import { RATE_LIMIT_COOLDOWN_MS } from '@/constants/app';
 import { analytics } from '@/lib/analytics';
+import { validateEmailWithSuggestions } from '@/utils/emailValidation';
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
@@ -33,8 +35,14 @@ const Auth = () => {
   const [rateLimitedUntil, setRateLimitedUntil] = useState<Date | null>(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   
+  // New states for email-first magic link flow
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [usePassword, setUsePassword] = useState(false); // Toggle between magic link and password
+  const [emailContext, setEmailContext] = useState<{ isHelper?: boolean; isPlaceholder?: boolean; ownerName?: string; isNewUser?: boolean } | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+  
   const passwordsMatch = password === confirmPassword;
-  const { user, loading: authLoading, supabaseError, signIn, signUp, signInWithOAuth, resendVerificationEmail } = useAuth();
+  const { user, loading: authLoading, supabaseError, signIn, signUp, signInWithMagicLink, checkEmailExists, signInWithOAuth, resendVerificationEmail } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -43,6 +51,45 @@ const Auth = () => {
   
   const passwordStrength = usePasswordStrength(password);
   const emailValidation = useEmailValidation(email);
+
+  // Handle magic link callback (check for hash fragments from Supabase redirect)
+  const magicLinkProcessedRef = useRef(false);
+  
+  useEffect(() => {
+    if (authLoading || magicLinkProcessedRef.current) return; // Wait for auth to initialize and prevent re-processing
+    
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = hashParams.get('access_token');
+    const error = hashParams.get('error');
+    const errorDescription = hashParams.get('error_description');
+    const type = hashParams.get('type'); // 'signup' or 'recovery'
+
+    if (accessToken || error) {
+      // Mark as processed immediately to prevent re-execution
+      magicLinkProcessedRef.current = true;
+      
+      // Magic link callback detected - Supabase will handle auth state change
+      // Just clean up URL and show appropriate message
+      if (error) {
+        toast({
+          title: 'Magic link error',
+          description: errorDescription || error || 'The magic link could not be processed. It may have expired or been used already. Please request a new one.',
+          variant: 'destructive',
+        });
+        // Clean up URL
+        window.history.replaceState({}, '', '/auth');
+      } else if (accessToken) {
+        // Success - auth state change will handle the redirect
+        // Show success message briefly
+        toast({
+          title: type === 'signup' ? 'Welcome to SoloWipe!' : 'Welcome back!',
+          description: 'You\'ve been signed in successfully.',
+        });
+        // Clean up URL
+        window.history.replaceState({}, '', '/auth');
+      }
+    }
+  }, [authLoading, toast]);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -128,19 +175,52 @@ const Auth = () => {
     }
   }, [searchParams, authLoading, toast, navigate]);
 
+  // Check email context when email changes (for role detection)
+  useEffect(() => {
+    // Reset context when email is cleared
+    if (!email) {
+      setEmailContext(null);
+      return;
+    }
+
+    const checkEmail = async () => {
+      if (!emailValidation.isValid || checkingEmail) return;
+      
+      setCheckingEmail(true);
+      try {
+        const context = await checkEmailExists(email);
+        setEmailContext({
+          isHelper: context.isHelper,
+          isPlaceholder: context.isPlaceholder,
+          ownerName: context.ownerName,
+        });
+      } catch (err) {
+        console.error('[Auth] Error checking email context:', err);
+        setEmailContext(null);
+      } finally {
+        setCheckingEmail(false);
+      }
+    };
+
+    // Debounce email checking to avoid excessive API calls
+    const timeoutId = setTimeout(checkEmail, 500);
+    return () => clearTimeout(timeoutId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, emailValidation.isValid]);
+
   // Auto-focus first input when form loads or mode changes
   // Also reset email verification state when switching modes to avoid stale state
   useEffect(() => {
-    if (!authLoading && !user) {
+    if (!authLoading && !user && !magicLinkSent) {
       if (isLogin) {
         emailRef.current?.focus();
       } else {
-        businessNameRef.current?.focus();
+        emailRef.current?.focus(); // Focus email first (no business name)
         // Clear verification resend when switching to signup
         setShowVerificationResend(false);
       }
     }
-  }, [isLogin, authLoading, user]);
+  }, [isLogin, authLoading, user, magicLinkSent]);
 
   // Rate limit countdown
   const [rateLimitSeconds, setRateLimitSeconds] = useState(0);
@@ -164,7 +244,77 @@ const Auth = () => {
     return () => clearInterval(interval);
   }, [rateLimitedUntil]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Handle magic link submission (email-first flow)
+  const handleMagicLinkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (loading || !emailValidation.isValid) return;
+    
+    setLoading(true);
+    
+    try {
+      const { error, isNewUser } = await signInWithMagicLink(email);
+      
+      if (error) {
+        // Check for rate limiting
+        if (error.message?.toLowerCase().includes('rate limit') || 
+            error.message?.toLowerCase().includes('too many requests') ||
+            error.message?.toLowerCase().includes('exceeded')) {
+          setRateLimitedUntil(new Date(Date.now() + RATE_LIMIT_COOLDOWN_MS));
+          toast({
+            title: 'Too many requests',
+            description: 'Please wait a moment before requesting another magic link. This helps us prevent spam.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        // User-friendly error messages
+        let errorTitle = 'Failed to send magic link';
+        let errorDescription = error.message;
+
+        if (error.message?.toLowerCase().includes('invalid email')) {
+          errorTitle = 'Invalid email address';
+          errorDescription = 'Please check your email address and try again. Make sure it includes an @ symbol and a domain (e.g., example.com).';
+        } else if (error.message?.toLowerCase().includes('email not allowed')) {
+          errorTitle = 'Email not allowed';
+          errorDescription = 'This email address cannot be used. Please try a different email address.';
+        } else if (error.message?.toLowerCase().includes('network') || error.message?.toLowerCase().includes('fetch')) {
+          errorTitle = 'Connection problem';
+          errorDescription = 'Unable to connect to our servers. Please check your internet connection and try again.';
+        } else if (error.message?.toLowerCase().includes('timeout')) {
+          errorTitle = 'Request timed out';
+          errorDescription = 'The request took too long. Please check your internet connection and try again.';
+        }
+        
+        toast({
+          title: errorTitle,
+          description: errorDescription,
+          variant: 'destructive',
+        });
+      } else {
+        // Success! Show magic link sent screen
+        setMagicLinkSent(true);
+        // Update context with isNewUser (though it may be false initially)
+        setEmailContext(prev => ({ 
+          ...prev, 
+          isNewUser: isNewUser || false 
+        }));
+        
+        // Track analytics
+        // Note: isNewUser may be false initially, but magic link handles both signup and signin
+        analytics.track('magic_link_sent', {
+          is_helper: emailContext?.isHelper || false,
+          is_new_user: isNewUser || false,
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle password-based submission (fallback)
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Prevent double submission
@@ -185,12 +335,13 @@ const Auth = () => {
       }
       // Track signup start
       analytics.track('signup_started', {
+        method: 'password',
         has_business_name: !!businessName,
         password_strength: passwordStrength.strength,
       });
     } else {
       // Track login start
-      analytics.track('login_started');
+      analytics.track('login_started', { method: 'password' });
     }
     
     setLoading(true);
@@ -243,7 +394,7 @@ const Auth = () => {
           navigate('/dashboard');
         }
       } else {
-        const { error, needsEmailConfirmation } = await signUp(email, password, businessName);
+        const { error, needsEmailConfirmation } = await signUp(email, password, businessName || undefined);
         if (error) {
           console.error('[SignUp] Error details:', {
             message: error.message,
@@ -258,15 +409,27 @@ const Auth = () => {
             setRateLimitedUntil(new Date(Date.now() + RATE_LIMIT_COOLDOWN_MS));
           }
           
-          // Provide more specific error messages
+          // User-friendly error messages
+          let errorTitle = 'Sign up failed';
           let errorDescription = error.message || 'An unexpected error occurred';
           
-          if (error.message?.toLowerCase().includes('email already registered')) {
-            errorDescription = 'This email is already registered. Please sign in instead.';
+          if (error.message?.toLowerCase().includes('email already registered') ||
+              error.message?.toLowerCase().includes('user already registered')) {
+            errorTitle = 'Email already in use';
+            errorDescription = 'This email is already registered. Try signing in instead, or use the magic link option for passwordless access.';
           } else if (error.message?.toLowerCase().includes('invalid email')) {
-            errorDescription = 'Please enter a valid email address.';
-          } else if (error.message?.toLowerCase().includes('password')) {
-            errorDescription = 'Password must be at least 8 characters and meet all requirements.';
+            errorTitle = 'Invalid email address';
+            errorDescription = 'Please check your email address. Make sure it includes an @ symbol and a valid domain (e.g., example.com).';
+          } else if (error.message?.toLowerCase().includes('password') && 
+                     (error.message?.toLowerCase().includes('weak') || 
+                      error.message?.toLowerCase().includes('short') ||
+                      error.message?.toLowerCase().includes('minimum'))) {
+            errorTitle = 'Password too weak';
+            errorDescription = 'Your password must be at least 8 characters long and include a mix of letters, numbers, and symbols.';
+          } else if (error.message?.toLowerCase().includes('network') || 
+                     error.message?.toLowerCase().includes('fetch')) {
+            errorTitle = 'Connection problem';
+            errorDescription = 'Unable to connect to our servers. Please check your internet connection and try again.';
           }
           
           // Track signup failure
@@ -276,7 +439,7 @@ const Auth = () => {
           });
           
           toast({
-            title: 'Sign up failed',
+            title: errorTitle,
             description: errorDescription,
             variant: 'destructive',
           });
@@ -285,7 +448,7 @@ const Auth = () => {
             // Track email verification sent
             analytics.track('signup_email_verification_sent');
             analytics.track('signup_completed', {
-              method: 'email',
+              method: 'password',
               needs_verification: true,
             });
             
@@ -298,7 +461,7 @@ const Auth = () => {
           } else {
             // Track successful signup
             analytics.track('signup_completed', {
-              method: 'email',
+              method: 'password',
               needs_verification: false,
             });
             
@@ -321,6 +484,28 @@ const Auth = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Resend magic link
+  const handleResendMagicLink = async () => {
+    setResendingEmail(true);
+    try {
+      const { error } = await signInWithMagicLink(email);
+      if (error) {
+        toast({
+          title: 'Failed to resend',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Magic link sent',
+          description: 'Check your email for the new link.',
+        });
+      }
+    } finally {
+      setResendingEmail(false);
     }
   };
 
@@ -372,6 +557,29 @@ const Auth = () => {
     );
   }
 
+  // Show magic link sent screen
+  if (magicLinkSent) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
+          <MagicLinkSent
+            email={email}
+            isNewUser={emailContext?.isNewUser}
+            isHelper={emailContext?.isHelper}
+            isPlaceholder={emailContext?.isPlaceholder}
+            ownerName={emailContext?.ownerName}
+            onBack={() => {
+              setMagicLinkSent(false);
+              setEmail('');
+            }}
+            onResend={handleResendMagicLink}
+            resending={resendingEmail}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -396,6 +604,23 @@ const Auth = () => {
                 ? 'Sign in to manage your rounds' 
                 : 'Start managing your window cleaning business'}
             </p>
+            {/* Contextual helper message */}
+            {emailContext?.isHelper && emailContext.ownerName && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-3 p-3 rounded-lg bg-primary/10 border border-primary/20"
+              >
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold">You're joining {emailContext.ownerName}'s team!</span>
+                  {emailContext.isPlaceholder && (
+                    <span className="block mt-1 text-xs text-muted-foreground">
+                      Once you sign up, you'll automatically be linked to your assigned jobs.
+                    </span>
+                  )}
+                </p>
+              </motion.div>
+            )}
           </div>
 
           {/* Supabase configuration error */}
@@ -420,57 +645,147 @@ const Auth = () => {
 
           {/* Form */}
           <form 
-            onSubmit={handleSubmit} 
+            onSubmit={usePassword ? handlePasswordSubmit : handleMagicLinkSubmit}
             className="space-y-4"
             aria-label={isLogin ? 'Sign in form' : 'Sign up form'}
             noValidate
           >
-            {!isLogin && (
-              <div className="relative">
-                <label htmlFor="business-name" className="sr-only">
-                  Business Name
-                </label>
-                <Building 
-                  className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" 
-                  aria-hidden="true"
-                />
-                <input
-                  ref={businessNameRef}
-                  id="business-name"
-                  name="business-name"
-                  type="text"
-                  placeholder="Business Name"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
-                  required={!isLogin}
-                  autoComplete="organization"
-                  aria-label="Business name"
-                  aria-required="true"
-                  className={cn(
-                    "w-full h-14 pl-12 pr-4 rounded-xl",
-                    "bg-muted border-0",
-                    "text-foreground placeholder:text-muted-foreground",
-                    "focus:outline-none focus:ring-2 focus:ring-primary"
-                  )}
-                />
-              </div>
-            )}
+            {/* Email Input - Always First */}
+            <div className="space-y-2">
+              <EmailInput
+                ref={emailRef}
+                id={isLogin ? "login-email" : "signup-email"}
+                name={isLogin ? "login-email" : "signup-email"}
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                validation={emailValidation}
+                showValidation={true}
+                required
+                autoComplete={isLogin ? "email" : "email"}
+                aria-label="Email address"
+                aria-required="true"
+                aria-invalid={!emailValidation.isEmpty && !emailValidation.isValid}
+                className="touch-target-lg" // Larger touch target for mobile
+              />
+              {/* Email typo suggestion */}
+              {email && emailValidation.isValid && (() => {
+                const suggestion = validateEmailWithSuggestions(email);
+                if (suggestion.suggestions && suggestion.suggestions.length > 0) {
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="p-2 rounded-lg bg-warning/10 border border-warning/20"
+                    >
+                      <p className="text-xs text-foreground mb-1">
+                        <span className="font-medium">Did you mean </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEmail(suggestion.suggestions![0]);
+                            emailRef.current?.focus();
+                          }}
+                          className="text-primary hover:underline font-semibold touch-target-sm"
+                        >
+                          {suggestion.suggestions[0]}
+                        </button>
+                        <span className="font-medium">?</span>
+                      </p>
+                    </motion.div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
 
-            <EmailInput
-              ref={emailRef}
-              id={isLogin ? "login-email" : "signup-email"}
-              name={isLogin ? "login-email" : "signup-email"}
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              validation={emailValidation}
-              showValidation={!isLogin}
-              required
-              autoComplete={isLogin ? "email" : "email"}
-              aria-label="Email address"
-              aria-required="true"
-              aria-invalid={!isLogin && !emailValidation.isEmpty && !emailValidation.isValid}
-            />
+            {/* Password Fields - Only show if user chooses password */}
+            {usePassword && (
+              <>
+                {!isLogin && (
+                  <div className="relative">
+                    <label htmlFor="business-name" className="sr-only">
+                      Business Name (Optional)
+                    </label>
+                    <Building 
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none" 
+                      aria-hidden="true"
+                    />
+                    <input
+                      ref={businessNameRef}
+                      id="business-name"
+                      name="business-name"
+                      type="text"
+                      placeholder="Business Name (Optional)"
+                      value={businessName}
+                      onChange={(e) => setBusinessName(e.target.value)}
+                      autoComplete="organization"
+                      aria-label="Business name"
+                      className={cn(
+                        "w-full h-14 pl-12 pr-4 rounded-xl",
+                        "bg-muted border-0",
+                        "text-foreground placeholder:text-muted-foreground",
+                        "focus:outline-none focus:ring-2 focus:ring-primary"
+                      )}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <PasswordInput
+                    id={isLogin ? "login-password" : "signup-password"}
+                    name={isLogin ? "login-password" : "signup-password"}
+                    placeholder="Password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onFocus={() => !isLogin && setShowPasswordFeedback(true)}
+                    onBlur={() => setShowPasswordFeedback(false)}
+                    required={usePassword}
+                    minLength={8}
+                    autoComplete={isLogin ? "current-password" : "new-password"}
+                    aria-label="Password"
+                    aria-required={usePassword}
+                    aria-invalid={!isLogin && password.length > 0 && passwordStrength.score < 3}
+                    aria-describedby={!isLogin && password.length > 0 ? "password-strength" : undefined}
+                  />
+                  
+                  {/* Password Strength Indicator - only show on signup */}
+                  {!isLogin && password.length > 0 && (
+                    <div id="password-strength" role="region" aria-live="polite" aria-label="Password strength">
+                      <PasswordStrengthIndicator 
+                        passwordStrength={passwordStrength}
+                        showChecklist={showPasswordFeedback || passwordStrength.score < 4}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Confirm Password - only show on signup */}
+                {!isLogin && (
+                  <div className="space-y-1">
+                    <PasswordInput
+                      id="confirm-password"
+                      name="confirm-password"
+                      placeholder="Confirm Password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      hasError={confirmPassword.length > 0 && !passwordsMatch}
+                      required={usePassword}
+                      autoComplete="new-password"
+                      aria-label="Confirm password"
+                      aria-required={usePassword}
+                      aria-invalid={confirmPassword.length > 0 && !passwordsMatch}
+                      aria-describedby={confirmPassword.length > 0 && !passwordsMatch ? "confirm-password-error" : undefined}
+                    />
+                    {confirmPassword.length > 0 && !passwordsMatch && (
+                      <p id="confirm-password-error" className="text-xs text-destructive pl-1" role="alert">
+                        Passwords do not match
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
 
             <div className="space-y-2">
               <PasswordInput
@@ -526,8 +841,8 @@ const Auth = () => {
               </div>
             )}
 
-            {/* Remember me checkbox - only show on login */}
-            {isLogin && (
+            {/* Remember me checkbox - only show on password login */}
+            {isLogin && usePassword && (
               <div className="flex items-center gap-3">
                 <Checkbox
                   id="rememberMe"
@@ -545,7 +860,7 @@ const Auth = () => {
             )}
 
             {/* Free Trial Info - only show on signup */}
-            {!isLogin && (
+            {!isLogin && !usePassword && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -567,8 +882,8 @@ const Auth = () => {
               </motion.div>
             )}
 
-            {/* Terms checkbox - only show on signup */}
-            {!isLogin && (
+            {/* Terms checkbox - only show on password signup */}
+            {!isLogin && usePassword && (
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="acceptTerms"
@@ -642,30 +957,77 @@ const Auth = () => {
               </div>
             )}
 
+            {/* Primary Action Button */}
             <Button
               type="submit"
-              disabled={loading || rateLimitSeconds > 0 || (!isLogin && (!emailValidation.isValid || passwordStrength.score < 3 || !passwordsMatch || !acceptedTerms))}
+              disabled={
+                loading || 
+                rateLimitSeconds > 0 || 
+                !emailValidation.isValid ||
+                (usePassword && !isLogin && (passwordStrength.score < 3 || !passwordsMatch || !acceptedTerms))
+              }
               className={cn(
-                "w-full h-14 rounded-xl",
+                "w-full h-14 rounded-xl touch-target-lg", // Larger touch target for mobile
                 "bg-primary hover:bg-primary/90 text-primary-foreground",
-                "font-semibold text-base"
+                "font-semibold text-base",
+                "transition-all duration-200",
+                loading && "opacity-75 cursor-not-allowed"
               )}
-              aria-label={loading ? 'Processing' : isLogin ? 'Sign in to your account' : 'Create new account'}
+              aria-label={loading ? 'Processing' : usePassword ? (isLogin ? 'Sign in' : 'Create account') : 'Send magic link'}
               aria-busy={loading}
+              aria-describedby={rateLimitSeconds > 0 ? 'rate-limit-message' : undefined}
             >
               {loading ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin mr-2" aria-hidden="true" />
-                  <span>Processing...</span>
+                  <span>{usePassword ? 'Processing...' : 'Sending magic link...'}</span>
                 </>
               ) : rateLimitSeconds > 0 ? (
-                `Wait ${rateLimitSeconds}s`
-              ) : isLogin ? (
-                'Sign In'
+                <>
+                  <span>Wait {rateLimitSeconds}s</span>
+                  <span id="rate-limit-message" className="sr-only">
+                    Please wait {rateLimitSeconds} seconds before trying again
+                  </span>
+                </>
+              ) : usePassword ? (
+                isLogin ? 'Sign In' : 'Create Account'
               ) : (
-                'Create Account'
+                <>
+                  <Mail className="w-5 h-5 mr-2" />
+                  {isLogin ? 'Send magic link' : 'Continue with email'}
+                </>
               )}
             </Button>
+
+            {/* Toggle between magic link and password */}
+            {!usePassword && (
+              <button
+                type="button"
+                onClick={() => setUsePassword(true)}
+                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors touch-target-lg py-2"
+                aria-label="Switch to password sign in"
+              >
+                <Lock className="w-4 h-4 inline mr-1" />
+                Or use password instead
+              </button>
+            )}
+
+            {usePassword && (
+              <button
+                type="button"
+                onClick={() => {
+                  setUsePassword(false);
+                  setPassword('');
+                  setConfirmPassword('');
+                  setBusinessName(''); // Reset business name when switching back
+                }}
+                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors touch-target-lg py-2"
+                aria-label="Switch to magic link sign in"
+              >
+                <Mail className="w-4 h-4 inline mr-1" />
+                Or use magic link instead (easier!)
+              </button>
+            )}
           </form>
 
           {/* Social Login Divider */}
@@ -797,14 +1159,47 @@ const Auth = () => {
           <div className="mt-6 text-center">
             <button
               type="button"
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-primary font-medium hover:underline"
+              onClick={() => {
+                setIsLogin(!isLogin);
+                setUsePassword(false); // Reset to magic link when switching modes
+                setEmail('');
+                setPassword('');
+                setConfirmPassword('');
+                setEmailContext(null);
+                setMagicLinkSent(false); // Reset magic link sent state
+              }}
+              className="text-primary font-medium hover:underline touch-target-lg px-2 py-2" // Larger touch target
+              aria-label={isLogin ? "Switch to sign up" : "Switch to sign in"}
             >
               {isLogin 
                 ? "Don't have an account? Sign up" 
                 : 'Already have an account? Sign in'}
             </button>
           </div>
+
+          {/* Trust indicators - only show on signup */}
+          {!isLogin && !usePassword && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="mt-6 text-center space-y-2"
+            >
+              <p className="text-xs text-muted-foreground">
+                Trusted by 10,000+ cleaners across the UK
+              </p>
+              <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3 text-primary" />
+                  Bank-level security
+                </span>
+                <span className="flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3 text-primary" />
+                  GDPR compliant
+                </span>
+              </div>
+            </motion.div>
+          )}
         </motion.div>
       </div>
     </div>

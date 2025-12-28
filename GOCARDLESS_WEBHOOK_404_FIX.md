@@ -182,3 +182,7 @@ https://owqjyaiptexqwafzmcwy.supabase.co/functions/v1/gocardless-webhook
 
 Health checks (GET) work immediately. Webhook events (POST) require `GOCARDLESS_WEBHOOK_SECRET` to be configured in Supabase secrets.
 
+
+
+
+

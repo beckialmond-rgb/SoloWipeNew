@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff, RefreshCw, CloudOff, Cloud, FileJson, MessageCircle, FileText, AlertTriangle, MessageSquare, Database, CheckCircle2, Smartphone } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff, RefreshCw, CloudOff, Cloud, FileJson, MessageCircle, FileText, AlertTriangle, MessageSquare, Database, CheckCircle2, Smartphone, Mail } from 'lucide-react';
 import { useOffline } from '@/contexts/OfflineContext';
 import { syncStatus } from '@/lib/offlineStorage';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -34,7 +34,7 @@ import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 
 const Settings = () => {
-  const { businessName, userEmail, updateBusinessName, updateGoogleReviewLink, recentlyArchivedCustomers, allArchivedCustomers, unarchiveCustomer, scrubCustomerData, weeklyEarnings, customers, profile, refetchAll, upcomingJobs } = useSupabaseData();
+  const { businessName, userEmail, updateBusinessName, updateGoogleReviewLink, recentlyArchivedCustomers, allArchivedCustomers, unarchiveCustomer, scrubCustomerData, weeklyEarnings, customers, profile, refetchAll, upcomingJobs, assignedJobs, teamMemberships } = useSupabaseData();
   const { signOut, deleteAccount } = useAuth();
   const { isOnline, isSyncing, pendingCount, syncPendingMutations } = useOffline();
   const { checkSubscription } = useSubscription();
@@ -282,10 +282,25 @@ const Settings = () => {
                   </CollapsibleContent>
                 </Collapsible>
 
-                {/* Subscription Section */}
-                <div className="pt-2 border-t border-border">
-                  <SubscriptionSection />
-                </div>
+                {/* Subscription Section - Only show for owners, not helpers */}
+                {(() => {
+                  // Determine if user is owner or helper
+                  // Owner: has customers
+                  // Helper: has assigned jobs OR is in team_members (even if no current assignments)
+                  const isOwner = customers.length > 0;
+                  const isHelper = assignedJobs.length > 0 || (teamMemberships?.length ?? 0) > 0;
+                  
+                  // Only show subscription section for owners
+                  if (!isOwner && isHelper) {
+                    return null;
+                  }
+                  
+                  return (
+                    <div className="pt-2 border-t border-border">
+                      <SubscriptionSection />
+                    </div>
+                  );
+                })()}
 
                 {/* GoCardless Section */}
                 <div className="pt-2 border-t border-border">
@@ -629,6 +644,23 @@ const Settings = () => {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground">Export All Data</p>
                         <p className="text-xs text-muted-foreground">Your Data</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    </button>
+
+                    {/* Get Import Help */}
+                    <button
+                      onClick={() => window.location.href = 'mailto:aaron@solowipe.co.uk?subject=Help me import my customers'}
+                      className={cn(
+                        "w-full flex items-center gap-3 text-left py-2",
+                        "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                        "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                      )}
+                    >
+                      <Mail className="w-4 h-4 text-primary flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground">Get Import Help</p>
+                        <p className="text-xs text-muted-foreground">We can import for you</p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </button>

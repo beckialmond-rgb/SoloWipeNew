@@ -62,7 +62,7 @@ export function UnpaidJobCard({
     
     const phone = job.customer.mobile_phone || '';
     showTemplatePicker('unpaid_reminder', context, (message) => {
-      openSMSApp(phone, message);
+      openSMSApp(phone, message, undefined, job.id);
     });
   };
 
@@ -206,7 +206,7 @@ export function UnpaidJobCard({
 
             {/* Processing messaging for GoCardless payments */}
             {isPaymentProcessing && (
-              <div className="mb-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800/50">
+              <div className="mb-3 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-xl border border-yellow-200 dark:border-yellow-800/50">
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-xs text-yellow-700 dark:text-yellow-400 flex-1">
                     ⏳ Payment processing via GoCardless. Funds typically arrive in 3-5 working days.
@@ -220,7 +220,7 @@ export function UnpaidJobCard({
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 px-2 text-xs shrink-0"
+                      className="touch-sm min-h-[44px] px-2 text-xs shrink-0"
                       onClick={() => onSyncPayment(job)}
                       disabled={isCollecting}
                       title="Sync payment status from GoCardless"

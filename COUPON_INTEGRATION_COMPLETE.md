@@ -142,3 +142,7 @@ The system handles:
 - Coupon validation happens before checkout session creation
 - All coupon codes are automatically converted to uppercase
 
+
+
+
+

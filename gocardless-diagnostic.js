@@ -120,3 +120,7 @@ window.gocardlessDiagnostic = function() {
 
 console.log('💡 Tip: Run gocardlessDiagnostic() anytime to re-run this diagnostic');
 
+
+
+
+

@@ -61,3 +61,7 @@ COMMENT ON COLUMN public.leads.source IS 'Where the email was captured: landing_
 COMMENT ON COLUMN public.leads.consent_given IS 'User has given consent to receive emails (GDPR requirement)';
 COMMENT ON COLUMN public.leads.subscribed IS 'User is currently subscribed (can be unsubscribed)';
 
+
+
+
+

@@ -282,3 +282,7 @@ This is the same for all environments because Supabase handles the redirect to y
 
 If any step fails, check the error and refer to the troubleshooting section above.
 
+
+
+
+

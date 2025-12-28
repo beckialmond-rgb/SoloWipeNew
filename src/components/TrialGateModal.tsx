@@ -235,7 +235,7 @@ export function TrialGateModal() {
                   </>
                 ) : (
                   <>
-                    Start Free Trial — Then £15/month
+                    Start Free Trial — Then £25/month
                     <Sparkles className="w-5 h-5 ml-2" />
                   </>
                 )}
@@ -246,7 +246,7 @@ export function TrialGateModal() {
                 variant="outline"
                 className="w-full h-12 rounded-xl text-sm font-medium"
               >
-                {isLoading ? 'Processing...' : 'Or £150/year (save £30)'}
+                {isLoading ? 'Processing...' : 'Or £250/year (save £50)'}
               </Button>
             </motion.div>
           </div>

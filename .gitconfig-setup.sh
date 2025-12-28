@@ -34,3 +34,7 @@ echo ""
 echo "Current configuration:"
 git config --list --global | grep -E "(user|push|color|branch|merge)"
 
+
+
+
+

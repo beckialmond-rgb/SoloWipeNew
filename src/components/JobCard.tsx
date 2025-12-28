@@ -1,6 +1,6 @@
 import { Check, MapPin, SkipForward, Navigation, Phone, GripVertical, CreditCard, Clock } from 'lucide-react';
 import { motion, useMotionValue, useTransform, PanInfo, Reorder, useDragControls } from 'framer-motion';
-import { JobWithCustomer } from '@/types/database';
+import { JobWithCustomer, JobWithCustomerAndAssignment } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { useState, forwardRef } from 'react';
 import { CustomerNotesPreview } from './CustomerNotesPreview';
@@ -9,19 +9,22 @@ import { Button } from './ui/button';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
 import { useSubscription } from '@/hooks/useSubscription';
+import { JobAssignmentAvatar } from './JobAssignmentAvatar';
 
 interface JobCardProps {
-  job: JobWithCustomer;
+  job: JobWithCustomer | JobWithCustomerAndAssignment;
   onComplete: (job: JobWithCustomer) => void;
   onSkip: (jobId: string) => void;
   index: number;
   isNextUp?: boolean;
   businessName?: string;
+  onAssignClick?: (job: JobWithCustomerAndAssignment) => void;
+  showAssignment?: boolean;
 }
 
 const SWIPE_THRESHOLD = 100;
 
-export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplete, onSkip, index, isNextUp = false, businessName = 'SoloWipe' }, ref) => {
+export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplete, onSkip, index, isNextUp = false, businessName = 'SoloWipe', onAssignClick, showAssignment = false }, ref) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const x = useMotionValue(0);
@@ -182,8 +185,15 @@ export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplet
                     <h3 className="font-bold text-foreground text-xl leading-tight flex-1 min-w-0 pr-1">
                       {job.customer.name || 'Unknown Customer'}
                     </h3>
-                    {/* Status indicators */}
+                    {/* Status indicators and assignment */}
                     <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                      {showAssignment && onAssignClick && (
+                        <JobAssignmentAvatar
+                          job={job as JobWithCustomerAndAssignment}
+                          onClick={() => onAssignClick(job as JobWithCustomerAndAssignment)}
+                          size="sm"
+                        />
+                      )}
                       {job.customer.gocardless_mandate_status === 'pending' ? (
                         <span title="DD Pending"><Clock className="w-4 h-4 text-warning" /></span>
                       ) : job.customer.gocardless_id ? (

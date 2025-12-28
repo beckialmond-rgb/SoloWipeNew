@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { Search, Users, Plus, CreditCard, Send, CheckSquare, Square, Loader2, X, Download, Upload, Mail, Gift } from 'lucide-react';
+import { useState, useRef, useMemo } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
+import { Search, Users, Plus, CreditCard, Send, CheckSquare, Square, Loader2, X, Download, Upload, Mail, Gift, Banknote } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { CustomerCard } from '@/components/CustomerCard';
@@ -9,9 +11,11 @@ import { AddCustomerModal } from '@/components/AddCustomerModal';
 import { EditCustomerModal } from '@/components/EditCustomerModal';
 import { CustomerHistoryModal } from '@/components/CustomerHistoryModal';
 import { ReferralSMSModal } from '@/components/ReferralSMSModal';
+import { ImportCustomersModal } from '@/components/ImportCustomersModal';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -35,41 +39,70 @@ const Customers = () => {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [historyCustomer, setHistoryCustomer] = useState<Customer | null>(null);
   const [selectMode, setSelectMode] = useState(false);
+  const [bulkMode, setBulkMode] = useState<'dd-links' | 'payment-method'>('dd-links');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSendingBulkDD, setIsSendingBulkDD] = useState(false);
+  const [bulkPaymentMethod, setBulkPaymentMethod] = useState<'cash' | 'transfer' | 'gocardless' | null>(null);
+  const [isUpdatingPaymentMethods, setIsUpdatingPaymentMethods] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
 
+  // Debounce search query to avoid filtering on every keystroke
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
   // Calculate counts for each filter (before applying DD filter, but after search)
-  const searchFilteredCustomers = customers.filter(customer =>
-    customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.address.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const ddCounts = {
-    all: searchFilteredCustomers.length,
-    withDD: searchFilteredCustomers.filter(c => !!c.gocardless_id).length,
-    withoutDD: searchFilteredCustomers.filter(c => !c.gocardless_id && c.gocardless_mandate_status !== 'pending').length,
-    pending: searchFilteredCustomers.filter(c => c.gocardless_mandate_status === 'pending').length,
-  };
-
-  const filteredCustomers = searchFilteredCustomers.filter(customer => {
-    // DD filter
-    if (ddFilter === 'with-dd') {
-      return !!customer.gocardless_id;
-    } else if (ddFilter === 'without-dd') {
-      return !customer.gocardless_id && customer.gocardless_mandate_status !== 'pending';
-    } else if (ddFilter === 'pending') {
-      return customer.gocardless_mandate_status === 'pending';
+  const searchFilteredCustomers = useMemo(() => {
+    if (!debouncedSearchQuery) {
+      return customers;
     }
-    return true;
-  });
+    const query = debouncedSearchQuery.toLowerCase().replace(/\s/g, ''); // Strip spaces from search query
+    return customers.filter(customer =>
+      customer.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      customer.address.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      (customer.mobile_phone && customer.mobile_phone.replace(/\s/g, '').toLowerCase().includes(query))
+    );
+  }, [customers, debouncedSearchQuery]);
+
+  const ddCounts = useMemo(() => {
+    return {
+      all: searchFilteredCustomers.length,
+      withDD: searchFilteredCustomers.filter(c => !!c.gocardless_id).length,
+      withoutDD: searchFilteredCustomers.filter(c => !c.gocardless_id && c.gocardless_mandate_status !== 'pending').length,
+      pending: searchFilteredCustomers.filter(c => c.gocardless_mandate_status === 'pending').length,
+    };
+  }, [searchFilteredCustomers]);
+
+  const filteredCustomers = useMemo(() => {
+    return searchFilteredCustomers.filter(customer => {
+      // DD filter
+      if (ddFilter === 'with-dd') {
+        return !!customer.gocardless_id;
+      } else if (ddFilter === 'without-dd') {
+        return !customer.gocardless_id && customer.gocardless_mandate_status !== 'pending';
+      } else if (ddFilter === 'pending') {
+        return customer.gocardless_mandate_status === 'pending';
+      }
+      return true;
+    });
+  }, [searchFilteredCustomers, ddFilter]);
 
   // Customers eligible for DD link (no mandate, has phone)
-  const customersEligibleForDD = filteredCustomers.filter(
-    c => !c.gocardless_id && c.gocardless_mandate_status !== 'pending' && c.mobile_phone
-  );
+  const customersEligibleForDD = useMemo(() => {
+    return filteredCustomers.filter(
+      c => !c.gocardless_id && c.gocardless_mandate_status !== 'pending' && c.mobile_phone
+    );
+  }, [filteredCustomers]);
+
+  // Virtualization setup for customer list
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: filteredCustomers.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 112, // CustomerCard height (~88px) + gap (24px)
+    overscan: 5, // Render 5 extra items outside viewport
+  });
 
   const toggleSelectCustomer = (customerId: string) => {
     setSelectedIds(prev => {
@@ -84,13 +117,28 @@ const Customers = () => {
   };
 
   const selectAllEligible = () => {
-    setSelectedIds(new Set(customersEligibleForDD.map(c => c.id)));
+    if (bulkMode === 'dd-links') {
+      setSelectedIds(new Set(customersEligibleForDD.map(c => c.id)));
+    } else {
+      // For payment method, select all filtered customers
+      setSelectedIds(new Set(filteredCustomers.map(c => c.id)));
+    }
   };
 
   const clearSelection = () => {
     setSelectedIds(new Set());
     setSelectMode(false);
+    setBulkPaymentMethod(null);
   };
+
+  // Get eligible customers based on current bulk mode
+  const eligibleCustomersForBulkMode = useMemo(() => {
+    if (bulkMode === 'dd-links') {
+      return customersEligibleForDD;
+    } else {
+      return filteredCustomers; // All customers for payment method
+    }
+  }, [bulkMode, customersEligibleForDD, filteredCustomers]);
 
   const handleBulkSendDDLink = async () => {
     const selectedCustomers = customersEligibleForDD.filter(c => selectedIds.has(c.id));
@@ -153,6 +201,46 @@ const Customers = () => {
 
     // Start processing from the first customer
     processNextCustomer(0);
+  };
+
+  const handleBulkUpdatePaymentMethod = async () => {
+    if (!bulkPaymentMethod || selectedIds.size === 0) {
+      toast.error('Please select a payment method and customers');
+      return;
+    }
+
+    const selectedCustomers = filteredCustomers.filter(c => selectedIds.has(c.id));
+    if (selectedCustomers.length === 0) {
+      toast.error('No customers selected');
+      return;
+    }
+
+    setIsUpdatingPaymentMethods(true);
+
+    try {
+      // Update each customer's preferred_payment_method
+      const updatePromises = selectedCustomers.map(customer =>
+        updateCustomer(customer.id, {
+          name: customer.name,
+          address: customer.address,
+          mobile_phone: customer.mobile_phone,
+          price: customer.price,
+          frequency_weeks: customer.frequency_weeks,
+          preferred_payment_method: bulkPaymentMethod,
+        })
+      );
+
+      await Promise.all(updatePromises);
+
+      toast.success(`Updated payment method to ${bulkPaymentMethod === 'gocardless' ? 'Direct Debit' : bulkPaymentMethod === 'cash' ? 'Cash' : 'Bank Transfer'} for ${selectedCustomers.length} customer${selectedCustomers.length !== 1 ? 's' : ''}`);
+      clearSelection();
+      refetchAll();
+    } catch (error) {
+      console.error('[Customers] Failed to update payment methods:', error);
+      toast.error('Failed to update payment methods. Please try again.');
+    } finally {
+      setIsUpdatingPaymentMethods(false);
+    }
   };
 
   const handleEditCustomer = (customer: Customer) => {
@@ -233,22 +321,43 @@ const Customers = () => {
               description="Add your first customer to get started"
               icon={<Users className="w-8 h-8 text-primary" />}
             />
-            <motion.button
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-              onClick={handleAddClick}
-              className={cn(
-                "w-full mt-6 h-14 rounded-xl",
-                "bg-primary text-primary-foreground",
-                "font-semibold text-base",
-                "flex items-center justify-center gap-2",
-                "hover:bg-primary/90 transition-colors"
-              )}
-            >
-              <Plus className="w-5 h-5" />
-              Add Your First Customer
-            </motion.button>
+            <div className="flex flex-col gap-3 mt-6">
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.2 }}
+                onClick={handleAddClick}
+                className={cn(
+                  "w-full h-14 rounded-xl",
+                  "bg-primary text-primary-foreground",
+                  "font-semibold text-base",
+                  "flex items-center justify-center gap-2",
+                  "hover:bg-primary/90 transition-colors"
+                )}
+              >
+                <Plus className="w-5 h-5" />
+                Add Your First Customer
+              </motion.button>
+              <motion.button
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3 }}
+                onClick={() => setIsImportModalOpen(true)}
+                className={cn(
+                  "w-full h-14 rounded-xl",
+                  "bg-background border-2 border-border",
+                  "font-semibold text-base text-foreground",
+                  "flex items-center justify-center gap-2",
+                  "hover:bg-muted/50 hover:border-primary/40",
+                  "hover:shadow-depth-2 hover:-translate-y-0.5",
+                  "transition-all duration-300 ease-out",
+                  "shadow-sm"
+                )}
+              >
+                <Upload className="w-5 h-5" />
+                Import from CSV
+              </motion.button>
+            </div>
           </motion.div>
         ) : (
           <>
@@ -283,7 +392,7 @@ const Customers = () => {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
-                className="flex gap-2 mb-4 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-hide"
+                className="flex flex-col sm:flex-row gap-2 mb-4"
               >
                 <button
                   onClick={() => setDDFilter('all')}
@@ -366,30 +475,43 @@ const Customers = () => {
                 <span className="font-medium">{filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}</span>
               </div>
               
-              {/* Action buttons - Stack on mobile for better touch targets */}
+              {/* Action buttons - Grid layout for stable positioning */}
               {!selectMode && filteredCustomers.length > 0 && (
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Import CSV button */}
+                  <Button
+                    variant="outline"
+                    size="default"
+                    onClick={() => setIsImportModalOpen(true)}
+                    className="h-11 text-primary border-primary/20 hover:bg-primary/10 touch-sm font-medium min-w-0"
+                  >
+                    <Upload className="w-4 h-4 mr-2 shrink-0" />
+                    <span className="truncate">Import CSV</span>
+                  </Button>
                   {/* Export to Xero button */}
                   <Button
                     variant="outline"
                     size="default"
                     onClick={handleExportToXero}
-                    className="flex-1 h-11 text-primary border-primary/20 hover:bg-primary/10 touch-sm font-medium"
+                    className="h-11 text-primary border-primary/20 hover:bg-primary/10 touch-sm font-medium min-w-0"
                   >
-                    <Download className="w-4 h-4 mr-2" />
-                    Export for Xero
+                    <Download className="w-4 h-4 mr-2 shrink-0" />
+                    <span className="truncate">Export for Xero</span>
                   </Button>
                   
-                  {/* Bulk DD Link action - only show if GoCardless connected and eligible customers exist */}
-                  {isGoCardlessConnected && customersEligibleForDD.length > 0 && (
+                  {/* Bulk Operations button - only show if GoCardless connected */}
+                  {isGoCardlessConnected && (
                     <Button
                       variant="outline"
                       size="default"
-                      onClick={() => setSelectMode(true)}
-                      className="flex-1 h-11 text-primary border-primary/20 hover:bg-primary/10 touch-sm font-medium"
+                      onClick={() => {
+                        setSelectMode(true);
+                        setBulkMode('dd-links');
+                      }}
+                      className="h-11 text-primary border-primary/20 hover:bg-primary/10 touch-sm font-medium min-w-0"
                     >
-                      <Send className="w-4 h-4 mr-2" />
-                      Bulk DD Link
+                      <Send className="w-4 h-4 mr-2 shrink-0" />
+                      <span className="truncate">Bulk Actions</span>
                     </Button>
                   )}
 
@@ -399,130 +521,271 @@ const Customers = () => {
                       variant="outline"
                       size="default"
                       onClick={() => setIsReferralModalOpen(true)}
-                      className="flex-1 h-11 text-primary border-primary/20 hover:bg-primary/10 touch-sm font-medium"
+                      className="h-11 text-primary border-primary/20 hover:bg-primary/10 touch-sm font-medium min-w-0"
                     >
-                      <Gift className="w-4 h-4 mr-2" />
-                      Referral SMS
+                      <Gift className="w-4 h-4 mr-2 shrink-0" />
+                      <span className="truncate">Referral SMS</span>
                     </Button>
                   )}
                 </div>
               )}
             </div>
 
-            {/* Select mode header */}
+            {/* Bulk Operations - Tabbed Interface */}
             <AnimatePresence>
               {selectMode && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  className="mb-4 p-3 bg-primary/10 rounded-xl border border-primary/20"
+                  className="mb-4 p-4 bg-card rounded-xl border border-border shadow-sm"
                 >
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-4">
                     <span className="text-sm font-medium text-foreground">
-                      {selectedIds.size} of {customersEligibleForDD.length} selected
+                      {selectedIds.size} of {eligibleCustomersForBulkMode.length} selected
                     </span>
                     <button
                       onClick={clearSelection}
-                      className="p-1 hover:bg-muted rounded-full transition-colors"
+                      className="p-1 hover:bg-muted rounded-full transition-colors touch-sm min-h-[32px] min-w-[32px] flex items-center justify-center"
+                      aria-label="Close bulk operations"
                     >
                       <X className="w-4 h-4 text-muted-foreground" />
                     </button>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={selectAllEligible}
-                      className="flex-1"
-                    >
-                      Select All ({customersEligibleForDD.length})
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={handleBulkSendDDLink}
-                      disabled={selectedIds.size === 0 || isSendingBulkDD}
-                      className="flex-1 bg-primary hover:bg-primary/90"
-                    >
-                      {isSendingBulkDD ? (
-                        <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+
+                  <Tabs value={bulkMode} onValueChange={(value) => {
+                    setBulkMode(value as 'dd-links' | 'payment-method');
+                    // Clear selection when switching tabs
+                    setSelectedIds(new Set());
+                    setBulkPaymentMethod(null);
+                  }}>
+                    <TabsList className="w-full grid grid-cols-2 h-12 mb-4">
+                      <TabsTrigger value="dd-links" className="flex items-center gap-2 text-sm">
+                        <Send className="w-4 h-4" />
+                        <span className="hidden sm:inline">Bulk DD Links</span>
+                        <span className="sm:hidden">DD Links</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="payment-method" className="flex items-center gap-2 text-sm">
+                        <CreditCard className="w-4 h-4" />
+                        <span className="hidden sm:inline">Payment Method</span>
+                        <span className="sm:hidden">Payment</span>
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="dd-links" className="mt-0 space-y-3">
+                      {customersEligibleForDD.length === 0 ? (
+                        <div className="text-center py-4 text-sm text-muted-foreground">
+                          No customers eligible for Direct Debit setup
+                        </div>
                       ) : (
-                        <Send className="w-4 h-4 mr-1.5" />
+                        <>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={selectAllEligible}
+                              className="flex-1 touch-sm min-h-[44px]"
+                            >
+                              Select All ({customersEligibleForDD.length})
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={handleBulkSendDDLink}
+                              disabled={selectedIds.size === 0 || isSendingBulkDD}
+                              className="flex-1 bg-primary hover:bg-primary/90 touch-sm min-h-[44px]"
+                            >
+                              {isSendingBulkDD ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                                  Sending...
+                                </>
+                              ) : (
+                                <>
+                                  <Send className="w-4 h-4 mr-1.5" />
+                                  Send DD Links
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Select customers without Direct Debit to send setup links
+                          </p>
+                        </>
                       )}
-                      Send DD Links
-                    </Button>
-                  </div>
+                    </TabsContent>
+
+                    <TabsContent value="payment-method" className="mt-0 space-y-4">
+                      {/* Payment Method Selection */}
+                      <div className="space-y-3">
+                        <p className="text-sm font-medium text-foreground">Select Payment Method</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setBulkPaymentMethod('cash')}
+                            disabled={isUpdatingPaymentMethods}
+                            className={cn(
+                              "flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all touch-sm min-h-[80px]",
+                              "hover:border-primary hover:bg-primary/5",
+                              "disabled:opacity-50 disabled:cursor-not-allowed",
+                              bulkPaymentMethod === 'cash'
+                                ? "border-primary bg-primary/10"
+                                : "border-border"
+                            )}
+                          >
+                            <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                              <Banknote className="w-6 h-6 text-green-600 dark:text-green-400" />
+                            </div>
+                            <span className="font-medium text-foreground text-sm">Cash</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setBulkPaymentMethod('transfer')}
+                            disabled={isUpdatingPaymentMethods}
+                            className={cn(
+                              "flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all touch-sm min-h-[80px]",
+                              "hover:border-primary hover:bg-primary/5",
+                              "disabled:opacity-50 disabled:cursor-not-allowed",
+                              bulkPaymentMethod === 'transfer'
+                                ? "border-primary bg-primary/10"
+                                : "border-border"
+                            )}
+                          >
+                            <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                              <CreditCard className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <span className="font-medium text-foreground text-sm">Bank Transfer</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setBulkPaymentMethod('gocardless')}
+                            disabled={isUpdatingPaymentMethods}
+                            className={cn(
+                              "flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all touch-sm min-h-[80px]",
+                              "hover:border-primary hover:bg-primary/5",
+                              "disabled:opacity-50 disabled:cursor-not-allowed",
+                              bulkPaymentMethod === 'gocardless'
+                                ? "border-primary bg-primary/10"
+                                : "border-border"
+                            )}
+                          >
+                            <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                              <CreditCard className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                            </div>
+                            <span className="font-medium text-foreground text-sm">Direct Debit</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={selectAllEligible}
+                          className="flex-1 touch-sm min-h-[44px]"
+                        >
+                          Select All ({filteredCustomers.length})
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleBulkUpdatePaymentMethod}
+                          disabled={selectedIds.size === 0 || !bulkPaymentMethod || isUpdatingPaymentMethods}
+                          className="flex-1 bg-primary hover:bg-primary/90 touch-sm min-h-[44px]"
+                        >
+                          {isUpdatingPaymentMethods ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                              Updating...
+                            </>
+                          ) : (
+                            <>
+                              <CreditCard className="w-4 h-4 mr-1.5" />
+                              Update Payment Method
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Select customers and choose their preferred payment method
+                      </p>
+                    </TabsContent>
+                  </Tabs>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Customer list */}
-            <div className="space-y-4">
-              {filteredCustomers.map((customer, index) => {
-                const isEligible = customersEligibleForDD.some(c => c.id === customer.id);
-                const isSelected = selectedIds.has(customer.id);
-                
-                return (
-                  <div key={customer.id} className="flex items-center gap-3 min-h-[88px] overflow-hidden">
-                    {/* Checkbox in select mode */}
-                    {selectMode && (
-                      <button
-                        onClick={() => isEligible && toggleSelectCustomer(customer.id)}
-                        disabled={!isEligible}
-                        className={cn(
-                          "flex-shrink-0 transition-colors",
-                          !isEligible && "opacity-30 cursor-not-allowed"
-                        )}
-                      >
-                        {isSelected ? (
-                          <CheckSquare className="w-6 h-6 text-primary" />
-                        ) : (
-                          <Square className="w-6 h-6 text-muted-foreground" />
-                        )}
-                      </button>
-                    )}
-                    <div className="flex-1 h-full min-w-0 overflow-hidden">
-                      <CustomerCard
-                        customer={customer}
-                        onClick={() => !selectMode && setSelectedCustomer(customer)}
-                        index={index}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Import Help CTA - only show when there are customers - Optimized for mobile */}
-            {!selectMode && filteredCustomers.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="mt-6 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border-2 border-blue-200 dark:border-blue-900/30"
+            {/* Customer list - Virtualized */}
+            <div 
+              ref={parentRef}
+              className="overflow-auto"
+              style={{ 
+                height: 'calc(100vh - 450px)',
+                minHeight: '400px',
+                maxHeight: '800px',
+              }}
+            >
+              <div
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
               >
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-                    <Upload className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-base font-semibold text-blue-900 dark:text-blue-100 mb-1.5">
-                      Moving from another app?
-                    </p>
-                    <p className="text-sm text-blue-700 dark:text-blue-300/80 mb-4">
-                      Don't type them in manually! We can import your customers for you.
-                    </p>
-                    <a
-                      href="mailto:aaron@solowipe.co.uk?subject=Help me import my customers"
-                      className="inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 hover:bg-blue-200 dark:hover:bg-blue-900/60 active:bg-blue-300 dark:active:bg-blue-900/80 rounded-lg transition-colors touch-sm w-full sm:w-auto"
+                {virtualizer.getVirtualItems().map((virtualRow) => {
+                  const customer = filteredCustomers[virtualRow.index];
+                  const isEligible = customersEligibleForDD.some(c => c.id === customer.id);
+                  const isSelected = selectedIds.has(customer.id);
+                  
+                  return (
+                    <div
+                      key={customer.id}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualRow.size}px`,
+                        transform: `translateY(${virtualRow.start}px)`,
+                      }}
                     >
-                      <Mail className="w-4 h-4" />
-                      Get Import Help
-                    </a>
-                  </div>
-                </div>
-              </motion.div>
-            )}
+                      <div className="flex items-center gap-3 min-h-[88px] overflow-hidden pr-1 pb-4">
+                        {/* Checkbox in select mode */}
+                        {selectMode && (
+                          <button
+                            onClick={() => {
+                              // For DD links mode, only allow eligible customers
+                              // For payment method mode, allow all customers
+                              if (bulkMode === 'dd-links' && !isEligible) return;
+                              toggleSelectCustomer(customer.id);
+                            }}
+                            disabled={bulkMode === 'dd-links' && !isEligible}
+                            className={cn(
+                              "flex-shrink-0 transition-colors touch-sm min-h-[44px] min-w-[44px] flex items-center justify-center",
+                              bulkMode === 'dd-links' && !isEligible && "opacity-30 cursor-not-allowed"
+                            )}
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-6 h-6 text-primary" />
+                            ) : (
+                              <Square className="w-6 h-6 text-muted-foreground" />
+                            )}
+                          </button>
+                        )}
+                        <div className="flex-1 h-full min-w-0 overflow-hidden">
+                          <CustomerCard
+                            customer={customer}
+                            onClick={() => !selectMode && setSelectedCustomer(customer)}
+                            index={virtualRow.index}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* Empty search state */}
             {filteredCustomers.length === 0 && searchQuery && (
@@ -598,6 +861,16 @@ const Customers = () => {
         onClose={() => setIsReferralModalOpen(false)}
         customers={customers}
         businessName={businessName || 'Your Business'}
+      />
+
+      {/* Import Customers Modal */}
+      <ImportCustomersModal
+        open={isImportModalOpen}
+        onOpenChange={setIsImportModalOpen}
+        onImportComplete={() => {
+          refetchAll();
+        }}
+        addCustomer={addCustomer}
       />
     </div>
   );

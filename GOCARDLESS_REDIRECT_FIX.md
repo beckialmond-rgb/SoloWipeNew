@@ -163,3 +163,7 @@ npx supabase functions deploy gocardless-callback
 - It provides user-friendly UI for success/error states
 - Direct proxying would bypass this necessary conversion layer
 
+
+
+
+

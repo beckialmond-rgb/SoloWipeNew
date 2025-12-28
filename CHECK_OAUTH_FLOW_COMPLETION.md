@@ -104,3 +104,7 @@ If you're redirected back but URL has no parameters:
 
 **The callback page needs parameters from GoCardless - without them, it can't work. Please verify you're completing the full OAuth flow.**
 
+
+
+
+

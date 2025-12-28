@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Link2, Link2Off, CheckCircle2, ExternalLink, Bug, RefreshCw, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
+import { Loader2, Link2, Link2Off, CheckCircle2, ExternalLink, Bug, RefreshCw, Wifi, WifiOff, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Profile } from '@/types/database';
 import { useAuth } from '@/hooks/useAuth';
+import { cn } from '@/lib/utils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,10 +45,13 @@ interface HealthCheckResult {
 
 export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps) {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
+  const [showTechnicalDetails, setShowTechnicalDetails] = useState(false);
   const [debugLogs, setDebugLogs] = useState<DebugLog[]>([]);
   const [healthCheck, setHealthCheck] = useState<HealthCheckResult>({
     status: 'unknown',
@@ -56,7 +61,11 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   const [tokenValid, setTokenValid] = useState<boolean | null>(null); // null = not checked, true = valid, false = expired
   const [isValidatingToken, setIsValidatingToken] = useState(false);
+  const [isVerifyingConnection, setIsVerifyingConnection] = useState(false);
+  const [connectionVerificationMessage, setConnectionVerificationMessage] = useState<string | null>(null);
   const connectRequestRef = useRef<AbortController | null>(null); // Track active connection request
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingStartTimeRef = useRef<number | null>(null);
 
   // Generate a unique session token
   const generateSessionToken = (): string => {
@@ -137,6 +146,97 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
     const debugEnabled = localStorage.getItem('gocardless_debug') === 'true';
     setShowDebug(debugEnabled);
   }, []);
+
+  // Auto-polling when connection_attempt=true is in URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(location.search);
+    const connectionAttempt = urlParams.get('connection_attempt') === 'true';
+
+    if (connectionAttempt) {
+      // Remove the query parameter from URL
+      const newSearch = new URLSearchParams(location.search);
+      newSearch.delete('connection_attempt');
+      const newUrl = location.pathname + (newSearch.toString() ? `?${newSearch.toString()}` : '');
+      navigate(newUrl, { replace: true });
+
+      // Start verification process
+      setIsVerifyingConnection(true);
+      setConnectionVerificationMessage('Verifying connection...');
+      pollingStartTimeRef.current = Date.now();
+
+      // Start polling immediately
+      const checkConnection = async () => {
+        // Refresh profile data
+        onRefresh();
+        
+        // Wait a bit for the refresh to complete, then check profile
+        // We'll check in the next effect cycle
+      };
+
+      // Run immediately
+      checkConnection();
+
+      // Then poll every 2 seconds
+      pollingIntervalRef.current = setInterval(checkConnection, 2000);
+
+      // Cleanup on unmount
+      return () => {
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        pollingStartTimeRef.current = null;
+      };
+    }
+  }, [location.search, navigate, onRefresh]);
+
+  // Check connection status when profile updates during verification
+  useEffect(() => {
+    if (isVerifyingConnection && pollingStartTimeRef.current) {
+      // Check if connection is now established
+      const hasToken = !!profile?.gocardless_access_token_encrypted;
+      const hasOrgId = !!profile?.gocardless_organisation_id;
+      const tokenValidityCheck = checkTokenValidity();
+      const isTokenExpired = tokenValidityCheck === false;
+      const isConnected = hasOrgId && hasToken && !isTokenExpired;
+
+      if (isConnected) {
+        // Connection successful!
+        setIsVerifyingConnection(false);
+        setConnectionVerificationMessage(null);
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current);
+          pollingIntervalRef.current = null;
+        }
+        pollingStartTimeRef.current = null;
+        toast({
+          title: '✅ GoCardless connected!',
+          description: 'Your account has been successfully connected.',
+        });
+        return;
+      }
+
+      // Check if we've exceeded the timeout (10 seconds)
+      if (pollingStartTimeRef.current) {
+        const elapsed = Date.now() - pollingStartTimeRef.current;
+        if (elapsed >= 10000) {
+          // Timeout reached
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          pollingStartTimeRef.current = null;
+          setConnectionVerificationMessage('Connection taking longer than usual, please refresh');
+          // Keep isVerifyingConnection true to show the message
+          toast({
+            title: 'Connection taking longer than usual',
+            description: 'Please refresh the page or click "Test" to check the connection status.',
+            variant: 'default',
+          });
+        }
+      }
+    }
+  }, [profile, isVerifyingConnection]);
 
   // Clear expired token flag when connection is refreshed or reconnected
   useEffect(() => {
@@ -813,7 +913,7 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
               )}
             </div>
             <div>
-              <h3 className="font-medium">GoCardless Direct Debit</h3>
+              <h3 className="font-semibold text-foreground">GoCardless Direct Debit</h3>
               <p className="text-sm text-muted-foreground">
                 {isConnected 
                   ? 'Connected - collect payments automatically'
@@ -831,29 +931,66 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
               variant="ghost"
               size="icon"
               onClick={toggleDebugMode}
-              className={showDebug ? 'text-primary' : 'text-muted-foreground'}
+              className={cn(
+                "touch-sm min-h-[44px] w-10 h-10",
+                showDebug ? 'text-primary' : 'text-muted-foreground'
+              )}
             >
               <Bug className="w-4 h-4" />
             </Button>
             {isConnected ? (
-              <Badge variant="secondary" className="bg-success/10 text-success">
+              <Badge variant="secondary" className="bg-success/10 text-success border-success/30">
                 Connected
               </Badge>
             ) : needsReconnect ? (
-              <Badge variant="secondary" className="bg-destructive/10 text-destructive">
+              <Badge variant="secondary" className="bg-destructive/10 text-destructive border-destructive/30">
                 Expired
               </Badge>
             ) : hasPartialConnection ? (
-              <Badge variant="secondary" className="bg-warning/10 text-warning">
+              <Badge variant="secondary" className="bg-warning/10 text-warning border-warning/30">
                 Reconnect Required
               </Badge>
             ) : null}
           </div>
         </div>
 
-        {/* Debug Panel */}
-        {showDebug && (
-          <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
+        {/* Connection Verification Status */}
+        {(isVerifyingConnection || connectionVerificationMessage) && (
+          <div className="mt-4 p-3 bg-primary/10 rounded-xl border border-primary/20">
+            <div className="flex items-center gap-2">
+              {isVerifyingConnection && (
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              )}
+              <span className={`text-sm font-medium ${isVerifyingConnection ? 'text-primary' : 'text-muted-foreground'}`}>
+                {connectionVerificationMessage || 'Verifying connection...'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Technical Details Toggle */}
+        <div className="mt-4">
+          <button
+            onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
+            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+          >
+            {showTechnicalDetails ? (
+              <>
+                <ChevronUp className="w-3 h-3" />
+                Hide Technical Details
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-3 h-3" />
+                Show Technical Details
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Debug Panel - Hidden by default, shown when showTechnicalDetails is true */}
+        {showTechnicalDetails && (
+          <div className="mt-2 p-4 bg-muted/50 rounded-xl border border-border shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-mono font-medium text-muted-foreground">Debug Info</span>
               <div className="flex gap-2">
@@ -947,7 +1084,7 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
         {isConnected || needsReconnect ? (
           <div className="mt-4 pt-4 border-t space-y-3">
             {needsReconnect && (
-              <div className="p-3 bg-destructive/10 dark:bg-destructive/20 rounded-lg border border-destructive/30 dark:border-destructive/40">
+              <div className="p-4 bg-destructive/10 dark:bg-destructive/20 rounded-xl border border-destructive/30 dark:border-destructive/40">
                 <div className="flex items-start gap-2">
                   <AlertTriangle className="w-5 h-5 text-destructive dark:text-destructive shrink-0 mt-0.5" />
                   <div className="flex-1">
@@ -965,7 +1102,7 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="mt-2 text-xs h-7"
+                      className="mt-2 text-xs touch-sm min-h-[44px]"
                       onClick={() => {
                         localStorage.removeItem('gocardless_token_expired');
                         localStorage.removeItem('gocardless_token_expired_time');
@@ -982,10 +1119,10 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
                 </div>
               </div>
             )}
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                <div>Organisation ID: {profile?.gocardless_organisation_id?.substring(0, 12)}...</div>
-                <p className="text-xs text-muted-foreground/70 mt-1">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="text-sm text-muted-foreground flex-1 min-w-0">
+                <div className="break-words">Organisation ID: {profile?.gocardless_organisation_id?.substring(0, 12)}...</div>
+                <p className="text-xs text-muted-foreground/70 mt-1 break-words">
                   Standard platform & processing fees apply to payout.
                 </p>
               </div>
@@ -994,6 +1131,7 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
                 size="sm"
                 onClick={needsReconnect ? handleConnect : () => setShowDisconnectConfirm(true)}
                 disabled={isDisconnecting || isConnecting}
+                className="touch-sm min-h-[44px] whitespace-nowrap flex-shrink-0"
               >
                 {isDisconnecting || isConnecting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -1017,7 +1155,7 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
               size="sm"
               onClick={checkWebhookHealth}
               disabled={isCheckingHealth}
-              className="w-full justify-start text-muted-foreground hover:text-foreground"
+              className="w-full justify-start text-muted-foreground hover:text-foreground touch-sm min-h-[44px]"
             >
               {getHealthIcon()}
               <span className="ml-2">
@@ -1039,7 +1177,7 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
               variant="outline"
               onClick={() => setShowDisconnectConfirm(true)}
               disabled={isDisconnecting}
-              className="w-full"
+              className="w-full touch-sm min-h-[44px]"
             >
               {isDisconnecting ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
@@ -1051,18 +1189,30 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
           </div>
         ) : (
           <div className="mt-4 space-y-3">
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p>✓ Set up Direct Debit mandates for customers</p>
-              <p>✓ Automatically collect payments on job completion</p>
-              <p>✓ Track payment status in real-time</p>
-            </div>
-            
-            {/* Show redirect URI info even when not in debug mode if there's a connection issue */}
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            {isVerifyingConnection ? (
+              <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <span className="text-sm text-primary font-medium">
+                    {connectionVerificationMessage || 'Verifying connection...'}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>✓ Set up Direct Debit mandates for customers</p>
+                  <p>✓ Automatically collect payments on job completion</p>
+                  <p>✓ Track payment status in real-time</p>
+                </div>
+                
+                {/* Show redirect URI info only in technical details */}
+                {showTechnicalDetails && (
+                  <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-xl">
               <p className="text-xs font-medium text-amber-900 dark:text-amber-200 mb-2">
                 ⚠️ Before connecting, register this redirect URI in GoCardless:
               </p>
-              <div className="bg-white dark:bg-gray-900 p-2 rounded border border-amber-300 dark:border-amber-700 mb-2">
+              <div className="bg-white dark:bg-gray-900 p-3 rounded-xl border border-amber-300 dark:border-amber-700 mb-2">
                 <p className="text-xs font-mono text-amber-900 dark:text-amber-100 break-all">
                   {(() => {
                     const currentHostname = window.location.hostname;
@@ -1100,7 +1250,7 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
                 
                 if (isIPAddress) {
                   return (
-                    <div className={`mt-2 p-2 border rounded ${isPrivateIP ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' : 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800'}`}>
+                    <div className={`mt-2 p-3 border rounded-xl ${isPrivateIP ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800' : 'bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800'}`}>
                       <p className={`text-xs font-semibold mb-1 ${isPrivateIP ? 'text-red-900 dark:text-red-200' : 'text-blue-900 dark:text-blue-200'}`}>
                         {isPrivateIP ? '🚫 Private IP Address Detected' : '📱 Mobile Device Detected'}
                       </p>
@@ -1145,22 +1295,23 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
               <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
                 ⚠️ The URL must match EXACTLY (including protocol, domain/IP, port, and path)
               </p>
-            </div>
+                </div>
+                )}
             
             <Button
               onClick={handleConnect}
-              disabled={isConnecting}
-              className="w-full"
+              disabled={isConnecting || isVerifyingConnection}
+              className="w-full touch-sm min-h-[44px]"
             >
-              {isConnecting ? (
+              {isConnecting || isVerifyingConnection ? (
                 <Loader2 className="w-4 h-4 animate-spin mr-2" />
               ) : (
                 <ExternalLink className="w-4 h-4 mr-2" />
               )}
-              Connect GoCardless
+              {isVerifyingConnection ? 'Verifying connection...' : 'Connect GoCardless'}
             </Button>
             {showDebug && (
-              <div className="mt-2 p-2 bg-muted/50 rounded text-xs space-y-2">
+              <div className="mt-2 p-4 bg-muted/50 rounded-xl border border-border text-xs space-y-2">
                 <div>
                   <p className="font-medium mb-1">Redirect URI that will be sent:</p>
                   <p className="font-mono break-all text-foreground bg-background p-2 rounded border border-border">
@@ -1184,6 +1335,8 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
                   </ol>
                 </div>
               </div>
+            )}
+              </>
             )}
           </div>
         )}

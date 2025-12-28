@@ -55,13 +55,16 @@ export function useOfflineSync() {
               frequency_weeks: number | null;
               price: number;
               gocardless_id?: string;
+              gocardless_mandate_status?: string | null;
               scheduled_date?: string;
             };
           };
 
           const now = new Date();
           const completedAt = now.toISOString();
-          const isGoCardless = !!customerData.gocardless_id;
+          // Check if customer has ACTIVE Direct Debit mandate (not just gocardless_id)
+          const hasActiveMandate = customerData.gocardless_mandate_status === 'active' && !!customerData.gocardless_id;
+          const isGoCardless = hasActiveMandate;
           const amountCollected = customAmount ?? customerData.price;
 
           // Update current job
@@ -71,15 +74,26 @@ export function useOfflineSync() {
               status: 'completed',
               completed_at: completedAt,
               amount_collected: amountCollected,
-              payment_status: isGoCardless ? 'paid' : 'unpaid',
+              payment_status: isGoCardless ? 'processing' : 'unpaid',
               payment_method: isGoCardless ? 'gocardless' : null,
-              payment_date: isGoCardless ? completedAt : null,
+              payment_date: null, // Only set when paid_out (via webhook)
               photo_url: photoUrl || null,
             })
             .eq('id', jobId)
             .eq('status', 'pending');
 
           if (updateError) throw updateError;
+
+          // Clean up assignment - job is completed, assignment no longer needed
+          try {
+            await supabase
+              .from('job_assignments')
+              .delete()
+              .eq('job_id', jobId);
+          } catch (assignmentError) {
+            // Non-critical - log but don't fail job completion
+            console.warn('[Offline Sync] Failed to cleanup assignment:', assignmentError);
+          }
 
           // Check for frequency - if missing or null, treat as 'One-off' and don't reschedule
           const frequencyWeeks = customerData.frequency_weeks;

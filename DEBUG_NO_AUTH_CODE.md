@@ -189,3 +189,7 @@ If you need more help, collect this information:
 5. **Edge Function logs:**
    - From `gocardless-connect` function
 
+
+
+
+

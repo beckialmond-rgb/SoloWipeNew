@@ -118,3 +118,7 @@ If it's still not working after verifying exact match:
    - Are you completing the full authorization in GoCardless?
    - Or are you being redirected back before completing?
 
+
+
+
+

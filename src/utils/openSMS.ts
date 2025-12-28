@@ -17,15 +17,66 @@ import { validateAndCleanPhoneNumber } from '@/lib/validations';
  * @param phoneNumber - The phone number to send SMS to
  * @param message - The message to send
  * @param userId - Optional user ID for usage tracking
+ * @param jobId - Optional job ID for SMS history tracking
  */
 export function openSMSApp(
   phoneNumber: string | null | undefined, 
   message: string,
-  userId?: string
+  userId?: string,
+  jobId?: string
 ): void {
   if (!phoneNumber) {
     console.error('[openSMSApp] No phone number provided');
     return;
+  }
+
+  // Check SMS history to prevent double-texting (if jobId is provided)
+  if (jobId) {
+    const smsHistory = getSMSHistory();
+    const lastSMS = smsHistory[jobId];
+    
+    if (lastSMS) {
+      const now = Date.now();
+      const timeSinceLastSMS = now - lastSMS;
+      const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
+      
+      if (timeSinceLastSMS < TWELVE_HOURS_MS) {
+        const hoursAgo = Math.floor(timeSinceLastSMS / (60 * 60 * 1000));
+        const minutesAgo = Math.floor((timeSinceLastSMS % (60 * 60 * 1000)) / (60 * 1000));
+        const timeAgo = hoursAgo > 0 
+          ? `${hoursAgo} hour${hoursAgo !== 1 ? 's' : ''} ago`
+          : `${minutesAgo} minute${minutesAgo !== 1 ? 's' : ''} ago`;
+        
+        const shouldProceed = window.confirm(
+          `You already messaged this customer ${timeAgo}. Send anyway?`
+        );
+        
+        if (!shouldProceed) {
+          console.log('[openSMSApp] SMS cancelled - already sent recently');
+          return;
+        }
+      }
+    }
+  }
+
+  // Check if current time is within Do Not Disturb hours (8 PM - 8 AM)
+  const now = new Date();
+  const hour = now.getHours();
+  const DND_START = 20; // 8 PM
+  const DND_END = 8;    // 8 AM
+  
+  const isInDND = hour >= DND_START || hour < DND_END;
+  
+  if (isInDND) {
+    const timeString = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const shouldProceed = window.confirm(
+      `It is late (Time: ${timeString}). Are you sure you want to send this SMS now?`
+    );
+    
+    if (!shouldProceed) {
+      console.log('[openSMSApp] SMS cancelled due to DND hours');
+      return;
+    }
   }
 
   // Track SMS send if userId is provided (non-blocking)
@@ -51,9 +102,62 @@ export function openSMSApp(
     const separator = isIOS ? '&' : '?';
     const encodedMessage = encodeURIComponent(String(message));
     const smsLink = `sms:${phone}${separator}body=${encodedMessage}`;
+    
+    // Record SMS in history if jobId is provided
+    if (jobId) {
+      recordSMSSent(jobId);
+    }
+    
     window.open(smsLink, '_blank');
   } catch (error) {
     console.error('[openSMSApp] Error opening SMS:', error);
+  }
+}
+
+/**
+ * Get SMS history from localStorage
+ * Returns a map of jobId -> timestamp
+ */
+function getSMSHistory(): Record<string, number> {
+  try {
+    const stored = localStorage.getItem('sms_history');
+    if (stored) {
+      const history = JSON.parse(stored);
+      // Clean up old entries (older than 12 hours)
+      const now = Date.now();
+      const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+      const cleaned: Record<string, number> = {};
+      
+      for (const [jobId, timestamp] of Object.entries(history)) {
+        if (typeof timestamp === 'number' && (now - timestamp) < TWELVE_HOURS_MS) {
+          cleaned[jobId] = timestamp;
+        }
+      }
+      
+      // Update localStorage with cleaned history
+      if (Object.keys(cleaned).length !== Object.keys(history).length) {
+        localStorage.setItem('sms_history', JSON.stringify(cleaned));
+      }
+      
+      return cleaned;
+    }
+  } catch (error) {
+    console.error('[getSMSHistory] Error reading SMS history:', error);
+  }
+  return {};
+}
+
+/**
+ * Record that an SMS was sent for a specific job
+ * @param jobId - The job ID to record
+ */
+function recordSMSSent(jobId: string): void {
+  try {
+    const history = getSMSHistory();
+    history[jobId] = Date.now();
+    localStorage.setItem('sms_history', JSON.stringify(history));
+  } catch (error) {
+    console.error('[recordSMSSent] Error recording SMS:', error);
   }
 }
 

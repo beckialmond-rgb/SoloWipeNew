@@ -20,3 +20,7 @@ The important thing is to diagnose the GoCardless redirect URI issue.
 
 **Please check the redirect URI being sent** - see `URGENT_FIX_STEPS.md` for the diagnostic script.
 
+
+
+
+

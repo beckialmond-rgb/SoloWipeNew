@@ -154,3 +154,7 @@ https://solowipe.netlify.app/gocardless-callback
 
 This ensures you're using the exact URL the app is sending!
 
+
+
+
+

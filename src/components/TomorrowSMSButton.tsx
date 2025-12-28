@@ -14,6 +14,7 @@ interface TomorrowSMSButtonProps {
   className?: string;
   onClick?: () => void;
   businessName?: string;
+  jobId?: string; // Optional job ID for SMS history tracking
 }
 
 export function TomorrowSMSButton({ 
@@ -27,6 +28,7 @@ export function TomorrowSMSButton({
   className,
   onClick,
   businessName = 'SoloWipe',
+  jobId,
 }: TomorrowSMSButtonProps) {
   const { showTemplatePicker } = useSMSTemplateContext();
 
@@ -57,7 +59,7 @@ export function TomorrowSMSButton({
     });
 
     showTemplatePicker('tomorrow_sms_button', context, (message) => {
-      openSMSApp(phoneNumber, message);
+      openSMSApp(phoneNumber, message, undefined, jobId);
     });
   };
 

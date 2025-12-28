@@ -290,3 +290,7 @@ This is the same for all environments because Supabase handles the redirect.
 - Secure configuration
 - Mobile compatible
 
+
+
+
+

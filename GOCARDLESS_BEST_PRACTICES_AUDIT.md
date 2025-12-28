@@ -368,3 +368,7 @@ The integration is **production-ready** and follows **GoCardless official recomm
 **Last Updated:** $(date)  
 **Version:** 2.0.0
 
+
+
+
+

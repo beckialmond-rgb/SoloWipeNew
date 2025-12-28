@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { User, MapPin, Phone, PoundSterling, Calendar, Repeat, FileText } from 'lucide-react';
+import { User, MapPin, Phone, PoundSterling, Calendar, Repeat, FileText, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Drawer,
@@ -23,6 +23,7 @@ interface AddCustomerModalProps {
     price: number;
     frequency_weeks: number;
     first_clean_date: string;
+    preferred_payment_method?: 'gocardless' | 'cash' | 'transfer' | null;
     notes?: string;
   }) => Promise<unknown>;
 }
@@ -34,6 +35,7 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
   const [price, setPrice] = useState('20');
   const [frequencyWeeks, setFrequencyWeeks] = useState('4');
   const [firstCleanDate, setFirstCleanDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [preferredPaymentMethod, setPreferredPaymentMethod] = useState<'gocardless' | 'cash' | 'transfer' | null>(null);
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -73,6 +75,7 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
         price: validation.data.price,
         frequency_weeks: validation.data.frequency_weeks,
         first_clean_date: firstCleanDate,
+        preferred_payment_method: preferredPaymentMethod,
         notes: validation.data.notes || undefined,
       });
       // Reset form
@@ -82,6 +85,7 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
       setPrice('20');
       setFrequencyWeeks('4');
       setFirstCleanDate(format(new Date(), 'yyyy-MM-dd'));
+      setPreferredPaymentMethod(null);
       setNotes('');
       setErrors({});
       onClose();
@@ -227,6 +231,30 @@ export function AddCustomerModal({ isOpen, onClose, onSubmit }: AddCustomerModal
                 onChange={(e) => setFirstCleanDate(e.target.value)}
                 className={getInputClassName(false)}
               />
+            </FormField>
+
+            {/* Preferred Payment Method */}
+            <FormField 
+              label="Preferred Payment Method" 
+              icon={<CreditCard className="w-4 h-4" />}
+            >
+              <select
+                id="add-cust-payment-method"
+                name="customer_payment_method"
+                value={preferredPaymentMethod || ''}
+                onChange={(e) => setPreferredPaymentMethod(e.target.value === '' ? null : e.target.value as 'gocardless' | 'cash' | 'transfer')}
+                className={getInputClassName(false)}
+              >
+                <option value="">Select preferred method (optional)</option>
+                <option value="gocardless">Direct Debit (Recommended)</option>
+                <option value="transfer">Bank Transfer</option>
+                <option value="cash">Cash</option>
+              </select>
+              {preferredPaymentMethod === 'gocardless' && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Note: Direct Debit requires setting up a mandate separately
+                </p>
+              )}
             </FormField>
 
             {/* Notes */}

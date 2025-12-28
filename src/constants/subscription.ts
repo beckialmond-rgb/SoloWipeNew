@@ -4,7 +4,7 @@ export const SUBSCRIPTION_TIERS = {
     price_id: "price_1SdstJ4hy5D3Fg1bnepMLpw6",
     product_id: "prod_Tb5gxc2at1xv9q",
     name: "Monthly",
-    price: 15,
+    price: 25,
     currency: "£",
     interval: "month",
   },
@@ -12,10 +12,10 @@ export const SUBSCRIPTION_TIERS = {
     price_id: "price_1SdstJ4hy5D3Fg1bliu55p34",
     product_id: "prod_Tb5gDMeCzU9gNN",
     name: "Annual",
-    price: 150,
+    price: 250,
     currency: "£",
     interval: "year",
-    savings: 30,
+    savings: 50,
   },
 } as const;
 

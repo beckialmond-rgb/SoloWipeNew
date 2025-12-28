@@ -20,7 +20,7 @@ const DialogOverlay = React.forwardRef<
     <DialogPrimitive.Overlay
       ref={ref}
       className={cn(
-        "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        "fixed inset-0 z-[90] bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className,
       )}
       {...props}
@@ -31,16 +31,88 @@ const DialogOverlay = React.forwardRef<
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(function DialogContent({ className, children, ...props }, ref) {
+>(function DialogContent({ className, children, style: propsStyle, ...props }, ref) {
+  const contentRef = React.useRef<HTMLElement | null>(null);
+
+  // Get background color helper
+  const getBgColor = () => {
+    if (typeof window === 'undefined') return '#f5f7fa';
+    return document.documentElement.classList.contains('dark') ? '#131720' : '#f5f7fa';
+  };
+
+  // Force visibility after mount
+  React.useEffect(() => {
+    const element = contentRef.current;
+    if (!element) return;
+
+    const bgColor = getBgColor();
+    
+    // Force styles immediately
+    const forceStyles = () => {
+      element.style.setProperty('opacity', '1', 'important');
+      element.style.setProperty('visibility', 'visible', 'important');
+      element.style.setProperty('display', 'grid', 'important');
+      element.style.setProperty('background-color', bgColor, 'important');
+      element.style.setProperty('background', bgColor, 'important');
+    };
+
+    forceStyles();
+
+    // Watch for state changes
+    const observer = new MutationObserver(() => {
+      if (element.getAttribute('data-state') === 'open') {
+        forceStyles();
+      }
+    });
+
+    observer.observe(element, {
+      attributes: true,
+      attributeFilter: ['data-state'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  const setRef = React.useCallback((node: HTMLElement | null) => {
+    contentRef.current = node;
+    
+    // Apply styles IMMEDIATELY when ref is set (synchronously, no delay)
+    if (node) {
+      const bgColor = getBgColor();
+      // Apply synchronously - don't wait for animation frame
+      node.style.setProperty('opacity', '1', 'important');
+      node.style.setProperty('visibility', 'visible', 'important');
+      node.style.setProperty('display', 'grid', 'important');
+      node.style.setProperty('background-color', bgColor, 'important');
+      node.style.setProperty('background', bgColor, 'important');
+    }
+    
+    if (typeof ref === 'function') {
+      ref(node);
+    } else if (ref) {
+      ref.current = node;
+    }
+  }, [ref]);
+
+  const bgColor = getBgColor();
+
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
-        ref={ref}
+        ref={setRef}
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg max-h-[85vh] translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
+          "fixed left-[50%] top-[50%] z-[91] grid w-full max-w-lg max-h-[85vh] translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
           className,
         )}
+        style={{
+          ...propsStyle,
+          opacity: 1,
+          visibility: 'visible',
+          display: 'grid',
+          backgroundColor: bgColor,
+          background: bgColor,
+        }}
         {...props}
       >
         {children}

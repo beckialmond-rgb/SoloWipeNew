@@ -32,7 +32,7 @@ export function OnMyWayButton({ job, businessName, className }: OnMyWayButtonPro
     });
 
     showTemplatePicker('on_my_way', context, (message) => {
-      openSMSApp(job.customer.mobile_phone!, message);
+      openSMSApp(job.customer.mobile_phone!, message, undefined, job.id);
     });
   };
 

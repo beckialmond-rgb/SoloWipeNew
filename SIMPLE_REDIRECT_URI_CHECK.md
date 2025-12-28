@@ -28,3 +28,7 @@ Update the redirect URI in GoCardless Dashboard to match exactly what's shown in
 
 **That's it! The Optimizely warnings are unrelated - ignore them.**
 
+
+
+
+

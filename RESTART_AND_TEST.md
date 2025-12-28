@@ -77,3 +77,7 @@ npm run dev
 2. Console errors (copy/paste from browser console)
 3. Terminal output from `npm run dev`
 
+
+
+
+

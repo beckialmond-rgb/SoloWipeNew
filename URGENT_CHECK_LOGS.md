@@ -45,3 +45,7 @@ The redirect URI from logs MUST match EXACTLY what's registered:
 
 **With this information, we can determine why GoCardless is redirecting without parameters.**
 
+
+
+
+

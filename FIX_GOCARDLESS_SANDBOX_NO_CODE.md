@@ -257,3 +257,7 @@ https://solowipe.co.uk/gocardless-callback?error=redirect_uri_mismatch
    - Confirm using sandbox Client ID
    - Confirm redirect URI in sandbox dashboard
 
+
+
+
+

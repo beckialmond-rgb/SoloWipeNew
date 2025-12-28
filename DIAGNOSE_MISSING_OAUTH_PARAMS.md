@@ -117,3 +117,7 @@ Please share:
 
 **The fact that you're being redirected but without parameters suggests the redirect URI is registered, but something is wrong with how GoCardless is processing the OAuth response.**
 
+
+
+
+

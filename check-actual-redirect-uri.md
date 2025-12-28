@@ -31,3 +31,7 @@ console.log('=== END CHECK ===');
 - [ ] Check for protocol differences (http vs https)
 - [ ] Check for domain differences (www vs non-www)
 
+
+
+
+

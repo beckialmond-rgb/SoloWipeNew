@@ -157,3 +157,7 @@ gocardless-callback/index.ts
 5. Invalid authorization code (should show clear error)
 6. Network errors during token exchange (should retry gracefully)
 
+
+
+
+

@@ -10,7 +10,7 @@ export const Layout = () => {
 
   return (
     <div className="min-h-screen bg-background font-sans antialiased">
-      <main className={shouldShowNav ? "pb-20" : ""}>
+      <main className={`bg-background ${shouldShowNav ? "pb-20" : ""}`}>
         <Outlet />
       </main>
       

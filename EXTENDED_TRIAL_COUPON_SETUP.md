@@ -223,3 +223,7 @@ Extended trial coupons provide flexibility for:
 
 The system automatically detects and applies extended trials when coupon metadata includes `trial_days`, making it easy to manage different trial periods without code changes.
 
+
+
+
+

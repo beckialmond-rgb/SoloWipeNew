@@ -5,6 +5,10 @@ import { AnimatePresence, motion, Reorder } from 'framer-motion';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { JobCard } from '@/components/JobCard';
+import { JobAssignmentPicker } from '@/components/JobAssignmentPicker';
+import { JobAssignmentAvatar } from '@/components/JobAssignmentAvatar';
+import { useRouteSorting } from '@/hooks/useRouteSorting';
+import { JobWithCustomerAndAssignment } from '@/types/database';
 import { CompletedJobItem } from '@/components/CompletedJobItem';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
@@ -12,11 +16,14 @@ import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
 import { TextCustomerButton } from '@/components/TextCustomerButton';
 import { TomorrowSMSButton } from '@/components/TomorrowSMSButton';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
+import { BulkRescheduleModal } from '@/components/BulkRescheduleModal';
 import { JobNotesModal } from '@/components/JobNotesModal';
 import { OnMyWayButton } from '@/components/OnMyWayButton';
 import { QuickAddCustomerModal } from '@/components/QuickAddCustomerModal';
 import { WelcomeFlow } from '@/components/WelcomeFlow';
 import { WelcomeTour, useWelcomeTour } from '@/components/WelcomeTour';
+import { SetupChecklist } from '@/components/SetupChecklist';
+import { HelperWelcomeCelebration } from '@/components/HelperWelcomeCelebration';
 import { AskForReviewButton } from '@/components/AskForReviewButton';
 import { PriceAdjustModal } from '@/components/PriceAdjustModal';
 import { PhotoCaptureModal } from '@/components/PhotoCaptureModal';
@@ -35,7 +42,7 @@ import { useHaptics } from '@/hooks/useHaptics';
 import { useTimezone } from '@/hooks/useTimezone';
 import { syncStatus } from '@/lib/offlineStorage';
 import { cn } from '@/lib/utils';
-import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, ChevronUp, UserPlus, Navigation, X, Gift, CreditCard, AlertTriangle, MapPin, MessageSquare } from 'lucide-react';
+import { Sparkles, SkipForward, CheckCircle, PoundSterling, Clock, RefreshCw, ChevronDown, ChevronUp, UserPlus, Navigation, X, Gift, CreditCard, AlertTriangle, MapPin, MessageSquare, CheckSquare, Square, Calendar, UserCheck } from 'lucide-react';
 import { useSMSTemplateContext } from '@/contexts/SMSTemplateContext';
 import { prepareSMSContext, openSMSApp } from '@/utils/openSMS';
 import { JobWithCustomer } from '@/types/database';
@@ -57,7 +64,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 
 const Index = () => {
   const navigate = useNavigate();
-  const { pendingJobs, upcomingJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading, markJobPaid, profile, isMarkingPaid } = useSupabaseData();
+  const { pendingJobs, upcomingJobs, assignedJobs, completedToday, todayEarnings, customers, businessName, completeJob, rescheduleJob, skipJob, updateJobNotes, undoCompleteJob, undoSkipJob, addCustomer, refetchAll, isLoading, markJobPaid, profile, isMarkingPaid, helpers, helpersLoading, assignJob, assignMultipleUsers, unassignJob, createHelper, removeHelper, teamMemberships } = useSupabaseData();
   const { user } = useAuth();
   const { subscribed, status } = useSubscription();
   const { data: usageCounters } = useUsageCounters();
@@ -98,7 +105,7 @@ const Index = () => {
     );
   }, [pendingJobs, upcomingJobs, tomorrowDate]);
   
-  const [localJobs, setLocalJobs] = useState<JobWithCustomer[]>([]);
+  const [localJobs, setLocalJobs] = useState<JobWithCustomerAndAssignment[]>([]);
   // Track previous job IDs to prevent unnecessary updates
   const previousJobIdsRef = useRef<string>('');
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
@@ -106,9 +113,49 @@ const Index = () => {
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
   const [skipConfirmOpen, setSkipConfirmOpen] = useState(false);
   const [jobToSkip, setJobToSkip] = useState<JobWithCustomer | null>(null);
-  const [skipAllConfirmOpen, setSkipAllConfirmOpen] = useState(false);
-  const [isSkippingAll, setIsSkippingAll] = useState(false);
   const [notesJob, setNotesJob] = useState<JobWithCustomer | null>(null);
+  const [assignmentPickerOpen, setAssignmentPickerOpen] = useState(false);
+  const [selectedJobForAssignment, setSelectedJobForAssignment] = useState<JobWithCustomerAndAssignment | null>(null);
+  
+  // Determine if user is Owner or Helper
+  // Owner: has customers
+  // Helper: has assigned jobs OR is in team_members (even if no current assignments)
+  // This prevents helper status from being lost when all jobs are completed
+  const isOwner = customers.length > 0;
+  const isHelper = assignedJobs.length > 0 || (teamMemberships?.length ?? 0) > 0;
+  
+  // For Helpers: use route sorting
+  const { sortedJobs: sortedAssignedJobs } = useRouteSorting(assignedJobs);
+  
+  // Assignment handlers
+  const handleAssignClick = (job: JobWithCustomerAndAssignment) => {
+    if (!job) {
+      console.error('[Index] handleAssignClick called with null job');
+      return;
+    }
+    // Ensure job has all required assignment properties
+    const jobWithAssignments: JobWithCustomerAndAssignment = {
+      ...job,
+      assignment: 'assignment' in job ? job.assignment : undefined,
+      assignments: 'assignments' in job ? job.assignments : undefined
+    };
+    console.log('[Index] Opening assignment picker for job:', jobWithAssignments.id, 'with assignments:', jobWithAssignments.assignments?.length || 0);
+    // Set job first, then open modal synchronously
+    setSelectedJobForAssignment(jobWithAssignments);
+    setAssignmentPickerOpen(true);
+  };
+  
+  const handleAssign = async (jobId: string, userId: string) => {
+    await assignJob(jobId, userId);
+  };
+  
+  const handleAssignMultiple = async (jobId: string, userIds: string[]) => {
+    await assignMultipleUsers(jobId, userIds);
+  };
+  
+  const handleUnassign = async (jobId: string, userId?: string) => {
+    await unassignJob(jobId, userId);
+  };
   const [completedOpen, setCompletedOpen] = useState(true);
   const [smsQueue, setSmsQueue] = useState<{ index: number; jobIds: string[] } | null>(null);
   const [showNextSMS, setShowNextSMS] = useState(false);
@@ -141,6 +188,25 @@ const Index = () => {
     return localStorage.getItem('solowipe_welcome_dismissed') === 'true';
   });
   const [showBusinessNameModal, setShowBusinessNameModal] = useState(false);
+  const [bulkRescheduleMode, setBulkRescheduleMode] = useState(false);
+  const [bulkRescheduleModeForUpcoming, setBulkRescheduleModeForUpcoming] = useState(false);
+  const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
+  const [bulkRescheduleModalOpen, setBulkRescheduleModalOpen] = useState(false);
+  const [bulkCompleteConfirmOpen, setBulkCompleteConfirmOpen] = useState(false);
+  const [isBulkCompleting, setIsBulkCompleting] = useState(false);
+  const [jobFilter, setJobFilter] = useState<'all' | 'today' | 'overdue' | 'unpaid'>('all');
+  const [showSetupChecklist, setShowSetupChecklist] = useState(false);
+  
+  // Show setup checklist for new users after welcome flow
+  useEffect(() => {
+    const dismissed = localStorage.getItem('solowipe_setup_checklist_dismissed') === 'true';
+    const welcomeDismissed = localStorage.getItem('solowipe_welcome_dismissed') === 'true';
+    const hasCustomers = customers.length > 0;
+    
+    if (!dismissed && welcomeDismissed && !hasCustomers && !showWelcome) {
+      setShowSetupChecklist(true);
+    }
+  }, [customers.length, showWelcome]);
   
   // Check if user needs to provide business name after OAuth sign-up
   useEffect(() => {
@@ -235,7 +301,7 @@ const Index = () => {
     showTemplatePicker('tomorrow_sms_button', context, (message) => {
       // Mark as sent in queue (but don't mark individual receipts)
       setShowNextSMS(false);
-      openSMSApp(job.customer.mobile_phone!, message, user?.id);
+      openSMSApp(job.customer.mobile_phone!, message, user?.id, job.id);
     });
   };
 
@@ -345,6 +411,24 @@ const Index = () => {
       }
     }
 
+    // Format payment method for receipt - use actual, fallback to preferred
+    const formatPaymentMethod = (method: string | null, preferredMethod: string | null): string => {
+      // Actual payment method set - use it
+      if (method) {
+        if (method === 'gocardless') return 'Direct Debit';
+        if (method === 'cash') return 'Cash';
+        if (method === 'transfer') return 'Bank Transfer';
+        return method.charAt(0).toUpperCase() + method.slice(1);
+      }
+      
+      // No actual method - try preferred as fallback
+      if (preferredMethod === 'gocardless') return 'Direct Debit (Expected)';
+      if (preferredMethod === 'cash') return 'Cash (Expected)';
+      if (preferredMethod === 'transfer') return 'Bank Transfer (Expected)';
+      
+      return 'Not specified';
+    };
+
     const context = prepareSMSContext({
       customerName,
       customerAddress,
@@ -353,6 +437,7 @@ const Index = () => {
       completedDate: completedDateFormatted,
       photoUrl: photoUrl,
       businessName,
+      paymentMethod: formatPaymentMethod(job.payment_method, job.customer?.preferred_payment_method || null),
     });
 
     showTemplatePicker('receipt_sms', context, (message) => {
@@ -363,7 +448,7 @@ const Index = () => {
       localStorage.setItem('solowipe_sent_receipts', JSON.stringify([...newSentReceipts]));
 
       setShowNextReceipt(false);
-              openSMSApp(job.customer.mobile_phone!, message, user?.id);
+              openSMSApp(job.customer.mobile_phone!, message, user?.id, job.id);
     });
   };
 
@@ -451,14 +536,14 @@ const Index = () => {
   });
 
   // Apply saved order to jobs
-  const applyPersistedOrder = useCallback((jobs: JobWithCustomer[]): { jobs: JobWithCustomer[], wasRestored: boolean } => {
+  const applyPersistedOrder = useCallback((jobs: JobWithCustomerAndAssignment[]): { jobs: JobWithCustomerAndAssignment[], wasRestored: boolean } => {
     const savedOrder = localStorage.getItem(todayKey);
     if (!savedOrder) return { jobs, wasRestored: false };
     
     try {
       const orderedIds: string[] = JSON.parse(savedOrder);
       const jobMap = new Map(jobs.map(job => [job.id, job]));
-      const orderedJobs: JobWithCustomer[] = [];
+      const orderedJobs: JobWithCustomerAndAssignment[] = [];
       
       // Add jobs in saved order
       for (const id of orderedIds) {
@@ -485,13 +570,13 @@ const Index = () => {
   }, [todayKey]);
 
   // Save order to localStorage
-  const saveJobOrder = useCallback((jobs: JobWithCustomer[]) => {
+  const saveJobOrder = useCallback((jobs: JobWithCustomerAndAssignment[]) => {
     const orderIds = jobs.map(job => job.id);
     localStorage.setItem(todayKey, JSON.stringify(orderIds));
   }, [todayKey]);
 
   // Handle reorder with persistence and feedback
-  const handleReorder = useCallback((newOrder: JobWithCustomer[]) => {
+  const handleReorder = useCallback((newOrder: JobWithCustomerAndAssignment[]) => {
     setLocalJobs(newOrder);
     saveJobOrder(newOrder);
     toast({
@@ -501,11 +586,16 @@ const Index = () => {
     });
   }, [saveJobOrder, toast]);
 
-  // Sync local jobs with fetched pending jobs, applying saved order
+  // Sync local jobs with fetched jobs (pendingJobs for Owners, assignedJobs for Helpers)
   useEffect(() => {
-    // Create a stable string representation of current pending jobs
-    const newJobIds = pendingJobs.length > 0 
-      ? pendingJobs.map(j => j.id).sort().join(',')
+    // Determine source jobs based on role
+    const sourceJobs = isHelper && !isOwner 
+      ? sortedAssignedJobs  // Helper view: use route-sorted assigned jobs
+      : pendingJobs;         // Owner view: use pending jobs
+    
+    // Create a stable string representation of current jobs
+    const newJobIds = sourceJobs.length > 0 
+      ? sourceJobs.map(j => j.id).sort().join(',')
       : '';
     
     // If job IDs haven't changed, don't update (prevents infinite loop)
@@ -516,14 +606,20 @@ const Index = () => {
     // Update ref with new job IDs
     previousJobIdsRef.current = newJobIds;
     
-    // Apply persisted order
-    const { jobs: orderedJobs, wasRestored } = applyPersistedOrder(pendingJobs);
+    // For Helpers: use route-sorted jobs directly (no persisted order needed)
+    if (isHelper && !isOwner) {
+      setLocalJobs(sourceJobs);
+      return;
+    }
+    
+    // For Owners: apply persisted order
+    const { jobs: orderedJobs, wasRestored } = applyPersistedOrder(sourceJobs);
     
     // Update local jobs state only if it actually changed
     setLocalJobs(orderedJobs);
     
     // Show toast only once when order is restored
-    if (wasRestored && !orderRestored && pendingJobs.length > 0) {
+    if (wasRestored && !orderRestored && sourceJobs.length > 0) {
       setOrderRestored(true);
       const restoredKey = `solowipe_order_restored_${format(new Date(), 'yyyy-MM-dd')}`;
       localStorage.setItem(restoredKey, 'true');
@@ -533,7 +629,7 @@ const Index = () => {
         duration: 2000,
       });
     }
-  }, [pendingJobs, applyPersistedOrder, orderRestored, toast]);
+  }, [isHelper, isOwner, sortedAssignedJobs, pendingJobs, applyPersistedOrder, orderRestored, toast]);
 
   // Show welcome flow for new users
   useEffect(() => {
@@ -541,6 +637,56 @@ const Index = () => {
       setShowWelcome(true);
     }
   }, [isLoading, customers.length, welcomeDismissed]);
+
+  // Show helper welcome celebration if matched
+  const [showHelperWelcome, setShowHelperWelcome] = useState(false);
+  const [helperOwnerName, setHelperOwnerName] = useState<string | undefined>();
+  const helperWelcomeProcessedRef = useRef(false);
+
+  useEffect(() => {
+    // Prevent multiple executions
+    if (helperWelcomeProcessedRef.current) return;
+    
+    // Check if helper was just matched
+    const helperMatched = sessionStorage.getItem('helper_matched') === 'true';
+    const ownerId = sessionStorage.getItem('helper_owner_id');
+    
+    if (helperMatched && ownerId && isHelper && !isOwner && !isLoading) {
+      // Mark as processed immediately to prevent re-execution
+      helperWelcomeProcessedRef.current = true;
+      
+      // Get owner name
+      const getOwnerName = async () => {
+        try {
+          const { supabase } = await import('@/integrations/supabase/client');
+          const { data } = await supabase
+            .from('profiles')
+            .select('business_name')
+            .eq('id', ownerId)
+            .maybeSingle();
+          
+          if (data?.business_name) {
+            setHelperOwnerName(data.business_name);
+          }
+          setShowHelperWelcome(true);
+          
+          // Clear flags
+          sessionStorage.removeItem('helper_matched');
+          sessionStorage.removeItem('helper_owner_id');
+          sessionStorage.removeItem('helper_owner_name');
+        } catch (error) {
+          console.error('[Helper Welcome] Error fetching owner name:', error);
+          // Still show welcome even if owner name fetch fails
+          setShowHelperWelcome(true);
+          sessionStorage.removeItem('helper_matched');
+          sessionStorage.removeItem('helper_owner_id');
+          sessionStorage.removeItem('helper_owner_name');
+        }
+      };
+      
+      getOwnerName();
+    }
+  }, [isHelper, isOwner, isLoading]);
 
   const handleDismissWelcome = () => {
     setShowWelcome(false);
@@ -796,67 +942,6 @@ const Index = () => {
     }
   };
 
-  const handleSkipAllRequest = () => {
-    if (localJobs.length > 0) {
-      setSkipAllConfirmOpen(true);
-    }
-  };
-
-  const handleConfirmSkipAll = async () => {
-    if (localJobs.length === 0) return;
-    
-    setSkipAllConfirmOpen(false);
-    setIsSkippingAll(true);
-    
-    const jobsToSkip = [...localJobs];
-    const previousJobs = [...localJobs];
-    
-    // Optimistically clear local state
-    setLocalJobs([]);
-    
-    try {
-      // Skip all jobs in sequence
-      const skippedJobs: string[] = [];
-      const failedJobs: string[] = [];
-      
-      for (const job of jobsToSkip) {
-        try {
-          await skipJob(job.id);
-          skippedJobs.push(job.id);
-        } catch (error) {
-          failedJobs.push(job.id);
-          console.error(`Failed to skip job ${job.id}:`, error);
-        }
-      }
-      
-      if (failedJobs.length > 0) {
-        // Partial failure - restore failed jobs
-        const remainingJobs = previousJobs.filter(job => failedJobs.includes(job.id));
-        setLocalJobs(remainingJobs);
-        toast({
-          title: 'Some jobs skipped',
-          description: `${skippedJobs.length} jobs skipped, ${failedJobs.length} failed. Please try again.`,
-          variant: 'destructive',
-        });
-      } else {
-        toast({
-          title: 'All jobs skipped',
-          description: `${jobsToSkip.length} jobs rescheduled to their next intervals.`,
-        });
-      }
-    } catch (error) {
-      // Rollback on error - refetch to get current state
-      await refetchAll();
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to skip some jobs. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSkippingAll(false);
-    }
-  };
-
   const handleJobClick = (job: JobWithCustomer) => {
     setSelectedJob(job);
     setRescheduleModalOpen(true);
@@ -872,6 +957,235 @@ const Index = () => {
     }
   };
 
+  const handleBulkReschedule = async (newDate: string, sendSMS: boolean = false) => {
+    if (selectedJobIds.size === 0) return;
+    
+    const jobIdsArray = Array.from(selectedJobIds);
+    setBulkRescheduleModalOpen(false);
+    
+    // Get jobs from both pending and upcoming sources
+    const allJobs = [...localJobs, ...upcomingJobs];
+    const selectedJobs = allJobs.filter(job => selectedJobIds.has(job.id));
+    
+    try {
+      // Reschedule jobs sequentially to track individual failures
+      const rescheduledJobs: string[] = [];
+      const failedJobs: { jobId: string; error: string }[] = [];
+      
+      for (const jobId of jobIdsArray) {
+        try {
+          await rescheduleJob(jobId, newDate);
+          rescheduledJobs.push(jobId);
+        } catch (error) {
+          const job = selectedJobs.find(j => j.id === jobId);
+          const customerName = job?.customer?.name || 'Unknown customer';
+          failedJobs.push({
+            jobId,
+            error: error instanceof Error ? error.message : 'Failed to reschedule'
+          });
+          console.error(`Failed to reschedule job ${jobId} (${customerName}):`, error);
+        }
+      }
+      
+      // Show appropriate toast based on results
+      if (failedJobs.length === 0) {
+        toast({
+          title: 'Jobs rescheduled',
+          description: `Rescheduled ${rescheduledJobs.length} job${rescheduledJobs.length !== 1 ? 's' : ''} to ${newDate}`,
+        });
+      } else if (rescheduledJobs.length > 0) {
+        toast({
+          title: 'Partial success',
+          description: `Rescheduled ${rescheduledJobs.length} job${rescheduledJobs.length !== 1 ? 's' : ''}. ${failedJobs.length} job${failedJobs.length !== 1 ? 's' : ''} failed.`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Reschedule failed',
+          description: `Failed to reschedule all ${jobIdsArray.length} job${jobIdsArray.length !== 1 ? 's' : ''}. Please try again.`,
+          variant: 'destructive',
+        });
+        // Don't proceed with SMS if all jobs failed
+        return;
+      }
+      
+      // Send rain check SMS if requested (only to successfully rescheduled jobs)
+      if (sendSMS && rescheduledJobs.length > 0) {
+        const jobsWithPhone = selectedJobs.filter(job => 
+          rescheduledJobs.includes(job.id) && job.customer?.mobile_phone
+        );
+        
+        if (jobsWithPhone.length > 0) {
+          // Use the first job's context for template picker (they'll all get the same template)
+          const firstJob = jobsWithPhone[0];
+          const context = prepareSMSContext({
+            customerName: firstJob.customer?.name || 'Customer',
+            customerAddress: firstJob.customer?.address || '',
+            scheduledDate: newDate,
+            businessName,
+            serviceType: 'Window Clean',
+          });
+          
+          showTemplatePicker('rain_check', context, (templateMessage) => {
+            // The templateMessage already has variables replaced for the first customer
+            // We need to extract customer-specific parts and replace for each customer
+            const firstCustomerName = firstJob.customer?.name || 'Customer';
+            const firstCustomerFirstName = firstCustomerName.split(' ')[0] || 'there';
+            
+            // Send SMS to all customers, replacing customer-specific variables
+            jobsWithPhone.forEach((job, index) => {
+              setTimeout(() => {
+                const customerName = job.customer?.name || 'Customer';
+                const customerFirstName = customerName.split(' ')[0] || 'there';
+                
+                // Replace customer-specific variables in the message
+                let personalizedMessage = templateMessage;
+                
+                // Replace first customer's name with current customer's name
+                personalizedMessage = personalizedMessage.replace(
+                  new RegExp(firstCustomerFirstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                  customerFirstName
+                );
+                personalizedMessage = personalizedMessage.replace(
+                  new RegExp(firstCustomerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+                  customerName
+                );
+                
+                openSMSApp(
+                  job.customer?.mobile_phone!,
+                  personalizedMessage,
+                  user?.id,
+                  job.id
+                );
+              }, index * 500); // Stagger by 500ms to avoid overwhelming the SMS app
+            });
+            
+            toast({
+              title: 'SMS queued',
+              description: `Sending rain check SMS to ${jobsWithPhone.length} customer${jobsWithPhone.length !== 1 ? 's' : ''}`,
+            });
+          });
+        }
+      }
+      
+      // Clear selection and exit bulk mode
+      setSelectedJobIds(new Set());
+      setBulkRescheduleMode(false);
+      setBulkRescheduleModeForUpcoming(false);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to reschedule some jobs. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const toggleSelectJob = (jobId: string) => {
+    setSelectedJobIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(jobId)) {
+        newSet.delete(jobId);
+      } else {
+        newSet.add(jobId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllJobs = () => {
+    setSelectedJobIds(new Set(localJobs.map(j => j.id)));
+  };
+
+  const selectAllUpcomingJobs = () => {
+    setSelectedJobIds(prev => {
+      const newSet = new Set(prev);
+      upcomingJobs.forEach(job => newSet.add(job.id));
+      return newSet;
+    });
+  };
+
+  const clearBulkSelection = () => {
+    setSelectedJobIds(new Set());
+    setBulkRescheduleMode(false);
+    setBulkRescheduleModeForUpcoming(false);
+  };
+
+  const handleBulkComplete = async () => {
+    if (selectedJobIds.size === 0) return;
+    
+    setBulkCompleteConfirmOpen(false);
+    setIsBulkCompleting(true);
+    
+    const jobIdsArray = Array.from(selectedJobIds);
+    const jobsToComplete = localJobs.filter(job => selectedJobIds.has(job.id));
+    
+    try {
+      // Complete jobs sequentially to track individual failures
+      const completedJobs: string[] = [];
+      const failedJobs: { jobId: string; customerName: string; error: string }[] = [];
+      
+      for (const job of jobsToComplete) {
+        try {
+          const defaultPrice = job.customer?.price || 0;
+          await completeJob(job.id, defaultPrice);
+          completedJobs.push(job.id);
+        } catch (error) {
+          const customerName = job.customer?.name || 'Unknown customer';
+          failedJobs.push({
+            jobId: job.id,
+            customerName,
+            error: error instanceof Error ? error.message : 'Failed to complete'
+          });
+          console.error(`Failed to complete job ${job.id} (${customerName}):`, error);
+        }
+      }
+      
+      // Show appropriate toast based on results
+      if (failedJobs.length === 0) {
+        toast({
+          title: 'Jobs completed',
+          description: `Completed ${completedJobs.length} job${completedJobs.length !== 1 ? 's' : ''}`,
+        });
+      } else if (completedJobs.length > 0) {
+        const failedNames = failedJobs.map(f => f.customerName).join(', ');
+        toast({
+          title: 'Partial success',
+          description: `Completed ${completedJobs.length} job${completedJobs.length !== 1 ? 's' : ''}. Failed: ${failedNames}`,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Completion failed',
+          description: `Failed to complete all ${jobIdsArray.length} job${jobIdsArray.length !== 1 ? 's' : ''}. Please try again.`,
+          variant: 'destructive',
+        });
+      }
+      
+      // Clear selection and exit bulk mode only if at least some jobs succeeded
+      if (completedJobs.length > 0) {
+        setSelectedJobIds(new Set());
+        setBulkRescheduleMode(false);
+      } else {
+        // Keep selection if all failed so user can retry
+        setSelectedJobIds(prev => {
+          const newSet = new Set(prev);
+          completedJobs.forEach(id => newSet.delete(id));
+          return newSet;
+        });
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to complete jobs. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsBulkCompleting(false);
+    }
+  };
+
+
   const handleSaveNotes = async (jobId: string, notes: string | null) => {
     try {
       await updateJobNotes(jobId, notes);
@@ -882,6 +1196,28 @@ const Index = () => {
   };
 
   const nextJob = localJobs[0];
+
+  // Filter jobs based on selected filter
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const filteredLocalJobs = useMemo(() => {
+    if (jobFilter === 'all') {
+      return localJobs;
+    } else if (jobFilter === 'today') {
+      return localJobs.filter(job => job.scheduled_date === today);
+    } else if (jobFilter === 'overdue') {
+      return localJobs.filter(job => job.scheduled_date < today);
+    } else if (jobFilter === 'unpaid') {
+      // For unpaid, we need to check completedToday since localJobs are pending
+      return completedToday.filter(job => job.payment_status === 'unpaid');
+    }
+    return localJobs;
+  }, [localJobs, jobFilter, today, completedToday]);
+
+  // Use filtered jobs for display, but keep localJobs for operations in bulk mode
+  const jobsToShow = bulkRescheduleMode ? localJobs : filteredLocalJobs;
+  
+  // Bulk mode can only be used when not viewing unpaid (completed) jobs
+  const canUseBulkMode = jobFilter !== 'unpaid';
 
   return (
     <div 
@@ -912,6 +1248,14 @@ const Index = () => {
       </motion.div>
 
       <main className="px-4 py-6 max-w-lg mx-auto">
+        {/* Helper Welcome Celebration */}
+        {showHelperWelcome && (
+          <HelperWelcomeCelebration
+            ownerName={helperOwnerName}
+            onDismiss={() => setShowHelperWelcome(false)}
+          />
+        )}
+
         {isLoading ? (
           <LoadingState type="skeleton" skeletonType="job-card" skeletonCount={3} />
         ) : showWelcome ? (
@@ -1066,7 +1410,7 @@ const Index = () => {
                       <Clock className="w-6 h-6 md:w-7 md:h-7 text-white dark:text-white" />
                     </div>
                     <p className="text-3xl md:text-4xl font-extrabold text-white dark:text-white text-center leading-tight">{localJobs.length}</p>
-                    <p className="text-slate-200 dark:text-slate-200 text-xs md:text-sm font-semibold text-center mt-2 uppercase tracking-wide">Pending</p>
+                    <p className="text-slate-200 dark:text-slate-200 text-xs md:text-sm font-semibold text-center mt-2 uppercase tracking-wide">{isHelper && !isOwner ? 'Assigned' : 'Pending'}</p>
                   </div>
                   <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 md:p-5 border-2 border-white/30 dark:border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 ease-out">
                     <div className="w-12 h-12 md:w-14 md:h-14 mx-auto rounded-full bg-emerald-500 dark:bg-emerald-500 flex items-center justify-center mb-3 shadow-md">
@@ -1119,58 +1463,289 @@ const Index = () => {
                 </div>
                 
                 <div className="flex items-center gap-3 md:gap-4">
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={() => setQuickAddOpen(true)}
-                    disabled={completingJobId !== null || isSkippingAll}
-                    className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ease-out"
-                  >
-                    <UserPlus className="w-4 h-4 md:w-5 md:h-5" />
-                    <span className="hidden sm:inline">Quick Add</span>
-                    <span className="sm:hidden">Add</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="default"
-                    onClick={handleSkipAllRequest}
-                    disabled={isSkippingAll || completingJobId !== null}
-                    className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ease-out"
-                  >
-                    <SkipForward className="w-4 h-4 md:w-5 md:h-5" />
-                    {isSkippingAll ? 'Skipping...' : <span className="hidden sm:inline">Skip All</span>}
-                    {!isSkippingAll && <span className="sm:hidden">Skip</span>}
-                  </Button>
+                  {!bulkRescheduleMode ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="default"
+                        onClick={() => setQuickAddOpen(true)}
+                        disabled={completingJobId !== null}
+                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ease-out"
+                      >
+                        <UserPlus className="w-4 h-4 md:w-5 md:h-5" />
+                        <span className="hidden sm:inline">Quick Add</span>
+                        <span className="sm:hidden">Add</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="default"
+                        onClick={() => setBulkRescheduleMode(true)}
+                        disabled={completingJobId !== null || bulkRescheduleModeForUpcoming}
+                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ease-out"
+                      >
+                        <Calendar className="w-4 h-4 md:w-5 md:h-5" />
+                        <span className="hidden sm:inline">Bulk Reschedule</span>
+                        <span className="sm:hidden">Reschedule</span>
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="default"
+                        onClick={selectAllJobs}
+                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="default"
+                        onClick={clearBulkSelection}
+                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
+                      >
+                        <X className="w-4 h-4" />
+                        Cancel
+                      </Button>
+                      <Button
+                        size="default"
+                        onClick={() => setBulkCompleteConfirmOpen(true)}
+                        disabled={selectedJobIds.size === 0 || isBulkCompleting}
+                        className="gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold shadow-sm hover:shadow-md"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        Complete ({selectedJobIds.size})
+                      </Button>
+                      <Button
+                        size="default"
+                        onClick={() => setBulkRescheduleModalOpen(true)}
+                        disabled={selectedJobIds.size === 0}
+                        className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm hover:shadow-md"
+                      >
+                        <Calendar className="w-4 h-4" />
+                        Reschedule ({selectedJobIds.size})
+                      </Button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
 
+            {/* Quick Filters */}
+            {(localJobs.length > 0 || (jobFilter === 'unpaid' && completedToday.length > 0)) && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 flex flex-col sm:flex-row gap-2"
+              >
+                <button
+                  onClick={() => setJobFilter('all')}
+                  className={cn(
+                    "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
+                    jobFilter === 'all'
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
+                  )}
+                >
+                  All
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
+                    jobFilter === 'all' ? "bg-primary-foreground/20" : "bg-background"
+                  )}>
+                    {localJobs.length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setJobFilter('today')}
+                  className={cn(
+                    "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
+                    jobFilter === 'today'
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
+                  )}
+                >
+                  Today
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
+                    jobFilter === 'today' ? "bg-primary-foreground/20" : "bg-background"
+                  )}>
+                    {localJobs.filter(j => j.scheduled_date === today).length}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setJobFilter('overdue')}
+                  className={cn(
+                    "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
+                    jobFilter === 'overdue'
+                      ? "bg-destructive text-destructive-foreground shadow-sm"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
+                  )}
+                >
+                  Overdue
+                  <span className={cn(
+                    "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
+                    jobFilter === 'overdue' ? "bg-destructive-foreground/20" : "bg-background"
+                  )}>
+                    {localJobs.filter(j => j.scheduled_date < today).length}
+                  </span>
+                </button>
+                {completedToday.filter(j => j.payment_status === 'unpaid').length > 0 && (
+                  <button
+                    onClick={() => {
+                      // Exit bulk mode when switching to unpaid filter (incompatible)
+                      if (bulkRescheduleMode) {
+                        setBulkRescheduleMode(false);
+                        setSelectedJobIds(new Set());
+                      }
+                      setJobFilter('unpaid');
+                    }}
+                    className={cn(
+                      "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
+                      jobFilter === 'unpaid'
+                        ? "bg-warning text-warning-foreground shadow-sm"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
+                    )}
+                  >
+                    Unpaid
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
+                      jobFilter === 'unpaid' ? "bg-warning-foreground/20" : "bg-background"
+                    )}>
+                      {completedToday.filter(j => j.payment_status === 'unpaid').length}
+                    </span>
+                  </button>
+                )}
+              </motion.div>
+            )}
+
             {/* Route optimization */}
-            {localJobs.length >= 2 && (
+            {localJobs.length >= 2 && jobFilter === 'all' && (
               <div className="mb-4">
                 <OptimizeRouteButton jobs={localJobs} onReorder={handleReorder} />
               </div>
             )}
 
-            {/* Jobs list - Drag to reorder */}
-            <Reorder.Group axis="y" values={localJobs} onReorder={handleReorder} className="space-y-4 md:space-y-6">
-              <AnimatePresence mode="popLayout">
-                {localJobs.map((job, index) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    businessName={businessName}
-                    onComplete={handleCompleteRequest}
-                    onSkip={handleSkipRequestById}
-                    index={index}
-                    isNextUp={index === 0}
-                  />
-                ))}
-              </AnimatePresence>
-            </Reorder.Group>
+            {/* Bulk reschedule mode header */}
+            {(bulkRescheduleMode && canUseBulkMode && selectedJobIds.size > 0) && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-4 p-3 bg-primary/10 rounded-xl border border-primary/20"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-foreground">
+                    {selectedJobIds.size} of {localJobs.length} job{localJobs.length !== 1 ? 's' : ''} selected
+                  </span>
+                </div>
+              </motion.div>
+            )}
+            
+            {/* Warning when unpaid filter is active - bulk mode disabled */}
+            {jobFilter === 'unpaid' && bulkRescheduleMode && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-4 p-3 bg-warning/10 rounded-xl border border-warning/20"
+              >
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-warning" />
+                  <span className="text-sm text-foreground">
+                    Bulk operations are not available for completed jobs. Switch to "All" or "Today" filter to use bulk actions.
+                  </span>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Jobs list - Drag to reorder (disabled in bulk mode) */}
+            {/* Bulk mode is disabled for unpaid filter (completed jobs) */}
+            {jobFilter === 'unpaid' ? (
+              // Show unpaid jobs from completedToday
+              <div className="space-y-4 md:space-y-6">
+                <AnimatePresence mode="popLayout">
+                  {filteredLocalJobs.map((job, index) => (
+                    <div key={job.id}>
+                      <CompletedJobItem
+                        job={job}
+                        index={index}
+                        businessName={businessName}
+                        onAddNote={(job) => setNotesJob(job)}
+                        onMarkPaid={(job) => !isMarkingPaid && handleMarkPaidRequest(job)}
+                        isProcessing={isMarkingPaid}
+                        receiptSent={sentReceipts.has(job.id)}
+                        isCurrentInQueue={receiptQueue && receiptQueue.jobIds[receiptQueue.index] === job.id}
+                        onReceiptSent={(jobId) => {
+                          const newSentReceipts = new Set(sentReceipts);
+                          newSentReceipts.add(jobId);
+                          setSentReceipts(newSentReceipts);
+                          localStorage.setItem('solowipe_sent_receipts', JSON.stringify([...newSentReceipts]));
+                        }}
+                      />
+                    </div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <Reorder.Group 
+                axis="y" 
+                values={(bulkRescheduleMode && canUseBulkMode) ? [] : jobsToShow} 
+                onReorder={(bulkRescheduleMode && canUseBulkMode) ? () => {} : handleReorder} 
+                className="space-y-4 md:space-y-6"
+              >
+                <AnimatePresence mode="popLayout">
+                  {jobsToShow.map((job, index) => {
+                    const isSelected = selectedJobIds.has(job.id);
+                    // Ensure job has assignment properties for assignment feature
+                    const jobWithAssignment: JobWithCustomerAndAssignment = {
+                      ...job,
+                      assignment: 'assignment' in job ? job.assignment : undefined,
+                      assignments: 'assignments' in job ? job.assignments : undefined
+                    };
+                    return (
+                      <div key={job.id} className="flex items-center gap-3">
+                        {(bulkRescheduleMode && canUseBulkMode) && (
+                          <button
+                            onClick={() => toggleSelectJob(job.id)}
+                            className="flex-shrink-0 transition-colors mt-2"
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-6 h-6 text-primary" />
+                            ) : (
+                              <Square className="w-6 h-6 text-muted-foreground" />
+                            )}
+                          </button>
+                        )}
+                        <div className="flex-1">
+                          <JobCard
+                            job={jobWithAssignment}
+                            businessName={businessName}
+                            onComplete={handleCompleteRequest}
+                            onSkip={handleSkipRequestById}
+                            index={index}
+                            isNextUp={index === 0}
+                            onAssignClick={isOwner ? handleAssignClick : undefined}
+                            showAssignment={isOwner}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </AnimatePresence>
+              </Reorder.Group>
+            )}
+
+            {/* Empty state for filtered results */}
+            {jobsToShow.length === 0 && localJobs.length > 0 && (
+              <EmptyState
+                title={`No ${jobFilter === 'today' ? 'today\'s' : jobFilter === 'overdue' ? 'overdue' : jobFilter === 'unpaid' ? 'unpaid' : ''} jobs`}
+                description={jobFilter === 'today' ? 'No jobs scheduled for today' : jobFilter === 'overdue' ? 'No overdue jobs' : jobFilter === 'unpaid' ? 'All jobs are paid' : 'No jobs found'}
+                icon={<Clock className="w-8 h-8 text-primary" />}
+              />
+            )}
 
             {/* Empty state for today */}
-            {localJobs.length === 0 && completedToday.length === 0 && customers.length > 0 && (
+            {localJobs.length === 0 && completedToday.length === 0 && 
+             (isOwner ? customers.length > 0 : assignedJobs.length === 0) && (
               <EmptyState
                 title="All done for today!"
                 description="Great work! You've completed all your scheduled jobs."
@@ -1178,8 +1753,17 @@ const Index = () => {
               />
             )}
 
-            {/* Empty state for new users without welcome */}
-            {localJobs.length === 0 && customers.length === 0 && !showWelcome && (
+            {/* Contextual empty state for helpers */}
+            {isHelper && !isOwner && assignedJobs.length === 0 && localJobs.length === 0 && (
+              <EmptyState
+                title="Waiting for job assignments"
+                description="Your owner will assign jobs to you here. You'll see them automatically when they're assigned, and you'll get notifications too."
+                icon={<UserCheck className="w-8 h-8 text-primary" />}
+              />
+            )}
+
+            {/* Empty state for new owners without welcome */}
+            {localJobs.length === 0 && customers.length === 0 && !showWelcome && isOwner && (
               <div className="text-center py-12">
                 <Button
                   onClick={() => setQuickAddOpen(true)}
@@ -1305,17 +1889,30 @@ const Index = () => {
                                 </div>
                               </div>
                               
-                              {/* SMS Button with tomorrow reminder template */}
-                              <TomorrowSMSButton
-                                phoneNumber={job.customer?.mobile_phone}
-                                customerName={customerName}
-                                customerAddress={job.customer?.address || 'your address'}
-                                jobPrice={job.customer?.price || 0}
-                                scheduledDate={job.scheduled_date}
-                                isGoCardlessActive={job.customer?.gocardless_mandate_status === 'active' && !!job.customer?.gocardless_id}
-                                businessName={businessName}
-                                iconOnly={true}
-                              />
+                              {/* Assignment and SMS buttons */}
+                              <div className="flex items-center gap-2 shrink-0">
+                                {/* Assignment Avatar - only show for owners */}
+                                {isOwner && (
+                                  <JobAssignmentAvatar
+                                    job={job as JobWithCustomerAndAssignment}
+                                    onClick={() => handleAssignClick(job as JobWithCustomerAndAssignment)}
+                                    size="sm"
+                                  />
+                                )}
+                                
+                                {/* SMS Button with tomorrow reminder template */}
+                                <TomorrowSMSButton
+                                  phoneNumber={job.customer?.mobile_phone}
+                                  customerName={customerName}
+                                  customerAddress={job.customer?.address || 'your address'}
+                                  jobPrice={job.customer?.price || 0}
+                                  scheduledDate={job.scheduled_date}
+                                  isGoCardlessActive={job.customer?.gocardless_mandate_status === 'active' && !!job.customer?.gocardless_id}
+                                  businessName={businessName}
+                                  iconOnly={true}
+                                  jobId={job.id}
+                                />
+                              </div>
                             </div>
                           </motion.div>
                         );
@@ -1418,7 +2015,90 @@ const Index = () => {
             )}
 
             {/* Upcoming Jobs Section */}
-            <UpcomingJobsSection jobs={upcomingJobs} businessName={businessName} onJobClick={handleJobClick} onSkip={handleSkipRequest} />
+            <div className="mt-8">
+              {/* Bulk Reschedule Toggle for Upcoming Jobs */}
+              {upcomingJobs.length > 0 && (
+                <div className="mb-4 flex items-center justify-end">
+                  {!bulkRescheduleModeForUpcoming ? (
+                    <Button
+                      variant="outline"
+                      size="default"
+                      onClick={() => setBulkRescheduleModeForUpcoming(true)}
+                      disabled={bulkRescheduleMode}
+                      className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ease-out"
+                    >
+                      <Calendar className="w-4 h-4 md:w-5 md:h-5" />
+                      <span className="hidden sm:inline">Bulk Reschedule</span>
+                      <span className="sm:hidden">Reschedule</span>
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="default"
+                        onClick={selectAllUpcomingJobs}
+                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
+                      >
+                        Select All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="default"
+                        onClick={() => {
+                          // Only clear upcoming jobs from selection, keep pending if any
+                          setSelectedJobIds(prev => {
+                            const newSet = new Set(prev);
+                            upcomingJobs.forEach(job => newSet.delete(job.id));
+                            return newSet;
+                          });
+                          setBulkRescheduleModeForUpcoming(false);
+                        }}
+                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
+                      >
+                        <X className="w-4 h-4" />
+                        Cancel
+                      </Button>
+                      <Button
+                        size="default"
+                        onClick={() => setBulkRescheduleModalOpen(true)}
+                        disabled={selectedJobIds.size === 0 || !Array.from(selectedJobIds).some(id => upcomingJobs.some(j => j.id === id))}
+                        className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm hover:shadow-md"
+                      >
+                        <Calendar className="w-4 h-4" />
+                        Reschedule ({Array.from(selectedJobIds).filter(id => upcomingJobs.some(j => j.id === id)).length})
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Bulk mode header for upcoming jobs */}
+              {(bulkRescheduleModeForUpcoming && selectedJobIds.size > 0 && Array.from(selectedJobIds).some(id => upcomingJobs.some(j => j.id === id))) && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-4 p-3 bg-primary/10 rounded-xl border border-primary/20"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-foreground">
+                      {Array.from(selectedJobIds).filter(id => upcomingJobs.some(j => j.id === id)).length} of {upcomingJobs.length} upcoming job{upcomingJobs.length !== 1 ? 's' : ''} selected
+                    </span>
+                  </div>
+                </motion.div>
+              )}
+
+              <UpcomingJobsSection 
+                jobs={upcomingJobs} 
+                businessName={businessName} 
+                onJobClick={handleJobClick} 
+                onSkip={handleSkipRequest}
+                bulkMode={bulkRescheduleModeForUpcoming}
+                selectedJobIds={selectedJobIds}
+                onToggleSelect={toggleSelectJob}
+                onSelectAll={selectAllUpcomingJobs}
+              />
+            </div>
           </>
         )}
       </main>
@@ -1428,6 +2108,15 @@ const Index = () => {
         open={rescheduleModalOpen}
         onOpenChange={setRescheduleModalOpen}
         onReschedule={handleReschedule}
+      />
+
+      <BulkRescheduleModal
+        open={bulkRescheduleModalOpen}
+        onOpenChange={setBulkRescheduleModalOpen}
+        onReschedule={handleBulkReschedule}
+        jobCount={selectedJobIds.size}
+        jobs={[...localJobs, ...upcomingJobs].filter(job => selectedJobIds.has(job.id))}
+        businessName={businessName}
       />
 
       <JobNotesModal
@@ -1464,18 +2153,19 @@ const Index = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={skipAllConfirmOpen} onOpenChange={setSkipAllConfirmOpen}>
+      <AlertDialog open={bulkCompleteConfirmOpen} onOpenChange={setBulkCompleteConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Skip all jobs for today?</AlertDialogTitle>
+            <AlertDialogTitle>Complete {selectedJobIds.size} job{selectedJobIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will reschedule all {localJobs.length} pending {localJobs.length === 1 ? 'job' : 'jobs'} to their 
-              next scheduled intervals based on each customer's frequency.
+              This will mark {selectedJobIds.size} job{selectedJobIds.size !== 1 ? 's' : ''} as completed using their default prices. Are you sure?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSkipAll}>Skip All Jobs</AlertDialogAction>
+            <AlertDialogCancel disabled={isBulkCompleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkComplete} disabled={isBulkCompleting}>
+              {isBulkCompleting ? 'Completing...' : 'Complete Jobs'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -1500,6 +2190,30 @@ const Index = () => {
         jobId={jobToComplete?.id}
       />
 
+      {/* Assignment Picker Modal */}
+      <JobAssignmentPicker
+        job={selectedJobForAssignment}
+        isOpen={assignmentPickerOpen}
+        onClose={() => {
+          setAssignmentPickerOpen(false);
+          setSelectedJobForAssignment(null);
+        }}
+        onAssign={handleAssign}
+        onAssignMultiple={handleAssignMultiple}
+        onUnassign={handleUnassign}
+        onCreateHelper={createHelper}
+        onRemoveHelper={removeHelper}
+        helpers={helpers.map(h => ({
+          id: h.id,
+          email: h.email || '',
+          name: h.name,
+          initials: h.initials,
+          isPlaceholder: h.isPlaceholder
+        }))}
+        currentUserId={user?.id}
+        isLoadingHelpers={helpersLoading || isLoading}
+      />
+
       <MarkPaidModal
         isOpen={markPaidModalOpen}
         job={jobToMarkPaid}
@@ -1514,6 +2228,20 @@ const Index = () => {
 
       {/* Welcome Tour for first-time users */}
       {showTour && <WelcomeTour onComplete={completeTour} />}
+
+      {/* Setup Checklist for new users */}
+      {showSetupChecklist && (
+        <SetupChecklist
+          onComplete={() => {
+            setShowSetupChecklist(false);
+            localStorage.setItem('solowipe_setup_checklist_dismissed', 'true');
+          }}
+          onDismiss={() => {
+            setShowSetupChecklist(false);
+            localStorage.setItem('solowipe_setup_checklist_dismissed', 'true');
+          }}
+        />
+      )}
 
       {/* Business Name Modal for OAuth sign-ups */}
       <BusinessNameModal

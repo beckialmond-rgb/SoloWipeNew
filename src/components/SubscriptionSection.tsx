@@ -248,11 +248,11 @@ export function SubscriptionSection() {
               {hasFreeUsage ? 'Subscribe to SoloWipe Pro' : 'Upgrade to Pro'}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {hasFreeUsage 
+                {hasFreeUsage 
                 ? 'Subscribe now to unlock unlimited access' 
                 : jobsCompleted >= 10 
                   ? 'You\'ve used your free jobs - upgrade to continue'
-                  : 'Get your first 10 jobs free, then £15/month'
+                  : 'Get your first 10 jobs free, then £25/month'
               }
             </p>
           </div>
@@ -332,7 +332,7 @@ export function SubscriptionSection() {
                 Processing...
               </>
             ) : (
-              'Start Free Trial — then £15/month'
+              'Start Free Trial — then £25/month'
             )}
           </Button>
         </div>
@@ -364,7 +364,7 @@ export function SubscriptionSection() {
                 Processing...
               </>
             ) : (
-              'Start Free Trial — then £150/year'
+              'Start Free Trial — then £250/year'
             )}
           </Button>
         </div>

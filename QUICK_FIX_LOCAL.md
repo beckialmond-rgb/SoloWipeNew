@@ -98,3 +98,7 @@ npm run dev
 2. Browser console errors (F12 → Console tab)
 3. Terminal output from `npm run dev`
 
+
+
+
+

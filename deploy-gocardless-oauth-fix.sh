@@ -67,3 +67,7 @@ echo "   4. Check Supabase Dashboard → Edge Functions → Logs for any errors"
 echo ""
 echo "📚 See GOCARDLESS_OAUTH_FIX_COMPLETE.md for detailed testing instructions"
 
+
+
+
+

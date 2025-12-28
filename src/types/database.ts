@@ -31,6 +31,7 @@ export interface Customer {
   status: 'active' | 'inactive';
   gocardless_id: string | null;
   gocardless_mandate_status: string | null;
+  preferred_payment_method: 'gocardless' | 'cash' | 'transfer' | null;
   notes: string | null;
   archived_at: string | null;
   is_archived: boolean;
@@ -67,6 +68,51 @@ export interface Job {
 
 export interface JobWithCustomer extends Job {
   customer: Customer;
+}
+
+export interface JobAssignment {
+  id: string;
+  job_id: string;
+  assigned_to_user_id: string;
+  assigned_by_user_id: string;
+  assigned_at: string;
+  created_at: string;
+}
+
+export interface JobAssignmentWithUser extends JobAssignment {
+  assigned_to?: {
+    id: string;
+    email: string;
+    // Profile data can be joined if needed
+  };
+  assigned_by?: {
+    id: string;
+    email: string;
+  };
+}
+
+export interface JobWithCustomerAndAssignment extends JobWithCustomer {
+  assignment?: JobAssignmentWithUser; // Deprecated: use assignments instead
+  assignments?: JobAssignmentWithUser[]; // Multiple assignments per job
+}
+
+export interface TeamMember {
+  id: string;
+  owner_id: string;
+  helper_id: string;
+  helper_email: string;
+  helper_name: string | null;
+  added_at: string;
+  created_at: string;
+}
+
+export interface Helper {
+  id: string;
+  email: string;
+  name?: string;
+  initials: string;
+  isTeamMember?: boolean; // True if added via team_members table
+  isPlaceholder?: boolean; // True if helper hasn't signed up yet
 }
 
 export interface UsageCounter {

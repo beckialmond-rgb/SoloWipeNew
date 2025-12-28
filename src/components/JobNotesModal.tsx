@@ -111,6 +111,8 @@ export function JobNotesModal({ job, isOpen, onClose, onSave }: JobNotesModalPro
               error={error}
             >
               <textarea
+                id="job-notes-textarea"
+                name="job_notes"
                 value={notes}
                 onChange={(e) => {
                   setNotes(e.target.value);

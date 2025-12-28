@@ -38,6 +38,7 @@ export const customerSchema = z.object({
     .int('Frequency must be a whole number')
     .min(1, 'Frequency must be at least 1 week')
     .max(52, 'Frequency cannot exceed 52 weeks'),
+  preferred_payment_method: z.enum(['gocardless', 'cash', 'transfer']).nullable().optional(),
   notes: z
     .string()
     .trim()

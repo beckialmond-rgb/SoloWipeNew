@@ -22,6 +22,8 @@ import { OfflineIndicator } from "@/components/OfflineIndicator";
 const Landing = lazy(() => import("./pages/Landing"));
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
+const ROICalculator = lazy(() => import("./pages/ROICalculator").then(m => ({ default: m.ROICalculator })));
+const SetupChecklistPage = lazy(() => import("./pages/SetupChecklistPage").then(m => ({ default: m.SetupChecklistPage })));
 
 const WhatsNewModal = lazy(() =>
   import("@/components/WhatsNewModal").then((m) => ({ default: m.WhatsNewModal }))
@@ -112,6 +114,8 @@ const App = () => {
                         <Route path="/cookies" element={<CookiePolicy />} />
                         <Route path="/showcase" element={<JobShowcaseExample />} />
                         <Route path="/gocardless-callback" element={<GoCardlessCallback />} />
+                        <Route path="/roi-calculator" element={<ROICalculator />} />
+                        <Route path="/setup-checklist" element={<SetupChecklistPage />} />
 
                         <Route element={<Layout />}>
                           <Route

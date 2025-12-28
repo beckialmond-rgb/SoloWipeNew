@@ -245,3 +245,7 @@ If none of the above fixes work, gather this information:
 
 **Most Common Fix:** Register the redirect URI in GoCardless Dashboard if it's missing or doesn't match exactly.
 
+
+
+
+

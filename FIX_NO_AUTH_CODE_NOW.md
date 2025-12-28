@@ -155,3 +155,7 @@ Then verify this EXACT value is in your GoCardless Dashboard.
 
 **This is a configuration issue, not a code issue. The redirect URI MUST be registered in GoCardless Dashboard for OAuth to work.**
 
+
+
+
+

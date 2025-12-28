@@ -106,3 +106,7 @@ You could add `?v=2` to the image URL, but this is usually not necessary if you 
 4. **Use Facebook Debugger** to force refresh cache if needed
 5. **Monitor** to ensure logo appears correctly
 
+
+
+
+
