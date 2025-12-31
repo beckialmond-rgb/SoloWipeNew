@@ -9,8 +9,8 @@ const corsHeaders = {
 
 // SoloWipe Pro Subscription Pricing
 const PRICES = {
-  monthly: "price_1SdstJ4hy5D3Fg1bnepMLpw6", // £25/month
-  annual: "price_1SdstJ4hy5D3Fg1bliu55p34",  // £250/year (save £50)
+  monthly: "price_1SjwvU4hy5D3Fg1bxwaOEPJt", // £25/month
+  annual: "price_1SjwvU4hy5D3Fg1bfIEAV8aj",  // £250/year (save £50)
 };
 
 const logStep = (step: string, details?: Record<string, unknown>) => {
@@ -45,19 +45,35 @@ serve(async (req) => {
     logStep("User authenticated", { userId: user.id, email: user.email });
 
     // Check if user is a helper (helpers don't need subscriptions - access is managed by owner)
-    const { data: teamMemberships } = await supabaseClient
-      .from('team_members')
-      .select('id')
-      .eq('helper_id', user.id)
-      .limit(1);
+    // Phase 4: Use explicit role field with fallback to inference
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
 
-    const { data: userCustomers } = await supabaseClient
-      .from('customers')
-      .select('id')
-      .eq('profile_id', user.id)
-      .limit(1);
+    let isHelper = false;
+    
+    if (profile?.role === 'helper') {
+      isHelper = true;
+    } else if (profile?.role === 'both' || profile?.role === 'owner') {
+      isHelper = false;
+    } else {
+      // Fallback: infer from data relationships (temporary during migration)
+      const { data: teamMemberships } = await supabaseClient
+        .from('team_members')
+        .select('id')
+        .eq('helper_id', user.id)
+        .limit(1);
 
-    const isHelper = (teamMemberships?.length ?? 0) > 0 && (userCustomers?.length ?? 0) === 0;
+      const { data: userCustomers } = await supabaseClient
+        .from('customers')
+        .select('id')
+        .eq('profile_id', user.id)
+        .limit(1);
+
+      isHelper = (teamMemberships?.length ?? 0) > 0 && (userCustomers?.length ?? 0) === 0;
+    }
 
     if (isHelper) {
       logStep("Helper detected - blocking subscription", { userId: user.id });

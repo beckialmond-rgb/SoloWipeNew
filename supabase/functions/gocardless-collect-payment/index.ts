@@ -154,6 +154,31 @@ serve(async (req) => {
       Deno.env.get('SERVICE_ROLE_KEY') ?? ''
     );
 
+    // CRITICAL FIX #1: Check if payment already exists for this job
+    // This prevents duplicate payments if the function is called multiple times
+    const { data: existingJob, error: jobCheckError } = await adminClient
+      .from('jobs')
+      .select('gocardless_payment_id')
+      .eq('id', jobId)
+      .single();
+
+    if (jobCheckError || !existingJob) {
+      return new Response(JSON.stringify({ error: 'Job not found' }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (existingJob.gocardless_payment_id) {
+      console.log('[GC-COLLECT] ⚠️ Payment already exists for job:', jobId);
+      return new Response(JSON.stringify({ 
+        error: 'Payment already created for this job' 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Get user's GoCardless credentials and customer's mandate
     const { data: profile, error: profileError } = await adminClient
       .from('profiles')

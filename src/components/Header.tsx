@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion';
 import { WeatherWidget } from './WeatherWidget';
+import { NotificationBell } from './NotificationBell';
 import { useTimezone } from '@/hooks/useTimezone';
+import { useRole } from '@/hooks/useRole';
 
 interface HeaderProps {
   showLogo?: boolean;
@@ -11,6 +13,7 @@ interface HeaderProps {
 
 export function Header({ showLogo = true, title, rightContent, showWeather = false }: HeaderProps) {
   const { timezone } = useTimezone();
+  const { isHelper, isOwner } = useRole();
   
   // Format date in user's timezone (defaults to GMT/Europe/London)
   const today = new Intl.DateTimeFormat('en-GB', {
@@ -19,6 +22,9 @@ export function Header({ showLogo = true, title, rightContent, showWeather = fal
     day: 'numeric',
     month: 'short',
   }).format(new Date());
+
+  // Show notification bell for helpers (but not for owners who are also helpers)
+  const showNotificationBell = isHelper && !isOwner;
 
   return (
     <header className="sticky top-0 z-40 bg-background/98 dark:bg-background/95 backdrop-premium border-b border-border/60 dark:border-border/80 shadow-lg">
@@ -39,6 +45,7 @@ export function Header({ showLogo = true, title, rightContent, showWeather = fal
         
         <div className="flex items-center gap-3">
           {showWeather && <WeatherWidget />}
+          {showNotificationBell && <NotificationBell />}
           {rightContent || (
             <motion.span 
               className="text-sm md:text-base font-semibold text-muted-foreground dark:text-muted-foreground/90"

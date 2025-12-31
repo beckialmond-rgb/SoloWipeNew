@@ -36,14 +36,14 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
             {/* Status indicators */}
             <div className="flex items-center gap-1.5 shrink-0">
               {customer.notes && (
-                <StickyNote className="w-4 h-4 text-warning flex-shrink-0" title="Has notes" />
+                <StickyNote className="w-5 h-5 text-warning flex-shrink-0" title="Has notes" />
               )}
               {customer.gocardless_mandate_status === 'pending' ? (
                 <span 
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/15 dark:bg-warning/25 text-warning dark:text-warning text-xs font-semibold flex-shrink-0 border border-warning/30 dark:border-warning/40"
                   title="DD Pending"
                 >
-                  <Clock className="w-3 h-3" />
+                  <Clock className="w-3 h-3 flex-shrink-0" />
                   Pending
                 </span>
               ) : customer.gocardless_id ? (
@@ -51,7 +51,7 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success/15 dark:bg-success/25 text-success dark:text-success text-xs font-semibold flex-shrink-0 border border-success/30 dark:border-success/40"
                   title="Direct Debit Active"
                 >
-                  <CreditCard className="w-3 h-3" />
+                  <CreditCard className="w-3 h-3 flex-shrink-0" />
                   DD
                 </span>
               ) : null}
@@ -59,8 +59,8 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
           </div>
           
           {/* Compact info grid */}
-          <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-sm text-muted-foreground">
-            <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
+          <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+            <MapPin className="w-5 h-5 mt-0.5 shrink-0" />
             <span className="truncate break-words">{customer.address?.split(/[,\n]/)[0].trim() || 'No address'}</span>
           </div>
         </div>
@@ -69,7 +69,7 @@ export function CustomerCard({ customer, onClick, index }: CustomerCardProps) {
           <span className="font-bold text-foreground text-xl">
             £{customer.price}
           </span>
-          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+          <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
         </div>
       </button>
     </motion.div>

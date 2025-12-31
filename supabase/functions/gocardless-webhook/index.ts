@@ -18,8 +18,22 @@ type GoCardlessEvent = {
   };
 };
 
+/**
+ * Verify GoCardless webhook signature
+ * GoCardless sends HMAC-SHA256 signatures as hex strings in the Webhook-Signature header
+ * Reference: https://developer.gocardless.com/getting-started/api/handling-webhooks/
+ */
 async function verifyWebhookSignature(body: string, signature: string, secret: string): Promise<boolean> {
   try {
+    // Remove any potential prefix (e.g., "sha256=") if present
+    const cleanSignature = signature.replace(/^sha256=/, '').trim().toLowerCase();
+    
+    // Ensure signature is not empty after cleaning
+    if (!cleanSignature) {
+      console.error('Signature is empty after cleaning');
+      return false;
+    }
+    
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
@@ -29,12 +43,24 @@ async function verifyWebhookSignature(body: string, signature: string, secret: s
       ['sign']
     );
     
+    // Compute HMAC-SHA256 signature
     const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
     const computedSignature = Array.from(new Uint8Array(signatureBuffer))
       .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+      .join('')
+      .toLowerCase();
     
-    return computedSignature === signature;
+    // Constant-time comparison to prevent timing attacks
+    if (computedSignature.length !== cleanSignature.length) {
+      return false;
+    }
+    
+    let result = 0;
+    for (let i = 0; i < computedSignature.length; i++) {
+      result |= computedSignature.charCodeAt(i) ^ cleanSignature.charCodeAt(i);
+    }
+    
+    return result === 0;
   } catch (error) {
     console.error('Signature verification error:', error);
     return false;
@@ -78,11 +104,14 @@ serve(async (req) => {
     console.log(`[WEBHOOK ${requestId}] Request body length: ${body.length} chars`);
     
     // GoCardless sends signature in Webhook-Signature header (case-insensitive)
-    const signature = req.headers.get('webhook-signature') || req.headers.get('Webhook-Signature');
+    // Check multiple header name variations for compatibility
+    const signature = req.headers.get('webhook-signature') || 
+                      req.headers.get('Webhook-Signature') ||
+                      req.headers.get('WEBHOOK-SIGNATURE');
     console.log(`[WEBHOOK ${requestId}] Signature header: ${signature ? `present (${signature.length} chars)` : 'MISSING'}`);
 
     // ALWAYS require valid signature in all environments for security
-    if (!signature) {
+    if (!signature || signature.trim().length === 0) {
       console.error(`[WEBHOOK ${requestId}] ❌ Missing webhook signature - REJECTING`);
       return new Response(JSON.stringify({ error: 'Missing webhook signature' }), {
         status: 401,
@@ -97,8 +126,9 @@ serve(async (req) => {
     
     if (!isValid) {
       console.error(`[WEBHOOK ${requestId}] ❌ Invalid webhook signature`);
-      console.error(`[WEBHOOK ${requestId}] Expected signature format: HMAC-SHA256 hex`);
-      console.error(`[WEBHOOK ${requestId}] Received signature: ${signature.substring(0, 20)}...`);
+      console.error(`[WEBHOOK ${requestId}] Expected signature format: HMAC-SHA256 hex (64 chars)`);
+      console.error(`[WEBHOOK ${requestId}] Received signature preview: ${signature.substring(0, 20)}... (${signature.length} chars)`);
+      console.error(`[WEBHOOK ${requestId}] Body length: ${body.length} chars`);
       return new Response(JSON.stringify({ error: 'Invalid signature' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -115,7 +145,49 @@ serve(async (req) => {
       Deno.env.get('SERVICE_ROLE_KEY') ?? ''
     );
 
-    for (const event of events) {
+    // CRITICAL FIX #2: Helper function to generate event ID for GoCardless events
+    // GoCardless doesn't provide event IDs, so we construct them from event data
+    function getGoCardlessEventId(event: GoCardlessEvent, index: number): string {
+      const resourceType = event.resource_type || 'unknown';
+      const action = event.action || 'unknown';
+      const resourceId = event.links?.payment || 
+                         event.links?.mandate || 
+                         event.links?.billing_request || 
+                         `idx_${index}`;
+      return `gc_${resourceType}_${action}_${resourceId}`;
+    }
+
+    // Process events with idempotency check
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i];
+      const eventId = getGoCardlessEventId(event, i);
+      
+      // Check if event already processed
+      const { data: existingEvent } = await adminClient
+        .from('webhook_events')
+        .select('event_id')
+        .eq('event_id', eventId)
+        .maybeSingle();
+      
+      if (existingEvent) {
+        console.log(`[WEBHOOK ${requestId}] ⚠️ Duplicate event detected, skipping: ${eventId}`);
+        continue; // Skip this event
+      }
+      
+      // Insert event record BEFORE processing
+      const { error: insertError } = await adminClient
+        .from('webhook_events')
+        .insert({
+          event_id: eventId,
+          resource_type: event.resource_type || 'unknown',
+          action: event.action || null,
+        });
+      
+      if (insertError) {
+        console.error(`[WEBHOOK ${requestId}] ❌ Failed to insert event record:`, insertError);
+        // Continue processing - idempotency check will catch duplicates on retry
+      }
+
       const { resource_type, action, links } = event;
 
       console.log(`[WEBHOOK ${requestId}] Processing event: ${resource_type}.${action}`, JSON.stringify(links));

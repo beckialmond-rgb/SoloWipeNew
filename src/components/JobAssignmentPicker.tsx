@@ -1,12 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, UserPlus, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { X, UserPlus, Check, AlertCircle, Loader2, Save, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { HelperList } from './HelperList';
 import { JobWithCustomerAndAssignment } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { getUserFriendlyError } from '@/lib/errorMessages';
+import { useRole } from '@/hooks/useRole';
+import { useAssignmentTemplates } from '@/hooks/useAssignmentTemplates';
+import { TemplateNameDialog } from './TemplateNameDialog';
 
 interface Helper {
   id: string;
@@ -14,6 +18,8 @@ interface Helper {
   name?: string;
   initials: string;
   isPlaceholder?: boolean; // True if helper hasn't signed up yet
+  hasPendingInvite?: boolean; // True if invite sent but not accepted
+  inviteExpiresAt?: string | null; // When invite expires
 }
 
 interface JobAssignmentPickerProps {
@@ -25,9 +31,12 @@ interface JobAssignmentPickerProps {
   onUnassign: (jobId: string, userId?: string) => Promise<void>;
   onCreateHelper?: (name: string, email?: string) => Promise<Helper>;
   onRemoveHelper?: (helperId: string) => Promise<void>;
+  onInviteSent?: () => void; // Callback when invite is sent (to refresh list)
   helpers: Helper[];
   currentUserId?: string;
   isLoadingHelpers?: boolean;
+  onApplyTemplate?: (templateId: string) => Promise<void>; // For bulk assignment template application
+  selectedJobIds?: Set<string>; // For bulk assignment (to know how many jobs)
 }
 
 export function JobAssignmentPicker({
@@ -39,17 +48,24 @@ export function JobAssignmentPicker({
   onUnassign,
   onCreateHelper,
   onRemoveHelper,
+  onInviteSent,
   helpers,
   currentUserId,
-  isLoadingHelpers = false
+  isLoadingHelpers = false,
+  onApplyTemplate,
+  selectedJobIds,
 }: JobAssignmentPickerProps) {
   const [isAssigning, setIsAssigning] = useState(false);
   const [selectedHelperIds, setSelectedHelperIds] = useState<Set<string>>(new Set());
   const [recentlyCreatedHelperIds, setRecentlyCreatedHelperIds] = useState<Set<string>>(new Set());
   const [assignmentSuccess, setAssignmentSuccess] = useState(false);
+  const [templateNameDialogOpen, setTemplateNameDialogOpen] = useState(false);
   const { toast } = useToast();
+  const { isOwner } = useRole();
+  const { templates, isLoading: templatesLoading, createTemplate, applyTemplate, isCreating, isApplying } = useAssignmentTemplates();
   const isAssigningRef = useRef(false); // Prevent double-clicks
   const jobIdRef = useRef<string | null>(null); // Track job ID to prevent stale assignments
+  const isBulkAssignment = job?.id === 'bulk-assignment';
 
   // Detect placeholder helpers in selection
   const selectedHelpers = helpers.filter(h => selectedHelperIds.has(h.id));
@@ -71,7 +87,11 @@ export function JobAssignmentPicker({
       const assignments = job.assignments || (job.assignment ? [job.assignment] : []);
       const assignedIds = new Set(assignments.map(a => a.assigned_to_user_id));
       setSelectedHelperIds(assignedIds);
-      jobIdRef.current = job.id; // Track current job ID
+      // Only update jobIdRef if not currently assigning (to prevent race condition with query invalidation)
+      // Use only the ref check since state updates are async
+      if (!isAssigningRef.current) {
+        jobIdRef.current = job.id; // Track current job ID
+      }
     } else if (!isOpen) {
       // Reset state when modal closes
       setSelectedHelperIds(new Set());
@@ -134,8 +154,11 @@ export function JobAssignmentPicker({
     // Prevent double-clicks and ensure job is still valid
     if (!job || isAssigning || isAssigningRef.current || selectedHelperIds.size === 0) return;
     
+    // Capture job ID FIRST before any async operations
+    const currentJobId = job.id;
+    
     // Verify job hasn't changed
-    if (jobIdRef.current && jobIdRef.current !== job.id) {
+    if (jobIdRef.current && jobIdRef.current !== currentJobId) {
       toast({
         title: 'Job changed',
         description: 'The job has changed. Please try again.',
@@ -165,16 +188,23 @@ export function JobAssignmentPicker({
       return;
     }
 
-    setIsAssigning(true);
+    // Lock the refs BEFORE any state updates to prevent race conditions
     isAssigningRef.current = true;
-    const currentJobId = job.id; // Capture job ID to verify later
+    jobIdRef.current = currentJobId; // Lock the jobIdRef to prevent it from being updated during assignment
+    setIsAssigning(true);
     
     try {
       if (onAssignMultiple && realHelperIds.length > 1) {
         await onAssignMultiple(currentJobId, realHelperIds);
         
         // Verify job hasn't changed during assignment
-        if (jobIdRef.current !== currentJobId) {
+        // Check if job prop changed to a different job ID (not just a new reference)
+        if (job && job.id !== currentJobId) {
+          console.warn('[JobAssignmentPicker] Job ID changed during assignment:', { 
+            expected: currentJobId, 
+            actual: job.id,
+            refValue: jobIdRef.current 
+          });
           throw new Error('Job was modified during assignment. Please refresh and try again.');
         }
         
@@ -194,7 +224,13 @@ export function JobAssignmentPicker({
         await onAssign(currentJobId, realHelperIds[0]);
         
         // Verify job hasn't changed during assignment
-        if (jobIdRef.current !== currentJobId) {
+        // Check if job prop changed to a different job ID (not just a new reference)
+        if (job && job.id !== currentJobId) {
+          console.warn('[JobAssignmentPicker] Job ID changed during assignment:', { 
+            expected: currentJobId, 
+            actual: job.id,
+            refValue: jobIdRef.current 
+          });
           throw new Error('Job was modified during assignment. Please refresh and try again.');
         }
         
@@ -213,6 +249,14 @@ export function JobAssignmentPicker({
         setAssignmentSuccess(false);
       }, 800);
     } catch (error) {
+      console.error('[JobAssignmentPicker] Assignment error:', {
+        error,
+        currentJobId,
+        jobIdRef: jobIdRef.current,
+        jobId: job?.id,
+        realHelperIds,
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
       const friendlyError = getUserFriendlyError(error, { 
         operation: 'Assigning job',
         entity: 'assignment'
@@ -231,8 +275,11 @@ export function JobAssignmentPicker({
   const handleUnassign = async (userId?: string) => {
     if (!job || isAssigning || isAssigningRef.current) return;
     
+    // Capture job ID FIRST before any async operations
+    const currentJobId = job.id;
+    
     // Verify job hasn't changed
-    if (jobIdRef.current && jobIdRef.current !== job.id) {
+    if (jobIdRef.current && jobIdRef.current !== currentJobId) {
       toast({
         title: 'Job changed',
         description: 'The job has changed. Please try again.',
@@ -241,15 +288,22 @@ export function JobAssignmentPicker({
       return;
     }
 
-    setIsAssigning(true);
+    // Lock the refs BEFORE any state updates to prevent race conditions
     isAssigningRef.current = true;
-    const currentJobId = job.id;
+    jobIdRef.current = currentJobId; // Lock the jobIdRef to prevent it from being updated during unassignment
+    setIsAssigning(true);
     
     try {
       await onUnassign(currentJobId, userId);
       
       // Verify job hasn't changed during unassignment
-      if (jobIdRef.current !== currentJobId) {
+      // Check if job prop changed to a different job ID (not just a new reference)
+      if (job && job.id !== currentJobId) {
+        console.warn('[JobAssignmentPicker] Job ID changed during unassignment:', { 
+          expected: currentJobId, 
+          actual: job.id,
+          refValue: jobIdRef.current 
+        });
         throw new Error('Job was modified during unassignment. Please refresh and try again.');
       }
       
@@ -288,8 +342,11 @@ export function JobAssignmentPicker({
   const handleAssignToMe = async () => {
     if (!job || !currentUserId || isAssigning || isAssigningRef.current) return;
     
+    // Capture job ID FIRST before any async operations
+    const currentJobId = job.id;
+    
     // Verify job hasn't changed
-    if (jobIdRef.current && jobIdRef.current !== job.id) {
+    if (jobIdRef.current && jobIdRef.current !== currentJobId) {
       toast({
         title: 'Job changed',
         description: 'The job has changed. Please try again.',
@@ -298,15 +355,22 @@ export function JobAssignmentPicker({
       return;
     }
     
-    setIsAssigning(true);
+    // Lock the refs BEFORE any state updates to prevent race conditions
     isAssigningRef.current = true;
-    const currentJobId = job.id;
+    jobIdRef.current = currentJobId; // Lock the jobIdRef to prevent it from being updated during assignment
+    setIsAssigning(true);
     
     try {
       await onAssign(currentJobId, currentUserId);
       
       // Verify job hasn't changed during assignment
-      if (jobIdRef.current !== currentJobId) {
+      // Check if job prop changed to a different job ID (not just a new reference)
+      if (job && job.id !== currentJobId) {
+        console.warn('[JobAssignmentPicker] Job ID changed during assignment:', { 
+          expected: currentJobId, 
+          actual: job.id,
+          refValue: jobIdRef.current 
+        });
         throw new Error('Job was modified during assignment. Please refresh and try again.');
       }
       
@@ -358,7 +422,56 @@ export function JobAssignmentPicker({
     }
   };
 
+  const handleSaveAsTemplate = async (name: string) => {
+    // Filter out placeholder helpers - only save real helpers
+    const realHelperIds = Array.from(selectedHelperIds).filter(id => {
+      const helper = helpers.find(h => h.id === id);
+      return helper && !helper.isPlaceholder && !helper.email.endsWith('@temp.helper');
+    });
+
+    if (realHelperIds.length === 0) {
+      toast({
+        title: 'No helpers to save',
+        description: 'Select at least one helper who has signed up to create a template.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    await createTemplate({ name, helperIds: realHelperIds });
+  };
+
+  const handleApplyTemplate = async (templateId: string) => {
+    if (!onApplyTemplate) {
+      // Fallback: apply template directly if no handler provided
+      if (job && !isBulkAssignment) {
+        // Single job assignment
+        const template = templates.find(t => t.id === templateId);
+        if (!template) {
+          toast({
+            title: 'Template not found',
+            description: 'The selected template could not be found.',
+            variant: 'destructive',
+          });
+          return;
+        }
+        
+        if (onAssignMultiple && template.helper_ids.length > 0) {
+          await onAssignMultiple(job.id, template.helper_ids);
+        }
+      } else if (isBulkAssignment && selectedJobIds) {
+        // Bulk assignment - use applyTemplate mutation
+        await applyTemplate({ templateId, jobIds: Array.from(selectedJobIds) });
+        onClose();
+      }
+    } else {
+      // Use provided handler (for BulkAssignmentModal)
+      await onApplyTemplate(templateId);
+    }
+  };
+
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent 
         className="sm:max-w-[500px] max-h-[90vh] flex flex-col"
@@ -382,7 +495,9 @@ export function JobAssignmentPicker({
             Assign Job
           </DialogTitle>
           <DialogDescription className="text-foreground">
-            {selectedHelperIds.size > 0 
+            {isBulkAssignment && selectedJobIds
+              ? `Assign ${selectedJobIds.size} job${selectedJobIds.size !== 1 ? 's' : ''} to helper${selectedHelperIds.size !== 1 ? 's' : ''}.`
+              : selectedHelperIds.size > 0 
               ? `Select helper${selectedHelperIds.size !== 1 ? 's' : ''} for this job. ${selectedHelperIds.size} selected.`
               : "Select one or more helpers, or type a name to add someone new."}
           </DialogDescription>
@@ -392,13 +507,51 @@ export function JobAssignmentPicker({
           <div className="mt-4 relative min-h-[200px] z-10">
           {job && job.customer ? (
             <>
+              {/* Template dropdown for bulk assignments */}
+              {isOwner && isBulkAssignment && templates.length > 0 && (
+                <div className="mb-4">
+                  <label className="text-sm font-medium text-foreground mb-2 block">
+                    Apply Template
+                  </label>
+                  <Select
+                    onValueChange={handleApplyTemplate}
+                    disabled={isApplying || isAssigning}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a template..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templates.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            <span>{template.name}</span>
+                            <span className="text-xs text-muted-foreground ml-auto">
+                              ({template.helper_ids.length} helper{template.helper_ids.length !== 1 ? 's' : ''})
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {isApplying && (
+                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-2">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Applying template...
+                    </p>
+                  )}
+                </div>
+              )}
+
               {/* Job info */}
               <div className="mb-4 p-3 rounded-lg bg-muted/50 border border-border">
                 <div className="font-medium text-foreground">{job.customer?.name || 'Unknown Customer'}</div>
                 <div className="text-sm text-muted-foreground">{job.customer?.address || 'No address'}</div>
-                <div className="text-sm text-muted-foreground mt-1">
-                  Scheduled: {job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString() : 'No date'}
-                </div>
+                {!isBulkAssignment && (
+                  <div className="text-sm text-muted-foreground mt-1">
+                    Scheduled: {job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString() : 'No date'}
+                  </div>
+                )}
               </div>
 
               {/* Status banner when placeholders selected */}
@@ -434,6 +587,7 @@ export function JobAssignmentPicker({
                   onAssignToMe={handleAssignToMe}
                   onCreateHelper={onCreateHelper ? handleCreateHelper : undefined}
                   onRemoveHelper={onRemoveHelper}
+                  onInviteSent={onInviteSent}
                   currentUserId={currentUserId}
                   isLoading={isAssigning}
                   recentlyCreatedHelperIds={recentlyCreatedHelperIds}
@@ -499,6 +653,17 @@ export function JobAssignmentPicker({
               </Button>
             )}
             <div className="flex gap-2 ml-auto">
+              {isOwner && selectedHelperIds.size > 0 && realHelpers.length > 0 && (
+                <Button
+                  variant="outline"
+                  onClick={() => setTemplateNameDialogOpen(true)}
+                  disabled={isAssigning || isCreating}
+                  title="Save current helper selection as a template"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  Save as Template
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={onClose}
@@ -541,5 +706,14 @@ export function JobAssignmentPicker({
         )}
       </DialogContent>
     </Dialog>
+    
+    {/* Template Name Dialog */}
+    <TemplateNameDialog
+      isOpen={templateNameDialogOpen}
+      onClose={() => setTemplateNameDialogOpen(false)}
+      onSave={handleSaveAsTemplate}
+      isLoading={isCreating}
+    />
+    </>
   );
 }

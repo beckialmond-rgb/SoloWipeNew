@@ -67,8 +67,155 @@ serve(async (req) => {
       });
     }
 
+    // CRITICAL FIX #2: Idempotency check - prevent duplicate webhook processing
+    const eventId = event.id;
+    
+    // Check if event already processed
+    const { data: existingEvent } = await supabaseClient
+      .from('webhook_events')
+      .select('event_id')
+      .eq('event_id', eventId)
+      .maybeSingle();
+
+    if (existingEvent) {
+      logStep("Duplicate event detected, skipping", { eventId, type: event.type });
+      return new Response(JSON.stringify({ received: true, duplicate: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    // Insert event record BEFORE processing
+    const { error: insertError } = await supabaseClient
+      .from('webhook_events')
+      .insert({
+        event_id: eventId,
+        resource_type: event.type.split('.')[0] || 'unknown', // e.g., 'invoice', 'customer'
+        action: event.type.split('.').slice(1).join('.') || null, // e.g., 'payment_succeeded'
+      });
+
+    if (insertError) {
+      logStep("ERROR: Failed to insert event record", { error: insertError.message });
+      // Continue processing - idempotency check will catch true duplicates on retry
+    }
+
     // Handle different event types
+    // CRITICAL FIX #3: Invoice handlers MUST run BEFORE subscription handlers
+    // to ensure payment success/failure status takes precedence
     switch (event.type) {
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as Stripe.Invoice;
+        logStep("Processing payment succeeded event", { 
+          invoiceId: invoice.id,
+          subscriptionId: invoice.subscription as string | null 
+        });
+
+        if (!invoice.subscription) {
+          logStep("WARNING: Invoice has no subscription", { invoiceId: invoice.id });
+          break;
+        }
+
+        // Get subscription to find customer
+        const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+        
+        // Find user by Stripe customer ID
+        const { data: profiles, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('id, subscription_status')
+          .eq('stripe_customer_id', subscription.customer as string);
+
+        if (profileError) {
+          logStep("ERROR: Failed to find profile", { error: profileError.message });
+          break;
+        }
+
+        if (!profiles || profiles.length === 0) {
+          logStep("WARNING: No profile found for customer", { customerId: subscription.customer });
+          break;
+        }
+
+        const profileId = profiles[0].id;
+        const wasPastDue = profiles[0].subscription_status === 'past_due';
+
+        // Clear grace period and explicitly mark as active
+        const subscriptionEnd = subscription.current_period_end 
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : null;
+
+        const { error: updateError } = await supabaseClient
+          .from('profiles')
+          .update({
+            subscription_status: 'active', // CRITICAL FIX #3: Explicitly set to active
+            subscription_ends_at: subscriptionEnd,
+            grace_period_ends_at: null,
+            subscription_grace_period: false,
+          })
+          .eq('id', profileId);
+
+        if (updateError) {
+          logStep("ERROR: Failed to update profile", { error: updateError.message });
+        } else {
+          logStep("Profile updated - payment recovered", { profileId, wasPastDue });
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        logStep("Processing payment failed event", { 
+          invoiceId: invoice.id,
+          subscriptionId: invoice.subscription as string | null 
+        });
+
+        if (!invoice.subscription) {
+          logStep("WARNING: Invoice has no subscription", { invoiceId: invoice.id });
+          break;
+        }
+
+        // Get subscription to find customer
+        const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+        
+        // Find user by Stripe customer ID
+        const { data: profiles, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('id')
+          .eq('stripe_customer_id', subscription.customer as string);
+
+        if (profileError) {
+          logStep("ERROR: Failed to find profile", { error: profileError.message });
+          break;
+        }
+
+        if (!profiles || profiles.length === 0) {
+          logStep("WARNING: No profile found for customer", { customerId: subscription.customer });
+          break;
+        }
+
+        const profileId = profiles[0].id;
+
+        // Set 7-day grace period
+        const graceEnd = new Date();
+        graceEnd.setDate(graceEnd.getDate() + 7);
+        const gracePeriodEndsAt = graceEnd.toISOString();
+
+        // CRITICAL FIX #3: Explicitly mark as past_due and set grace period
+        const { error: updateError } = await supabaseClient
+          .from('profiles')
+          .update({
+            subscription_status: 'past_due', // CRITICAL FIX #3: Explicitly set to past_due
+            grace_period_ends_at: gracePeriodEndsAt,
+            subscription_grace_period: true,
+          })
+          .eq('id', profileId);
+
+        if (updateError) {
+          logStep("ERROR: Failed to update profile", { error: updateError.message });
+        } else {
+          logStep("Profile updated with grace period", { profileId, gracePeriodEndsAt });
+        }
+        break;
+      }
+
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted': {
@@ -116,6 +263,7 @@ serve(async (req) => {
 
         // Update profile with subscription data
         // Note: stripe_customer_id is set by checkout.session.completed event
+        // Note: Invoice handlers run first, so they take precedence for status updates
         const { error: updateError } = await supabaseClient
           .from('profiles')
           .update({
@@ -131,118 +279,6 @@ serve(async (req) => {
           logStep("ERROR: Failed to update profile", { error: updateError.message });
         } else {
           logStep("Profile updated successfully", { profileId, status: subscriptionStatus });
-        }
-        break;
-      }
-
-      case 'invoice.payment_failed': {
-        const invoice = event.data.object as Stripe.Invoice;
-        logStep("Processing payment failed event", { 
-          invoiceId: invoice.id,
-          subscriptionId: invoice.subscription as string | null 
-        });
-
-        if (!invoice.subscription) {
-          logStep("WARNING: Invoice has no subscription", { invoiceId: invoice.id });
-          break;
-        }
-
-        // Get subscription to find customer
-        const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
-        
-        // Find user by Stripe customer ID
-        const { data: profiles, error: profileError } = await supabaseClient
-          .from('profiles')
-          .select('id')
-          .eq('stripe_customer_id', subscription.customer as string);
-
-        if (profileError) {
-          logStep("ERROR: Failed to find profile", { error: profileError.message });
-          break;
-        }
-
-        if (!profiles || profiles.length === 0) {
-          logStep("WARNING: No profile found for customer", { customerId: subscription.customer });
-          break;
-        }
-
-        const profileId = profiles[0].id;
-
-        // Set 7-day grace period
-        const graceEnd = new Date();
-        graceEnd.setDate(graceEnd.getDate() + 7);
-        const gracePeriodEndsAt = graceEnd.toISOString();
-
-        // Update profile with past_due status and grace period
-        const { error: updateError } = await supabaseClient
-          .from('profiles')
-          .update({
-            subscription_status: 'past_due',
-            grace_period_ends_at: gracePeriodEndsAt,
-            subscription_grace_period: true,
-          })
-          .eq('id', profileId);
-
-        if (updateError) {
-          logStep("ERROR: Failed to update profile", { error: updateError.message });
-        } else {
-          logStep("Profile updated with grace period", { profileId, gracePeriodEndsAt });
-        }
-        break;
-      }
-
-      case 'invoice.payment_succeeded': {
-        const invoice = event.data.object as Stripe.Invoice;
-        logStep("Processing payment succeeded event", { 
-          invoiceId: invoice.id,
-          subscriptionId: invoice.subscription as string | null 
-        });
-
-        if (!invoice.subscription) {
-          logStep("WARNING: Invoice has no subscription", { invoiceId: invoice.id });
-          break;
-        }
-
-        // Get subscription to find customer
-        const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
-        
-        // Find user by Stripe customer ID
-        const { data: profiles, error: profileError } = await supabaseClient
-          .from('profiles')
-          .select('id')
-          .eq('stripe_customer_id', subscription.customer as string);
-
-        if (profileError) {
-          logStep("ERROR: Failed to find profile", { error: profileError.message });
-          break;
-        }
-
-        if (!profiles || profiles.length === 0) {
-          logStep("WARNING: No profile found for customer", { customerId: subscription.customer });
-          break;
-        }
-
-        const profileId = profiles[0].id;
-
-        // Clear grace period and update to active
-        const subscriptionEnd = subscription.current_period_end 
-          ? new Date(subscription.current_period_end * 1000).toISOString()
-          : null;
-
-        const { error: updateError } = await supabaseClient
-          .from('profiles')
-          .update({
-            subscription_status: subscription.status === 'active' ? 'active' : subscription.status,
-            subscription_ends_at: subscriptionEnd,
-            grace_period_ends_at: null,
-            subscription_grace_period: false,
-          })
-          .eq('id', profileId);
-
-        if (updateError) {
-          logStep("ERROR: Failed to update profile", { error: updateError.message });
-        } else {
-          logStep("Profile updated - payment recovered", { profileId, status: subscription.status });
         }
         break;
       }

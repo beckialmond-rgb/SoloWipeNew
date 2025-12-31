@@ -1,152 +1,47 @@
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { 
   Calendar, 
-  PoundSterling, 
   MessageSquare, 
   Navigation, 
-  TrendingUp, 
-  WifiOff,
-  CheckCircle,
+  TrendingUp,
   ArrowRight,
-  Sparkles,
-  Clock,
   CreditCard,
-  MapPin,
   Users,
   ShieldCheck,
   Zap,
-  Target,
-  Smartphone,
-  X,
-  CheckCircle2
+  CheckCircle2,
+  Clock,
+  FileText,
+  AlertCircle,
+  PoundSterling,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { SUBSCRIPTION_TIERS } from '@/constants/subscription';
 import { useRef, useState, useEffect } from 'react';
 import { ExitIntentPopup, useExitIntent } from '@/components/ExitIntentPopup';
-import { EmailCaptureForm } from '@/components/EmailCaptureForm';
-
-// Image card component with error handling and multiple path attempts
-const TradeImageCard = ({ img, index }: { img: { src: string; alt: string; title: string }; index: number }) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [currentSrc, setCurrentSrc] = useState(img.src);
-  
-  // Try alternative paths if main one fails
-  const getAlternativePaths = (originalSrc: string) => {
-    const base = originalSrc.replace(/\.(jpg|jpeg|png)$/i, '');
-    return [
-      `${base}.jpg`,
-      `${base}.jpeg`,
-      `${base}.png`,
-      originalSrc.replace('trade-', 'trade'),
-      originalSrc.replace('trade-', 'trade_'),
-      originalSrc.replace('trade-', 'image-'),
-    ];
-  };
-
-  const handleImageError = () => {
-    const alternatives = getAlternativePaths(img.src);
-    const currentIndex = alternatives.indexOf(currentSrc);
-    
-    if (currentIndex < alternatives.length - 1) {
-      // Try next alternative
-      const nextSrc = alternatives[currentIndex + 1];
-      if (process.env.NODE_ENV === 'development') {
-      console.log(`Trying alternative: ${nextSrc}`);
-      }
-      setCurrentSrc(nextSrc);
-    } else {
-      // All alternatives exhausted
-      if (process.env.NODE_ENV === 'development') {
-      console.warn(`✗ All paths failed for: ${img.src}`);
-      }
-      setImageError(true);
-      setImageLoaded(false);
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      whileInView={{ opacity: 1 }}
-      viewport={{ once: true, margin: '-50px' }}
-      transition={{ 
-        duration: 0.3, 
-        delay: index * 0.03,
-        ease: "easeOut"
-      }}
-      className="relative group"
-    >
-      <div className="relative rounded-2xl overflow-hidden shadow-award border-2 border-border/80 bg-card aspect-[4/3] hover:shadow-award transition-all duration-300 ease-out card-award group">
-        {!imageError ? (
-          <>
-            <img
-              key={currentSrc}
-              src={currentSrc}
-              alt={img.alt}
-              className={`w-full h-full object-cover transition-opacity duration-300 ${
-                imageLoaded ? 'opacity-100' : 'opacity-0'
-              }`}
-              loading="lazy"
-              decoding="async"
-              onLoad={() => {
-                setImageLoaded(true);
-                if (process.env.NODE_ENV === 'development') {
-                  console.log(`✓ Loaded: ${currentSrc}`);
-                }
-              }}
-              onError={handleImageError}
-            />
-            {!imageLoaded && !imageError && (
-              <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center">
-                <div className="text-muted-foreground text-sm">Loading...</div>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-primary/5 to-muted flex flex-col items-center justify-center p-6 border-2 border-dashed border-primary/30">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-                <Smartphone className="w-8 h-8 text-primary/60" />
-              </div>
-              <h3 className="font-semibold text-foreground mb-2">{img.title}</h3>
-              <p className="text-sm text-muted-foreground">{img.alt}</p>
-            </div>
-          </div>
-        )}
-        
-        {/* Image Overlay - Fixed descriptions */}
-        <div 
-          className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-        >
-          <div className="absolute bottom-0 left-0 right-0 p-5 text-white pointer-events-auto">
-            <h3 className="font-bold text-xl mb-2 drop-shadow-lg">
-              {img.title}
-            </h3>
-            <p className="text-sm text-white/95 leading-relaxed drop-shadow-md">
-              {img.alt}
-            </p>
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
-};
 
 const Landing = () => {
   const navigate = useNavigate();
   const heroRef = useRef<HTMLDivElement>(null);
+  const solutionRef = useRef<HTMLDivElement>(null);
+  const featuresRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll();
   
-  // Removed scroll tracking for performance - static hero section
+  // Enhanced parallax transforms for floating hero image
+  const heroY = useTransform(scrollYProgress, [0, 1], ['0%', '15%']);
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
+  const heroScale = useTransform(scrollYProgress, [0, 0.5], [1, 0.95]);
+  
+  // Parallax for solution section image
+  const solutionY = useTransform(scrollYProgress, [0.2, 0.8], ['-5%', '10%']);
+  
+  // Parallax for features section image
+  const featuresY = useTransform(scrollYProgress, [0.4, 1], ['-8%', '12%']);
   
   // Exit intent popup state
   const [showExitIntent, setShowExitIntent] = useState(false);
   const [hasSeenExitIntent, setHasSeenExitIntent] = useState(false);
   
-  // Check if user has already seen exit intent (stored in sessionStorage)
   useEffect(() => {
     const seen = sessionStorage.getItem('exitIntentSeen');
     if (seen) {
@@ -154,7 +49,6 @@ const Landing = () => {
     }
   }, []);
   
-  // Exit intent detection
   useExitIntent(() => {
     if (!hasSeenExitIntent && !showExitIntent) {
       setShowExitIntent(true);
@@ -168,7 +62,6 @@ const Landing = () => {
   };
   
   const handleExitIntentSuccess = (email: string) => {
-    // Track successful lead capture
     if (typeof window !== 'undefined' && (window as any).gtag) {
       (window as any).gtag('event', 'conversion', {
         event_category: 'Lead Generation',
@@ -176,507 +69,147 @@ const Landing = () => {
         value: 1
       });
     }
-    if (process.env.NODE_ENV === 'development') {
-    console.log('Lead captured:', email);
-    }
   };
 
   const scrollToSection = (id: string) => {
-    try {
-    const headerOffset = 72; // approximate sticky header height
     const element = document.getElementById(id);
-      if (!element) {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn(`Section with id "${id}" not found`);
-        }
-        return;
-      }
+    if (!element) return;
+    const headerOffset = 80;
     const rect = element.getBoundingClientRect();
     const offsetTop = rect.top + window.scrollY - headerOffset;
-    
-    // Smooth scroll with easing
     window.scrollTo({ 
       top: Math.max(0, offsetTop), 
       behavior: 'smooth' 
     });
     
-    // Analytics tracking
     if (typeof window !== 'undefined' && (window as any).gtag) {
       (window as any).gtag('event', 'navigation', {
         event_category: 'Scroll',
         event_label: id,
         value: 1
       });
-      }
-    } catch (error) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Error scrolling to section:', error);
-      }
     }
   };
-  
-  // Optimized scroll depth tracking - throttled and debounced for performance
-  useEffect(() => {
-    const trackedMilestones = new Set<number>();
-    let lastScrollTime = 0;
-    const SCROLL_THROTTLE = 250; // Only check every 250ms
-    
-    const trackScrollDepth = () => {
-      const now = Date.now();
-      if (now - lastScrollTime < SCROLL_THROTTLE) return;
-      lastScrollTime = now;
-      
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-      const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (scrollHeight <= 0) return;
-      
-      const scrollPercent = Math.round((scrollTop / scrollHeight) * 100);
-      
-      // Track milestones: 25%, 50%, 75%, 100%
-      const milestones = [25, 50, 75, 100];
-      milestones.forEach(milestone => {
-        if (scrollPercent >= milestone && !trackedMilestones.has(milestone)) {
-          trackedMilestones.add(milestone);
-          if (typeof window !== 'undefined' && (window as any).gtag) {
-            (window as any).gtag('event', 'scroll_depth', {
-              event_category: 'Engagement',
-              event_label: `${milestone}%`,
-              value: milestone
-            });
-          }
-        }
-      });
-    };
-    
-    const handleScroll = () => {
-          trackScrollDepth();
-    };
-    
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-      trackedMilestones.clear();
-    };
-  }, []);
 
-  const trustStats = [
-    { icon: ShieldCheck, label: 'GDPR Compliant', value: '100%' },
-    { icon: CreditCard, label: 'GoCardless Ready', value: 'Direct Debit' },
-    { icon: MapPin, label: 'UK Based', value: 'Made Here' },
-    { icon: Zap, label: 'Setup Time', value: '30s' },
-  ];
-
-  const painPoints = [
+  const problems = [
     {
-      icon: Calendar,
-      title: 'Messy notebooks & memory',
-      description: 'Frequencies in your head. Missed streets. Forgotten one-offs. Your round falls apart.',
-      color: 'text-red-600',
-      bgColor: 'bg-red-50 dark:bg-red-950/20',
+      icon: Clock,
+      text: 'Chasing payments takes hours every week.',
     },
     {
-      icon: PoundSterling,
-      title: 'Chasing cash & bank transfers',
-      description: '"I\'ll pay you next time" stacks up. Door-knocking. Bank transfer tracking. Unpaid work piles up.',
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-50 dark:bg-amber-950/20',
+      icon: FileText,
+      text: 'Manual scheduling falls apart when life gets busy.',
     },
     {
-      icon: MessageSquare,
-      title: 'Last-minute texting & late nights',
-      description: 'Reminders, "on my way" texts, receipts—all typed manually from your sofa at 10pm.',
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50 dark:bg-blue-950/20',
-    },
-  ];
-
-  const transformations = [
-    {
-      before: 'Notebooks, wall calendars, memory',
-      after: 'Jobs auto-reschedule forever. Your round never falls apart.',
-      icon: Calendar,
-      color: 'text-emerald-600',
-      bgColor: 'bg-emerald-50 dark:bg-emerald-950/20',
-    },
-    {
-      before: 'Chasing payments, door-knocking, "I\'ll pay next time"',
-      after: 'Direct Debit auto-collects on completion. Never chase a payment again.',
-      icon: CreditCard,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10 dark:bg-primary/20',
-    },
-    {
-      before: 'Typing reminders, receipts, texts line-by-line',
-      after: 'Pre-written templates sent automatically. Professional communication in seconds.',
-      icon: MessageSquare,
-      color: 'text-green-600',
-      bgColor: 'bg-green-50 dark:bg-green-950/20',
-    },
-  ];
-
-  // Flexible image paths - try multiple naming conventions
-  const getImageSrc = (num: number) => {
-    // Try common naming patterns
-    const patterns = [
-      `/trade-${num}.jpg`,
-      `/trade-${num}.jpeg`,
-      `/trade-${num}.png`,
-      `/trade${num}.jpg`,
-      `/trade${num}.jpeg`,
-      `/trade${num}.png`,
-      `/trade_${num}.jpg`,
-      `/trade_${num}.jpeg`,
-      `/trade_${num}.png`,
-      `/image-${num}.jpg`,
-      `/image${num}.jpg`,
-    ];
-    // Return the first pattern - browser will try to load it
-    return patterns[0];
-  };
-
-  const tradeImages = [
-    {
-      src: getImageSrc(1),
-      alt: 'SoloWipe being reviewed with a customer in their living room',
-      title: 'Customer Consultation',
-    },
-    {
-      src: getImageSrc(2),
-      alt: 'SoloWipe user taking a break in his van between appointments',
-      title: 'In the Van',
-    },
-    {
-      src: getImageSrc(3),
-      alt: 'Team reviewing SoloWipe app in pub',
-      title: 'Team Review',
-    },
-    {
-      src: getImageSrc(4),
-      alt: 'SoloWipe user showing the app to a happy customer at the door',
-      title: 'Customer Service',
-    },
-    {
-      src: getImageSrc(5),
-      alt: 'SoloWipe in use while driving between jobs',
-      title: 'On the Road',
-    },
-    {
-      src: getImageSrc(6),
-      alt: 'SoloWipe user discussing finances in an office with an advisor',
-      title: 'Business Meeting',
-    },
-    {
-      src: getImageSrc(7),
-      alt: 'Professional using SoloWipe on the go',
-      title: 'On the Go',
-    },
-    {
-      src: getImageSrc(8),
-      alt: 'SoloWipe user managing their round and scheduling jobs',
-      title: 'Managing Your Round',
+      icon: AlertCircle,
+      text: 'Forgetting to send reminders loses customers.',
     },
   ];
 
   const features = [
     {
+      icon: CreditCard,
+      title: 'Direct Debit Payments',
+      description: 'Payments collect automatically when you complete a job.',
+    },
+    {
       icon: Calendar,
-      title: 'Automatic Job Scheduling',
-      description: 'Set up recurring customers once. Jobs automatically reschedule after completion so your round never falls apart.',
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50 dark:bg-blue-950/20',
-      glowColor: 'from-blue-500/20 to-transparent',
+      title: 'Automatic Scheduling',
+      description: 'Jobs reschedule themselves forever. Your round never falls apart.',
+    },
+    {
+      icon: MessageSquare,
+      title: 'Automated Messaging',
+      description: 'Professional reminders and receipts sent automatically.',
     },
     {
       icon: Users,
-      title: 'Assign Jobs to Helpers',
-      description: 'Build your team. Assign jobs to helpers and track who\'s doing what. Perfect for growing businesses and team coordination.',
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50 dark:bg-purple-950/20',
-      glowColor: 'from-purple-500/20 to-transparent',
-    },
-    {
-      icon: CreditCard,
-      title: 'Automatic Payment Collection',
-      description: 'Connect GoCardless once. When you complete a job, Direct Debit collection starts automatically so you never chase payments.',
-      color: 'text-emerald-600',
-      bgColor: 'bg-emerald-50 dark:bg-emerald-950/20',
-      glowColor: 'from-emerald-500/20 to-transparent',
-    },
-    {
-      icon: MessageSquare,
-      title: 'Smart Customer Communication',
-      description: 'Pre-written SMS templates for reminders, receipts, and updates. Send to one customer or bulk message your entire route.',
-      color: 'text-green-600',
-      bgColor: 'bg-green-50 dark:bg-green-950/20',
-      glowColor: 'from-green-500/20 to-transparent',
+      title: 'Helper Management',
+      description: 'Assign jobs, track work, and split payments automatically.',
     },
     {
       icon: Navigation,
-      title: 'Route Optimization',
-      description: 'One tap optimizes your day\'s jobs using GPS. Stop zig-zagging and wasting fuel with the most efficient route.',
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50 dark:bg-purple-950/20',
-      glowColor: 'from-purple-500/20 to-transparent',
+      title: 'Route Optimisation',
+      description: 'Optimise your daily route to save time and fuel.',
     },
     {
       icon: TrendingUp,
-      title: 'Real-Time Earnings Tracking',
-      description: 'See today\'s earnings, unpaid jobs, and weekly targets in seconds so you always know where you stand.',
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-50 dark:bg-amber-950/20',
-      glowColor: 'from-amber-500/20 to-transparent',
-    },
-    {
-      icon: WifiOff,
-      title: 'Works Offline',
-      description: 'Complete jobs, add customers, and track payments—all without internet. Everything syncs automatically when you\'re back online.',
-      color: 'text-slate-600',
-      bgColor: 'bg-slate-50 dark:bg-slate-950/20',
-      glowColor: 'from-slate-500/20 to-transparent',
-    },
-    {
-      icon: MessageSquare,
-      title: 'SMS Lead Generation',
-      description: 'Built-in referral SMS templates turn every customer into a lead generator. One tap sends professional referral messages that grow your round automatically.',
-      color: 'text-emerald-600',
-      bgColor: 'bg-emerald-50 dark:bg-emerald-950/20',
-      glowColor: 'from-emerald-500/20 to-transparent',
-    },
-    {
-      icon: TrendingUp,
-      title: 'Automated Price Increases',
-      description: 'Increase prices across your entire round in seconds. Send professional SMS notifications automatically. No awkward conversations—just professional, automated communication.',
-      color: 'text-amber-600',
-      bgColor: 'bg-amber-50 dark:bg-amber-950/20',
-      glowColor: 'from-amber-500/20 to-transparent',
+      title: 'Price Increases',
+      description: 'Automatically increase prices annually. Set it once, forget about it.',
     },
   ];
 
-  const faqItems = [
-    {
-      question: 'Do I have to use Direct Debit?',
-      answer:
-        'No. You can still take cash or bank transfer and mark jobs as paid manually. Direct Debit is there to automate collections for customers who prefer it.',
-    },
-    {
-      question: 'What if my signal is bad or I work in rural areas?',
-      answer:
-        'SoloWipe is built to work offline. You can view jobs, complete work, and add customers without internet—everything syncs automatically when you are back online.',
-    },
-    {
-      question: 'Is SoloWipe only for UK window cleaners?',
-      answer:
-        'Yes. SoloWipe is designed specifically for UK window cleaners with GBP pricing, UK tax assumptions, and GoCardless Direct Debit integration.',
-    },
-    {
-      question: 'How hard is it to switch from my paper diary or Excel?',
-      answer:
-        'Most users can move their round across in an evening. Start with your most regular streets, add customers with price and frequency, and SoloWipe will handle the rest.',
-    },
-    {
-      question: 'What happens after my first 10 free jobs?',
-      answer:
-        'You can keep all your data. To continue automating new jobs and SMS, you can subscribe to Pro (£25/month or £250/year) for unlimited access. You can also register interest for our special 60-day free trial offer.',
-    },
-    {
-      question: 'How does the 60-day free trial work?',
-      answer:
-        'The 60-day free trial is a special offer for our unlimited Pro subscription (£25/month or £250/year). First, start with your 10 free jobs (no credit card required). When you\'re ready to upgrade, register your interest for the 60-day trial. If selected, you\'ll receive a coupon code via email. Use the code when subscribing to get 60 days free of unlimited access. After 60 days, your subscription automatically continues at your chosen rate. Subject to availability.',
-    },
-    {
-      question: 'Can I cancel anytime?',
-      answer:
-        'Yes. You can cancel your subscription at any time from within the app. There are no contracts and no cancellation phone calls.',
-    },
+  const trustItems = [
+    { icon: ShieldCheck, label: 'GDPR Compliant' },
+    { icon: Zap, label: 'Works Offline' },
+    { icon: PoundSterling, label: 'UK Based' },
+    { icon: CheckCircle2, label: 'No Setup Fees' },
+  ];
+
+  const tradeImages = [
+    '/trade-1.jpg',
+    '/trade-2.jpg',
+    '/trade-3.jpg',
+    '/trade-4.jpg',
+    '/trade-5.jpg',
+    '/trade-6.jpg',
   ];
 
   return (
-    <div className="min-h-screen bg-background relative" role="main">
-      {/* Skip to content link for accessibility */}
-      <a
-        href="#hero"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-primary focus:text-white focus:rounded-lg focus:shadow-lg"
-      >
-        Skip to main content
-      </a>
-      
-      {/* 🏆 AWARD-WINNING STICKY NAVIGATION 🏆 */}
-      <header 
-        className="fixed top-0 left-0 right-0 z-50 border-b-2 border-border/50 bg-white/90 dark:bg-slate-950/90 backdrop-premium shadow-award"
-        role="banner"
-      >
-        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
-          <motion.button
-            onClick={() => scrollToSection('hero')}
-            className="flex items-center transition-all hover:opacity-90 -my-2 focus:outline-none focus:ring-4 focus:ring-primary/30 rounded-xl"
-            aria-label="SoloWipe Home"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-              <img
-              src="/SoloLogo.jpg"
-              alt="SoloWipe - Automate Your Window Cleaning Round"
-              className="h-16 w-auto sm:h-20 md:h-24 lg:h-28 brightness-110 contrast-110 saturate-110 drop-shadow-lg"
-              loading="eager"
-              width="auto"
-              height="auto"
-                decoding="async"
-                fetchPriority="high"
-            />
-          </motion.button>
-          <nav className="hidden md:flex items-center gap-6 text-sm" role="navigation" aria-label="Main navigation">
-            {[
-              { label: 'Features', section: 'features' },
-              { label: 'How it Works', section: 'how-it-works' },
-              { label: 'Pricing', section: 'pricing' },
-              { label: 'FAQ', section: 'faq' },
-            ].map((item) => (
-              <motion.button
-                key={item.section}
-                onClick={() => scrollToSection(item.section)}
-                className="text-slate-700 dark:text-slate-300 hover:text-primary dark:hover:text-primary transition-all font-semibold tracking-wide focus:outline-none focus:ring-4 focus:ring-primary/30 rounded-lg px-3 py-2 relative"
-                aria-label={`View ${item.label}`}
-                whileHover={{ y: -2, scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <span className="relative z-10">{item.label}</span>
-                <motion.div
-                  className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-primary to-emerald-600 rounded-full"
-                  initial={{ scaleX: 0 }}
-                  whileHover={{ scaleX: 1 }}
-                  transition={{ duration: 0.3 }}
-                />
-              </motion.button>
-            ))}
-          </nav>
-          <div className="flex items-center gap-3">
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <Button
-                size="sm"
-                onClick={() => {
-                  try {
-                  // Analytics tracking
-                  if (typeof window !== 'undefined' && (window as any).gtag) {
-                    (window as any).gtag('event', 'click', {
-                      event_category: 'CTA',
-                      event_label: 'Header Start Free',
-                      value: 1
-                    });
-                  }
-                  navigate('/auth?mode=signup');
-                  } catch (error) {
-                    if (process.env.NODE_ENV === 'development') {
-                      console.error('Navigation error:', error);
-                    }
-                  }
-                }}
-                className="h-10 px-6 text-sm font-black shadow-award bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90 text-white border-0 transition-all focus:outline-none focus:ring-4 focus:ring-primary/30 focus:ring-offset-2 btn-award"
-                aria-label="Start Free - Create Account"
-              >
-                Start Free
-              </Button>
-            </motion.div>
-          </div>
-        </div>
-      </header>
-
-      {/* 🏆 AWARD-WINNING 2026 HERO SECTION 🏆 */}
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* HERO SECTION - Premium Split-Screen */}
       <section
         id="hero"
         ref={heroRef}
-        className="relative overflow-hidden py-8 px-4 min-h-[calc(100vh-4rem)] flex flex-col justify-center particle-field"
-        aria-label="Hero Section"
-        style={{
-          background: `
-            radial-gradient(ellipse 120% 100% at 50% 0%, hsl(211 100% 50% / 0.3) 0%, transparent 50%),
-            radial-gradient(ellipse 100% 120% at 50% 100%, hsl(142 71% 45% / 0.3) 0%, transparent 50%),
-            linear-gradient(135deg, hsl(220 21% 25%) 0%, hsl(211 100% 40%) 25%, hsl(211 100% 50%) 50%, hsl(142 71% 45%) 75%, hsl(220 21% 25%) 100%)
-          `,
-          backgroundSize: '100% 100%, 100% 100%, 400% 400%'
-        }}
+        className="relative min-h-screen flex items-center overflow-hidden pt-20"
       >
-        {/* 🏆 Advanced Particle Field & Gradient Mesh System 🏆 */}
-        {/* Simplified background for performance */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {/* Minimal static background orbs */}
-          <div className="absolute top-0 left-0 w-[600px] h-[600px] bg-gradient-to-br from-primary/20 to-transparent rounded-full blur-[120px] opacity-30" />
-          <div className="absolute bottom-0 right-0 w-[500px] h-[500px] bg-gradient-to-tl from-emerald-400/20 to-transparent rounded-full blur-[120px] opacity-30" />
+        {/* Deep gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950" />
+        
+        {/* Layered gradient orbs for depth */}
+        <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-blue-500/20 rounded-full blur-[120px] opacity-60 z-[1]" />
+        <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-indigo-500/15 rounded-full blur-[100px] opacity-50 z-[1]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-purple-500/10 rounded-full blur-[150px] opacity-40 z-[1]" />
+        
+        {/* Logo - Top Left */}
+        <div className="absolute top-8 left-8 z-30">
+          <img 
+            src="/SoloLogo.jpg" 
+            alt="SoloWipe" 
+            className="h-32 md:h-40 lg:h-48 w-auto"
+            loading="eager"
+          />
         </div>
-
-        <div
-          className="relative max-w-6xl mx-auto w-full z-10"
-        >
-          {/* 🏆 AWARD-WINNING GLASSMORPHISM CONTAINER - 3D PARALLAX 🏆 */}
-          <div
-            className="text-center relative glass-award rounded-2xl p-4 md:p-6 border-2 border-white/50 shadow-lg z-20"
-          >
-            {/* Premium Multi-Layer Inner Glow */}
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-white/15 via-white/5 to-transparent pointer-events-none" />
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-tl from-transparent via-primary/5 to-emerald-400/5 pointer-events-none" />
+        
+        <div className="relative z-10 max-w-7xl mx-auto px-6 py-20 w-full">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center min-h-[80vh]">
             
-            {/* Static border - animation disabled to prevent flashing */}
-            {/* Static border - animations disabled */}
-            <div className="absolute inset-0 rounded-3xl pointer-events-none border-2 border-primary/30 opacity-50" />
-            {/* Compact Logo */}
-            <div className="mb-3 flex justify-center relative">
-              <img
-                src="/SoloLogo.jpg"
-                alt="SoloWipe - Automate Your Window Cleaning Round"
-                className="h-24 w-auto sm:h-32 md:h-40 lg:h-48 drop-shadow-[0_0_30px_rgba(59,130,246,0.4)] relative z-10 brightness-130 contrast-115 saturate-120"
-                loading="eager"
-                decoding="async"
-                fetchPriority="high"
-                width="auto"
-                height="auto"
-              />
-            </div>
-
-            {/* Compact Badges - Single Row */}
-            <div className="flex flex-wrap items-center justify-center gap-3 mb-4">
-              <div 
-                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-award text-white text-xs font-semibold border border-white/60 shadow-sm"
-              >
-                <Sparkles className="w-4 h-4 text-emerald-300" />
-                <span>New to market • Built from research</span>
-                </div>
-              <div className="flex items-center gap-2 text-white/90">
-                <Target className="w-4 h-4 text-emerald-300" />
-                <span className="text-xs font-semibold">Designed for real pain points</span>
-              </div>
-            </div>
-            
-            {/* Compact Headline */}
-            <h1 
-              className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-black text-white mb-3 leading-tight tracking-tight"
-              style={{ letterSpacing: '-0.02em' }}
-            >
-              <span className="text-white">Jobs, payments, and customer texts in one app.</span>
-            </h1>
-            
-            <p className="text-base md:text-lg text-white/90 mb-4 max-w-2xl mx-auto font-medium leading-snug">
-              Automate reminders, receipts, and price increases. Works offline. Assign jobs to helpers. Built from real conversations with UK window cleaners.
-            </p>
-            
-            {/* Special Offer Badge - 60 Day Trial */}
+            {/* LEFT SIDE - Content */}
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: -10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-              className="mb-6"
+              initial={{ opacity: 0, x: -40 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+              className="space-y-8 lg:space-y-10 relative z-20"
             >
-              <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-emerald-500/95 via-emerald-600/95 to-emerald-500/95 text-white text-sm font-bold shadow-xl border-2 border-white/40 backdrop-blur-md hover:scale-105 transition-transform duration-300">
-                <Sparkles className="w-4 h-4 animate-pulse" />
-                <span>🎉 Start Free Today • 60-Day Trial Available When You Upgrade</span>
-              </div>
-            </motion.div>
-            
-            {/* Primary CTA - Compact */}
-            <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-3 relative z-30">
+              <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white leading-[1.05] tracking-tight">
+                The simple admin app for{' '}
+                <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
+                  service businesses
+                </span>
+              </h1>
+              
+              <p className="text-xl md:text-2xl text-slate-300 leading-relaxed max-w-xl">
+                Built for window cleaners, bin cleaners, and valet companies that want their admin to run itself.
+              </p>
+              
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.2 }}
+                className="flex flex-col sm:flex-row gap-4 pt-4"
+              >
                 <Button
-                size="lg"
+                  size="xl"
                   onClick={() => {
                     if (typeof window !== 'undefined' && (window as any).gtag) {
                       (window as any).gtag('event', 'click', {
@@ -687,1430 +220,528 @@ const Landing = () => {
                     }
                     navigate('/auth?mode=signup');
                   }}
-                className="w-full sm:w-auto min-w-[280px] h-12 text-base font-bold bg-gradient-to-r from-primary to-emerald-600 text-white shadow-lg hover:shadow-xl relative overflow-hidden group border-0 focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 z-30"
-                style={{ position: 'relative', zIndex: 30 }}
-                  aria-label="Start Free - Automate Your First 10 Jobs"
+                  className="h-14 px-8 text-lg font-semibold bg-[#2563EB] text-white hover:bg-[#1D4ED8] rounded-xl shadow-[0_4px_14px_0_rgba(37,99,235,0.4)] hover:shadow-[0_6px_20px_0_rgba(37,99,235,0.5)] transition-all"
                 >
-                <span className="relative z-30 flex items-center gap-2">
-                  <span>Start Free - 10 Jobs</span>
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-                  </span>
+                  Start Free — 10 Jobs
+                  <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => {
-                  scrollToSection('pricing');
-                }}
-                className="w-full sm:w-auto h-12 text-sm bg-white/20 backdrop-blur-md border-white/50 text-white font-semibold hover:bg-white/30 hover:border-white/70 active:scale-95 transition-all duration-300 ease-out shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-white/50 focus:ring-offset-2 z-30"
-                style={{ position: 'relative', zIndex: 30 }}
-                aria-label="See Pricing & Special Offers"
-              >
-                See Pricing & Offers
-              </Button>
-            </div>
-
-            {/* Compact Risk Reversal */}
-            <p className="text-xs text-white/85 font-medium mb-4">
-              <strong className="text-white">No credit card.</strong> No setup fees. Cancel anytime. <strong className="text-white">Start with 10 free jobs.</strong>
-            </p>
-            
-            {/* Compact Email Capture */}
-            <div className="max-w-sm mx-auto">
-              <p className="text-xs text-white/75 text-center mb-2">
-                Get weekly tips to grow your business
-              </p>
-              <EmailCaptureForm
-                variant="banner"
-                placeholder="Enter your email for tips"
-                buttonText="Get Tips"
-                onSuccess={(email) => {
-                  if (typeof window !== 'undefined' && (window as any).gtag) {
-                    (window as any).gtag('event', 'email_capture', {
-                      event_category: 'Lead Generation',
-                      event_label: 'Hero Email Capture',
-                      value: 1
-                    });
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-      
-      {/* Exit Intent Popup */}
-      {showExitIntent && (
-        <ExitIntentPopup
-          onClose={handleExitIntentClose}
-          onSuccess={handleExitIntentSuccess}
-        />
-      )}
-
-      {/* Built from Research Section - New Authentic Messaging */}
-      <section className="py-28 px-4 md:px-6 bg-gradient-to-b from-background via-slate-50/30 dark:via-slate-900/30 to-background relative overflow-hidden">
-        {/* Decorative background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
-        </div>
-        
-        <div className="max-w-6xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-sm font-semibold mb-6 border border-primary/20 dark:border-primary/30">
-              <Users className="w-4 h-4" />
-              Built from Real Conversations
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
-              We Spoke to Local Cleaners. Here's What We Learned.
-            </h2>
-            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium">
-              SoloWipe isn't built on assumptions. After months of conversations with window cleaners across the UK, 
-              we identified the real pain points that slow you down every day.
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mb-16">
-            {[
-              {
-                icon: Calendar,
-                title: 'The Scheduling Problem',
-                description: 'Every cleaner we spoke to mentioned the same thing: "I forget which street is due when." Paper diaries get lost. Excel sheets get out of sync. SoloWipe auto-reschedules jobs so your round never falls apart.',
-                color: 'text-blue-600',
-                bgColor: 'bg-blue-50 dark:bg-blue-950/20',
-              },
-              {
-                icon: CreditCard,
-                title: 'The Payment Chase',
-                description: 'The #1 frustration: chasing payments. "I\'ll pay next time" became a weekly conversation. That\'s why we built Direct Debit integration—payments collect automatically when you complete a job.',
-                color: 'text-emerald-600',
-                bgColor: 'bg-emerald-50 dark:bg-emerald-950/20',
-              },
-              {
-                icon: MessageSquare,
-                title: 'The Communication Burden',
-                description: 'Typing reminders and receipts line-by-line eats hours every week. SoloWipe\'s SMS templates send professional messages in seconds, so you can focus on the work that pays.',
-                color: 'text-green-600',
-                bgColor: 'bg-green-50 dark:bg-green-950/20',
-              },
-            ].map((point, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ 
-                  duration: 0.6, 
-                  delay: index * 0.1,
-                  type: "spring",
-                  stiffness: 100
-                }}
-                whileHover={{ 
-                  y: -6,
-                  scale: 1.02,
-                  transition: { duration: 0.3 }
-                }}
-                className={cn(
-                  "bg-card rounded-2xl p-8 md:p-10 border-2 border-border/60 dark:border-border/80 shadow-lg hover:shadow-xl transition-all duration-300 ease-out relative overflow-hidden group",
-                  point.bgColor
-                )}
-              >
-                <div className="absolute top-0 right-0 w-40 h-40 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
-                <div className="relative z-10">
-                  <motion.div 
-                    className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-md", point.bgColor)}
-                    whileHover={{ 
-                      scale: 1.15,
-                      rotate: [0, -5, 5, 0],
-                      transition: { duration: 0.4 }
-                    }}
-                  >
-                    <point.icon className={cn("w-8 h-8", point.color)} />
-                  </motion.div>
-                  <h3 className="text-xl md:text-2xl font-bold text-foreground mb-4 leading-tight">{point.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed text-base group-hover:text-foreground/90 transition-colors">{point.description}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="bg-gradient-to-br from-primary/10 via-emerald-500/10 to-primary/10 rounded-2xl p-8 md:p-10 border-2 border-primary/20 text-center"
-          >
-            <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-4">
-              A Fresh Approach to an Old Problem
-            </h3>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-6">
-              SoloWipe is new to market, but it's built on deep research. We're not trying to be everything to everyone—we're 
-              laser-focused on solving the specific problems that UK window cleaners face every single day.
-            </p>
-            <p className="text-base text-foreground/80 font-medium">
-              Start with 10 free jobs. See if it solves your pain points. No credit card required.
-            </p>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Trust Bar & Preview Section - Premium Integration */}
-      <section className="py-28 px-4 md:px-6 bg-gradient-to-b from-slate-800 via-slate-700/50 to-background relative overflow-hidden">
-        {/* Subtle background effects */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
-        </div>
-        
-        <div className="max-w-6xl mx-auto relative">
-          {/* Award-Winning Trust Bar - Premium Design */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 max-w-4xl mx-auto mb-16"
-          >
-            {trustStats.map((stat, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true, margin: '-50px' }}
-                transition={{ 
-                  duration: 0.6, 
-                  delay: index * 0.1,
-                  type: "spring",
-                  stiffness: 100
-                }}
-                whileHover={{ 
-                  scale: 1.08, 
-                  y: -6,
-                  transition: { duration: 0.3 }
-                }}
-                className="bg-white/20 dark:bg-slate-800/70 glass-award rounded-2xl p-6 md:p-8 border-2 border-white/40 dark:border-slate-700/60 shadow-award hover:shadow-award transition-all duration-300 ease-out text-center group cursor-pointer card-award relative overflow-hidden transform-3d-premium"
-              >
-                {/* Premium Multi-Layer Glow Effects */}
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-transparent to-emerald-500/15 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                
-                <div 
-                  className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/40 to-emerald-500/40 flex items-center justify-center mx-auto mb-4 shadow-award relative z-10"
+                <Button
+                  variant="outline"
+                  size="xl"
+                  onClick={() => scrollToSection('pricing')}
+                  className="h-14 px-8 text-lg font-semibold bg-white/10 backdrop-blur-md text-slate-200 hover:bg-white/20 border-0 rounded-xl transition-all"
                 >
-                  <stat.icon className="w-8 h-8 text-white drop-shadow-lg" />
-                </div>
-                <div className="text-4xl font-black text-white mb-2 relative z-10">
-                  {stat.value}
-                </div>
-                <div className="text-xs text-white/95 font-bold relative z-10 uppercase tracking-wider">{stat.label}</div>
+                  See Pricing
+                </Button>
               </motion.div>
-            ))}
-          </motion.div>
-          
-          {/* Trust Badges */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="flex flex-wrap items-center justify-center gap-6 mb-16"
-          >
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 dark:bg-slate-800/50 backdrop-blur-md border border-white/20">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              <span className="text-sm font-medium text-white">UK GDPR Compliant</span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 dark:bg-slate-800/50 backdrop-blur-md border border-white/20">
-              <CreditCard className="w-5 h-5 text-primary" />
-              <span className="text-sm font-medium text-white">GoCardless Partner</span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 dark:bg-slate-800/50 backdrop-blur-md border border-white/20">
-              <ShieldCheck className="w-5 h-5 text-primary" />
-              <span className="text-sm font-medium text-white">Bank-Level Security</span>
-            </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/10 dark:bg-slate-800/50 backdrop-blur-md border border-white/20">
-              <CheckCircle className="w-5 h-5 text-emerald-400" />
-              <span className="text-sm font-medium text-white">UK-Based Business</span>
-            </div>
-          </motion.div>
-
-          {/* Living UI Preview - Premium Design */}
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.8 }}
-            className="relative max-w-4xl mx-auto"
-          >
-            <motion.div 
-              className="relative glass-award rounded-3xl shadow-award border-2 border-white/30 dark:border-slate-700/60 overflow-hidden transform-3d-premium"
-              whileHover={{
-                y: -4,
-                scale: 1.01,
-                transition: { duration: 0.3 }
+            </motion.div>
+            
+            {/* RIGHT SIDE - Hero Image - app-image-3.png - FLOATING & LAYERED */}
+            <motion.div
+              initial={{ opacity: 0, x: 40, scale: 0.95 }}
+              animate={{ opacity: 1, x: 0, scale: 1 }}
+              transition={{ duration: 1, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              style={{ 
+                y: heroY, 
+                opacity: heroOpacity,
+                scale: heroScale,
               }}
+              className="relative w-full max-w-lg mx-auto lg:mx-0 z-[8]"
             >
-              {/* Premium Browser chrome */}
-              <div className="bg-gradient-to-r from-muted/60 to-muted/40 px-6 py-4 border-b-2 border-border/60 flex items-center gap-2 backdrop-blur-sm">
-                <div className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-lg"></div>
-                <div className="w-3.5 h-3.5 rounded-full bg-yellow-500 shadow-lg"></div>
-                <div className="w-3.5 h-3.5 rounded-full bg-green-500 shadow-lg"></div>
-                <div className="flex-1"></div>
-                <div className="text-sm text-foreground font-bold flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-primary" />
-                  SoloWipe
-                </div>
+              {/* Background mesh/gradient behind image */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                {/* Layered blurred circles for depth */}
+                <div className="absolute w-[400px] h-[400px] bg-blue-500/20 rounded-full blur-[80px] opacity-60" />
+                <div className="absolute w-[300px] h-[300px] bg-indigo-500/25 rounded-full blur-[60px] opacity-50" />
+                <div className="absolute w-[200px] h-[200px] bg-purple-500/20 rounded-full blur-[40px] opacity-40" />
+                
+                {/* Glassmorphism panels */}
+                <div className="absolute top-1/4 right-1/4 w-32 h-32 bg-white/5 rounded-2xl backdrop-blur-xl border border-white/10 rotate-12" />
+                <div className="absolute bottom-1/4 left-1/4 w-24 h-24 bg-white/5 rounded-xl backdrop-blur-xl border border-white/10 -rotate-12" />
               </div>
               
-              <div className="p-6 space-y-4">
-                {/* 🏆 Award-Winning Job Card 🏆 */}
-                <motion.div 
-                  className="bg-card border-2 border-primary/30 rounded-xl p-5 shadow-award relative overflow-hidden card-award"
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  whileInView={{ opacity: 1, scale: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
-                  whileHover={{ scale: 1.02, y: -2 }}
-                >
-                  <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-primary/20 to-emerald-500/15 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 opacity-40" />
-                  <div className="relative z-10">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <h3 className="font-black text-xl text-foreground mb-2 text-gradient-primary">Sarah Johnson</h3>
-                        <p className="text-sm text-muted-foreground font-medium">123 High Street, London</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-3xl font-black text-foreground bg-gradient-to-r from-primary to-emerald-600 bg-clip-text text-transparent">£25</div>
-                        <div className="text-xs text-muted-foreground font-semibold">Every 4 weeks</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 mt-5">
-                      <div className="flex-1 h-3 bg-primary/20 rounded-full overflow-hidden shadow-depth-1">
-                        <motion.div
-                          className="h-full bg-gradient-to-r from-primary via-emerald-500 to-primary rounded-full shadow-award"
-                          initial={{ width: 0 }}
-                          whileInView={{ width: '75%' }}
-                          viewport={{ once: true }}
-                          transition={{ duration: 1.2, delay: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary/15 border-2 border-primary/30 shadow-award badge-premium">
-                        <CheckCircle2 className="w-5 h-5 text-primary" />
-                        <span className="text-xs font-bold text-primary">Completed · DD processing</span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* 🏆 Award-Winning SMS Preview 🏆 */}
-                <motion.div 
-                  className="bg-gradient-to-br from-muted/40 to-muted/20 rounded-xl p-5 border-2 border-primary/20 shadow-award card-award"
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.6, delay: 0.3 }}
-                  whileHover={{ scale: 1.02, y: -2 }}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-emerald-500/20 flex items-center justify-center flex-shrink-0 shadow-award">
-                      <MessageSquare className="w-6 h-6 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold text-foreground mb-2">
-                        Tomorrow reminder sent to <span className="text-gradient-primary font-black">Sarah</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground font-medium leading-relaxed">
-                        "You're booked for 10:00, £25 via Direct Debit."
-                      </div>
-                      <div className="mt-3 text-xs text-muted-foreground flex items-center gap-2 font-semibold">
-                        <Clock className="w-4 h-4 text-primary" />
-                        Receipt text sent and GoCardless payment created
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Second Job Card (Pending) - Premium Styling */}
-                <motion.div 
-                  className="bg-card border-2 border-border/60 rounded-xl p-5 shadow-depth-2 opacity-80 hover:opacity-100 transition-all card-premium"
-                  initial={{ opacity: 0.75 }}
-                  whileHover={{ opacity: 1, scale: 1.01, y: -2 }}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h3 className="font-bold text-foreground mb-1">Mike Thompson</h3>
-                      <p className="text-sm text-muted-foreground font-medium">45 Park Avenue, Manchester</p>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-black text-foreground">£30</div>
-                      <div className="text-xs text-muted-foreground font-semibold">Every 4 weeks</div>
-                    </div>
-                  </div>
-                  <div className="flex gap-3 mt-4">
-                    <div className="flex-1 h-2.5 bg-muted rounded-full shadow-depth-1"></div>
-                    <Clock className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                </motion.div>
-              </div>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Built for the Trade - Image Grid */}
-      <section id="trade" className="py-28 px-4 md:px-6 bg-gradient-to-b from-background via-slate-50/50 dark:via-slate-900/50 to-background relative overflow-hidden" style={{ position: 'relative', zIndex: 10 }}>
-        {/* Subtle decorative elements */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 right-0 w-96 h-96 bg-primary/3 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 left-0 w-96 h-96 bg-emerald-500/3 rounded-full blur-3xl" />
-        </div>
-        <div className="max-w-7xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-100px' }}
-            transition={{ duration: 0.6 }}
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-sm font-semibold mb-6 border border-primary/20 dark:border-primary/30">
-              <Sparkles className="w-4 h-4" />
-              Real Workdays
-            </div>
-            <h2 className="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-foreground mb-6 leading-tight tracking-tight">
-              Built for Real Workdays
-            </h2>
-            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed font-medium">
-              Every feature was designed after listening to cleaners describe their actual workflow&mdash;from the van, 
-              to the customer&apos;s home, to managing payments and back to planning the next round.
-            </p>
-          </motion.div>
-
-          {/* Enhanced responsive image grid with fallbacks */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8 auto-rows-fr relative z-10">
-            {tradeImages.map((img, index) => (
-              <TradeImageCard key={`trade-img-${index}-${img.title}`} img={img} index={index} />
-            ))}
-          </div>
-
-        </div>
-      </section>
-
-      {/* Problem Section - "The Round You're Running Now" */}
-      <section id="problem" className="py-28 px-4 md:px-6 bg-gradient-to-b from-background via-slate-50/30 dark:via-slate-900/30 to-muted/30 relative overflow-hidden">
-        {/* Decorative background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/3 w-96 h-96 bg-red-500/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/3 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl" />
-        </div>
-        
-        <div className="max-w-6xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/10 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-sm font-semibold mb-6 border border-red-500/20 dark:border-red-500/30">
-              The Problem
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
-              Right now, your round is costing you more time than it should
-            </h2>
-            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
-              These are the exact problems local cleaners told us about—the daily frustrations that eat your time
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-3 gap-6 md:gap-8">
-            {painPoints.map((point, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ 
-                  duration: 0.6, 
-                  delay: index * 0.1,
-                  type: "spring",
-                  stiffness: 100
-                }}
-                whileHover={{ 
-                  y: -6,
-                  scale: 1.02,
-                  transition: { duration: 0.3 }
-                }}
-                className={cn(
-                  "bg-card rounded-2xl p-8 md:p-10 border-2 border-border/60 dark:border-border/80 shadow-depth-2 hover:shadow-depth-4 transition-all duration-300 ease-out relative overflow-hidden group card-premium",
-                  point.bgColor
-                )}
-              >
-                <div className="absolute top-0 right-0 w-40 h-40 bg-destructive/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
-                <div className="relative z-10">
-                  <motion.div 
-                    className={cn("w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-depth-2", point.bgColor)}
-                    whileHover={{ 
-                      scale: 1.15,
-                      rotate: [0, -5, 5, 0],
-                      transition: { duration: 0.4 }
-                    }}
-                  >
-                    <point.icon className={cn("w-8 h-8", point.color)} />
-                  </motion.div>
-                  <h3 className="text-xl md:text-2xl font-bold text-foreground mb-4 leading-tight">{point.title}</h3>
-                  <p className="text-muted-foreground leading-relaxed text-base group-hover:text-foreground/90 transition-colors">{point.description}</p>
+              {/* Image container */}
+              <div className="relative">
+                {/* Subtle radial gradient glow behind phone - Grounding effect */}
+                <div className="absolute inset-0 flex items-center justify-center -z-10">
+                  <div className="w-[600px] h-[600px] bg-[#4F46E5] rounded-full blur-3xl opacity-20" />
                 </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Transformation Story - Before → After */}
-      <section id="transformation" className="py-28 px-4 md:px-6 bg-gradient-to-b from-muted/30 to-background relative overflow-hidden">
-        {/* Decorative background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-0 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-        </div>
-        
-        <div className="max-w-6xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6 border border-emerald-500/20 dark:border-emerald-500/30">
-              The Solution
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
-              How SoloWipe Transforms Your Day
-            </h2>
-            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
-              From manual chaos to automated wealth—here's what changes
-            </p>
-          </motion.div>
-
-          <div className="space-y-6 md:space-y-8">
-            {transformations.map((transformation, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, x: index % 2 === 0 ? -30 : 30, scale: 0.95 }}
-                whileInView={{ opacity: 1, x: 0, scale: 1 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ 
-                  duration: 0.6, 
-                  delay: index * 0.1,
-                  type: "spring",
-                  stiffness: 100
-                }}
-                whileHover={{ 
-                  y: -4,
-                  scale: 1.01,
-                  transition: { duration: 0.3 }
-                }}
-                className={cn(
-                  "relative rounded-2xl p-8 md:p-10 lg:p-12 border-2 border-border/60 dark:border-border/80 shadow-depth-3 hover:shadow-depth-4 overflow-hidden group transition-all duration-300 ease-out card-premium",
-                  transformation.bgColor
-                )}
-              >
-                <div className="absolute top-0 right-0 w-56 h-56 bg-gradient-to-br opacity-10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-700" />
-                <div className="relative grid md:grid-cols-2 gap-8 items-center z-10">
-                  <div>
-                    <div className="flex items-center gap-4 mb-5">
-                      <motion.div 
-                        className={cn("w-14 h-14 rounded-xl flex items-center justify-center shadow-depth-2", transformation.bgColor)}
-                        whileHover={{ scale: 1.1, rotate: -5 }}
-                      >
-                        <X className="w-7 h-7 text-destructive" />
-                      </motion.div>
-                      <div>
-                        <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">Before</div>
-                        <div className="text-lg font-bold text-foreground leading-snug">{transformation.before}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-4">
-                      <motion.div 
-                        className={cn("w-14 h-14 rounded-xl flex items-center justify-center shadow-depth-2", transformation.bgColor)}
-                        whileHover={{ scale: 1.1, rotate: 5 }}
-                      >
-                        <transformation.icon className={cn("w-7 h-7", transformation.color)} />
-                      </motion.div>
-                      <div>
-                        <div className="text-xs font-bold text-primary uppercase tracking-wider mb-1">After SoloWipe</div>
-                        <div className="text-lg font-bold text-foreground leading-snug">{transformation.after}</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-
-          {/* CTA after transformation - Fixed visibility */}
-          <div className="text-center mt-12 relative z-20">
-            <Button
-              size="xl"
-              onClick={() => {
-                if (typeof window !== 'undefined' && (window as any).gtag) {
-                  (window as any).gtag('event', 'click', {
-                    event_category: 'CTA',
-                    event_label: 'Transformation CTA',
-                    value: 1
-                  });
-                }
-                navigate('/auth?mode=signup');
-              }}
-              className="min-w-[280px] h-14 text-base font-semibold shadow-xl bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90 text-white border-0 hover:scale-105 active:scale-95 transition-all duration-300 ease-out focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 relative z-20"
-              style={{ position: 'relative', zIndex: 20 }}
-              aria-label="Start Free - Automate Your First 10 Jobs"
-            >
-              Automate Your First 10 Jobs Free
-              <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Lead Magnets Section */}
-      <section className="py-16 px-4 bg-gradient-to-br from-primary/10 via-emerald-500/10 to-primary/10 relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
-        </div>
-        
-        <div className="max-w-4xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-12"
-          >
-            <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-3">
-              Free Resources to Help You Succeed
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              Practical tools and guides to help you start and grow your window cleaning business
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 gap-6 mb-8">
-            {/* ROI Calculator */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: 0.1 }}
-              className="bg-card rounded-2xl border-2 border-border p-6 hover:border-primary/50 transition-all"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-primary" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground">ROI Calculator</h3>
-              </div>
-              <p className="text-muted-foreground mb-4">
-                Calculate how much time and money SoloWipe can save your business. Enter your current metrics and see your potential savings.
-              </p>
-              <Button
-                onClick={() => navigate('/roi-calculator')}
-                variant="outline"
-                className="w-full"
-              >
-                Calculate Your Savings
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </motion.div>
-
-            {/* Setup Checklist */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4, delay: 0.2 }}
-              className="bg-card rounded-2xl border-2 border-border p-6 hover:border-primary/50 transition-all"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-emerald-600" />
-                </div>
-                <h3 className="text-xl font-bold text-foreground">Setup Checklist</h3>
-              </div>
-              <p className="text-muted-foreground mb-4">
-                A comprehensive checklist to help you start your window cleaning business the right way. Covers legal, equipment, marketing, and more.
-              </p>
-              <Button
-                onClick={() => navigate('/setup-checklist')}
-                variant="outline"
-                className="w-full"
-              >
-                View Checklist
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </motion.div>
-          </div>
-
-          {/* Email Capture */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, delay: 0.3 }}
-            className="text-center"
-          >
-            <p className="text-muted-foreground mb-4">
-              Get weekly tips delivered to your inbox
-            </p>
-            <EmailCaptureForm
-              variant="inline"
-              placeholder="Enter your email"
-              buttonText="Subscribe to Tips"
-              onSuccess={(email) => {
-                if (typeof window !== 'undefined' && (window as any).gtag) {
-                  (window as any).gtag('event', 'email_signup', {
-                    event_category: 'Lead Generation',
-                    event_label: 'Tips Signup',
-                    value: 1
-                  });
-                }
-              }}
-            />
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Features Section - Premium Bento Grid */}
-      <section id="features" className="py-28 px-4 md:px-6 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
-        {/* Decorative background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl" />
-        </div>
-        
-        <div className="max-w-6xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-sm font-semibold mb-6 border border-primary/20 dark:border-primary/30">
-              <Zap className="w-4 h-4" />
-              Powerful Features
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
-              All-in-One Round Control
-            </h2>
-            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
-              Every feature addresses a real pain point we discovered through months of research with local window cleaners
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-            {features.map((feature, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ 
-                  duration: 0.6, 
-                  delay: index * 0.1,
-                  type: "spring",
-                  stiffness: 100
-                }}
-                whileHover={{ 
-                  y: -8,
-                  scale: 1.02,
-                  transition: { duration: 0.3 }
-                }}
-                className={cn(
-                  "relative rounded-2xl p-6 md:p-8 lg:p-10 border-2 border-border/60 dark:border-border/80 transition-all duration-300 ease-out overflow-hidden group bg-card card-award transform-3d-premium",
-                  feature.bgColor
-                )}
-              >
-                {/* Static glow effects - animations disabled */}
-                <div 
-                  className={cn(
-                    "absolute inset-0 bg-gradient-to-br opacity-0 group-hover:opacity-10 transition-opacity duration-500",
-                    feature.glowColor
-                  )}
+                
+                {/* Floating glow effect */}
+                <motion.div
+                  animate={{
+                    scale: [1, 1.05, 1],
+                    opacity: [0.3, 0.5, 0.3],
+                  }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                  className="absolute -inset-8 bg-blue-500/10 rounded-[3rem] blur-3xl -z-10"
                 />
                 
-                {/* Premium Shimmer Effect - static on hover only */}
-                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                  <div className="absolute inset-0 shimmer-award" />
+                {/* Image container with depth */}
+                <div className="relative rounded-3xl overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]">
+                  <img
+                    src="/app-image-3.png"
+                    alt="SoloWipe app interface"
+                    className="w-full h-auto"
+                    loading="eager"
+                    fetchPriority="high"
+                  />
                 </div>
-                
-                {/* Static border glow on hover */}
-                <div className="absolute inset-0 rounded-2xl border-2 border-primary/0 group-hover:border-primary/30 transition-all duration-500" />
-                
-                <div className="relative z-10">
-                  <div 
-                    className={cn("w-18 h-18 rounded-2xl flex items-center justify-center mb-6 shadow-award", feature.bgColor)}
-                    style={{ width: '72px', height: '72px' }}
-                  >
-                    <feature.icon className={cn("w-9 h-9", feature.color)} />
-                  </div>
-                  <h3 className="text-xl md:text-2xl font-black text-foreground mb-4 group-hover:text-gradient-award transition-all leading-tight tracking-tight">
-                    {feature.title}
-                  </h3>
-                  <p className="text-muted-foreground dark:text-muted-foreground/90 leading-relaxed text-base md:text-lg group-hover:text-foreground/95 transition-colors font-medium">
-                    {feature.description}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
+              </div>
+            </motion.div>
           </div>
-        </div>
-      </section>
-
-      {/* How It Works - 3-Step Flow */}
-      <section id="how-it-works" className="py-28 px-4 md:px-6 bg-gradient-to-b from-muted/30 to-background relative overflow-hidden">
-        {/* Decorative background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/2 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
         </div>
         
-        <div className="max-w-4xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-sm font-semibold mb-6 border border-primary/20 dark:border-primary/30">
-              <Target className="w-4 h-4" />
-              Simple Process
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
-              How SoloWipe Fits Into Your Day
-            </h2>
-            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
-              Set up once. Work from your phone. SoloWipe handles the rest.
-            </p>
-          </motion.div>
+        {/* Section divider */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-950 to-transparent z-[9]" />
+      </section>
 
-          <div className="space-y-8 md:space-y-10">
-            {[
-              {
-                step: 1,
-                title: 'Set up your round once',
-                description: 'Add customers with price and frequency. Optional: send Direct Debit invites right from SoloWipe so payments auto-collect.',
-                icon: Users,
-              },
-              {
-                step: 2,
-                title: 'Work from the Today screen',
-                description: 'See all due jobs. Send "On my way" SMS. Complete jobs. SoloWipe automatically reschedules and triggers Direct Debit payments.',
-                icon: Smartphone,
-              },
-              {
-                step: 3,
-                title: 'SoloWipe chases the rest',
-                description: 'Direct Debits move from processing to paid via webhooks, unpaid jobs stay visible until collected, and earnings auto-update.',
-                icon: Target,
-              },
-            ].map((step, index) => (
+      {/* TRUST BAR */}
+      <section className="py-16 border-y border-border/30 bg-muted/20">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
+            {trustItems.map((item, index) => (
               <motion.div
                 key={index}
-                initial={{ opacity: 0, x: -30, scale: 0.95 }}
-                whileInView={{ opacity: 1, x: 0, scale: 1 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ 
-                  duration: 0.6, 
-                  delay: index * 0.1,
-                  type: "spring",
-                  stiffness: 100
-                }}
-                whileHover={{ 
-                  y: -4,
-                  scale: 1.01,
-                  transition: { duration: 0.3 }
-                }}
-                className="relative bg-card rounded-2xl p-8 md:p-10 lg:p-12 border-2 border-border/60 dark:border-border/80 shadow-depth-3 hover:shadow-depth-4 transition-all duration-300 ease-out group card-premium"
+                initial={{ opacity: 0, y: 10 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className="flex flex-col items-center gap-3"
               >
-                <div className="flex items-start gap-6">
-                  <motion.div 
-                    className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary/25 to-emerald-500/25 flex items-center justify-center flex-shrink-0 border-2 border-primary/40 shadow-depth-2 relative overflow-hidden"
-                    whileHover={{ 
-                      scale: 1.15,
-                      rotate: [0, -5, 5, 0],
-                      transition: { duration: 0.4 }
-                    }}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                    <span className="text-3xl font-extrabold text-primary relative z-10">{step.step}</span>
-                  </motion.div>
-                  <div className="flex-1">
-                    <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-4 leading-tight tracking-tight">{step.title}</h3>
-                    <p className="text-muted-foreground dark:text-muted-foreground/90 text-lg md:text-xl leading-relaxed group-hover:text-foreground/90 transition-colors">{step.description}</p>
-                  </div>
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <item.icon className="w-6 h-6 text-primary" />
                 </div>
+                <span className="text-sm font-medium text-muted-foreground text-center">
+                  {item.label}
+                </span>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* SMS Lead Generation Section */}
-      <section className="py-28 px-4 md:px-6 bg-gradient-to-br from-emerald-50/50 via-primary/10 to-emerald-50/50 dark:from-emerald-950/20 dark:via-primary/5 dark:to-emerald-950/20">
+      {/* PROBLEMS SECTION - Ultra Simple */}
+      <section className="py-32 px-6 bg-background">
         <div className="max-w-4xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="text-center mb-12"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6 border border-emerald-500/20 dark:border-emerald-500/30">
-              <MessageSquare className="w-4 h-4" />
-              Lead Generation
-            </div>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Turn Every Customer Into a Lead Generator
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Built-in referral SMS templates help your customers bring you new business. 
-              One tap sends professional referral messages that grow your round automatically.
-            </p>
-          </motion.div>
-              
-          <div className="grid md:grid-cols-2 gap-8">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="bg-card rounded-2xl p-8 border-2 border-border"
-            >
-              <MessageSquare className="w-12 h-12 text-primary mb-4" />
-              <h3 className="text-xl font-bold text-foreground mb-3">
-                Referral SMS Templates
-              </h3>
-              <p className="text-muted-foreground">
-                Pre-written messages that make it easy for customers to refer friends. 
-                Track referrals and watch your round grow.
-              </p>
-            </motion.div>
-                  
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              className="bg-card rounded-2xl p-8 border-2 border-border"
-            >
-              <TrendingUp className="w-12 h-12 text-emerald-600 mb-4" />
-              <h3 className="text-xl font-bold text-foreground mb-3">
-                Automated Price Increases
-              </h3>
-              <p className="text-muted-foreground">
-                Increase prices across your round in seconds. Send professional SMS notifications 
-                automatically. No awkward conversations needed.
-              </p>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* Modern Design Section */}
-      <section className="py-28 px-4 md:px-6">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Designed for 2026, Built for Real Life
-          </h2>
-          <p className="text-lg text-muted-foreground mb-8">
-            Modern, mobile-first design that works offline. No complicated setup. 
-            No technical knowledge required. Just simple, powerful tools that save you time.
-          </p>
-              
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-card rounded-xl p-6 border-2 border-border">
-              <Smartphone className="w-10 h-10 text-primary mx-auto mb-4" />
-              <h3 className="font-bold text-foreground mb-2">Mobile-First</h3>
-              <p className="text-sm text-muted-foreground">
-                Designed for your phone. Works perfectly on the go.
-              </p>
-            </div>
-                  
-            <div className="bg-card rounded-xl p-6 border-2 border-border">
-              <WifiOff className="w-10 h-10 text-primary mx-auto mb-4" />
-              <h3 className="font-bold text-foreground mb-2">Works Offline</h3>
-              <p className="text-sm text-muted-foreground">
-                No signal? No problem. Complete jobs anywhere.
-              </p>
-            </div>
-                  
-            <div className="bg-card rounded-xl p-6 border-2 border-border">
-              <Zap className="w-10 h-10 text-primary mx-auto mb-4" />
-              <h3 className="font-bold text-foreground mb-2">30-Second Setup</h3>
-              <p className="text-sm text-muted-foreground">
-                Add your first customer in seconds. No training needed.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Comparison Section */}
-      <section id="comparison" className="py-28 px-4 md:px-6 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
-        {/* Decorative background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
-        </div>
-        
-        <div className="max-w-5xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
+            transition={{ duration: 0.6 }}
             className="text-center mb-20"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6 border border-emerald-500/20 dark:border-emerald-500/30">
-              The Comparison
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
-              SoloWipe vs. Paper Diaries & Excel
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 tracking-tight">
+              Running a service business is hard enough
             </h2>
-            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
-              See why SoloWipe gives you a higher likelihood of success than running your round on paper or spreadsheets.
-            </p>
           </motion.div>
-
-          <div className="grid md:grid-cols-2 gap-6 md:gap-8">
-            <motion.div
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="rounded-2xl border-2 border-emerald-500/30 dark:border-emerald-500/40 bg-card p-8 md:p-10 shadow-xl hover:shadow-2xl transition-all duration-300 ease-out"
-            >
-              <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
-                <img 
-                  src="/SoloLogo.jpg" 
-                  alt="SoloWipe" 
-                  className="h-12 w-auto md:h-16"
-                  loading="lazy"
-                  width="auto"
-                  height="auto"
-                />
-                <span className="bg-gradient-to-r from-primary to-emerald-600 bg-clip-text text-transparent">SoloWipe</span>
-              </h3>
-              <ul className="space-y-3 text-sm">
-                {[
-                  'Jobs auto-reschedule from customer frequency so you never miss a visit.',
-                  'Direct Debit via GoCardless automatically collects payments on completion.',
-                  'Pre-written SMS templates send reminders and receipts in seconds.',
-                  'Route optimization reduces wasted driving and fuel.',
-                  'Offline-first mobile app—works even with no signal.',
-                  'UK GDPR-aligned, secure Supabase backend and RLS policies.',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5" />
-                    <span className="text-foreground">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-
-            <motion.div
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="rounded-2xl border-2 border-border/70 dark:border-border/80 bg-muted/40 dark:bg-muted/60 p-8 md:p-10 shadow-lg"
-            >
-              <h3 className="text-xl font-bold mb-6 flex items-center gap-3">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-muted text-sm font-bold border-2 border-border">
-                  PD/XL
-                </span>
-                <span>Paper Diaries & Excel</span>
-              </h3>
-              <ul className="space-y-3 text-sm">
-                {[
-                  'Frequencies live in your head or on paper—easy to miss streets and one-offs.',
-                  'You manually chase cash and bank transfers and track who owes what.',
-                  'Every reminder and receipt is typed by hand and easy to forget.',
-                  'No automatic route planning—lots of back and forth driving.',
-                  'No offline sync or mobile app intelligence—just notes.',
-                  'No automated backups or role-based access control.',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <X className="w-4 h-4 text-destructive mt-0.5" />
-                    <span className="text-foreground">{item}</span>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* Pricing Section - Risk Reversal */}
-      <section id="pricing" className="py-28 px-4 md:px-6 bg-gradient-to-b from-muted/30 via-background to-background relative overflow-hidden" style={{ position: 'relative', zIndex: 20 }}>
-        {/* Decorative background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/3 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/3 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl" />
-        </div>
-        
-        <div className="max-w-4xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6 border border-emerald-500/20 dark:border-emerald-500/30">
-              <ShieldCheck className="w-4 h-4" />
-              Risk-Free Start
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
-              Start Free, Then Choose Your Plan
-            </h2>
-            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
-              Automate your first 10 jobs completely free. No credit card required. Then upgrade to unlimited access when you're ready.
-            </p>
-          </motion.div>
-
-          <div className="grid md:grid-cols-2 gap-8 md:gap-10 mb-16 relative z-20">
-            {/* Free Tier */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="bg-card rounded-2xl p-8 md:p-10 lg:p-12 border-2 border-primary/30 dark:border-primary/40 shadow-xl hover:shadow-2xl relative overflow-hidden group transition-all duration-300 ease-out"
-            >
-              <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform" />
-              <div className="relative z-10">
-                <div className="text-center mb-8">
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/15 text-primary text-sm font-semibold mb-5 border border-primary/20">
-                    Always Free
-                  </div>
-                  <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-3">Free Usage</h3>
-                  <div className="text-6xl font-bold text-foreground mb-2 bg-gradient-to-r from-primary to-emerald-600 bg-clip-text text-transparent">£0</div>
-                  <p className="text-muted-foreground font-medium">No credit card required</p>
-                </div>
-                <ul className="space-y-4 mb-8">
-                  {[
-                    'First 10 jobs free',
-                    'First 10 SMS messages free',
-                    'All features included',
-                    'No time limit',
-                    'Perfect for trying SoloWipe',
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <CheckCircle className="w-6 h-6 text-primary mt-0.5 flex-shrink-0" />
-                      <span className="text-foreground font-medium">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  size="xl"
-                  onClick={() => {
-                    if (typeof window !== 'undefined' && (window as any).gtag) {
-                      (window as any).gtag('event', 'click', {
-                        event_category: 'CTA',
-                        event_label: 'Pricing Free Tier',
-                        value: 1
-                      });
-                    }
-                    navigate('/auth?mode=signup');
-                  }}
-                  className="w-full h-14 text-base font-semibold shadow-xl bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90 text-white border-0 hover:scale-105 active:scale-95 transition-all duration-300 ease-out focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 relative z-20"
-                  style={{ position: 'relative', zIndex: 20 }}
-                  aria-label="Start Free - 10 Jobs Included"
-                >
-                  Start Free - 10 Jobs Included
-                </Button>
-              </div>
-            </motion.div>
-
-            {/* Paid Tier */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="bg-gradient-to-br from-primary/5 to-emerald-500/5 dark:from-primary/10 dark:to-emerald-500/10 rounded-2xl p-8 md:p-10 lg:p-12 border-2 border-primary dark:border-primary/60 shadow-2xl hover:shadow-primary/20 hover:-translate-y-1 relative overflow-hidden group transition-all duration-300 ease-out"
-            >
-              {/* Special Offer Badge */}
-              <div className="absolute top-4 right-4 z-20">
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  whileInView={{ scale: 1, opacity: 1 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
-                  className="px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-xs font-bold shadow-lg border border-white/20"
-                >
-                  Special Offer
-                </motion.div>
-              </div>
-              
-              <div className="absolute top-0 right-0 w-48 h-48 bg-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-500" />
-              <div className="relative z-10">
-                <div className="text-center mb-8">
-                  <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-3">Pro Subscription</h3>
-                  <div className="text-6xl font-bold text-foreground mb-2 bg-gradient-to-r from-primary to-emerald-600 bg-clip-text text-transparent">
-                    £25
-                    <span className="text-xl text-muted-foreground font-normal">/month</span>
-                  </div>
-                  <p className="text-muted-foreground font-medium">or £250/year (save £50)</p>
-                  
-                  {/* 60-Day Trial Offer */}
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: 0.4, duration: 0.5 }}
-                    className="mt-4 inline-flex flex-col items-center gap-2"
-                  >
-                    <div className="px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold border border-emerald-500/20 dark:border-emerald-500/30 shadow-sm">
-                      <Clock className="w-4 h-4 inline mr-2" />
-                      <span>60-Day Free Trial Available</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground max-w-xs text-center leading-relaxed">
-                      Register interest to receive coupon code (subject to availability)
-                    </p>
-                  </motion.div>
-                </div>
-                <ul className="space-y-4 mb-8">
-                  {[
-                    'Unlimited jobs and customers',
-                    'Assign jobs to helpers & team members',
-                    'Unlimited SMS templates',
-                    'Direct Debit integration',
-                    'Route optimization',
-                    'Priority support',
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <CheckCircle className="w-6 h-6 text-primary mt-0.5 flex-shrink-0" />
-                      <span className="text-foreground font-medium">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="bg-white/50 dark:bg-slate-800/50 rounded-xl p-5 mb-6 border border-primary/20">
-                  <p className="text-sm text-muted-foreground text-center font-medium space-y-2">
-                    <div>
-                      <strong className="text-foreground">Start with 10 free jobs</strong>, then subscribe for unlimited access at £25/month or £250/year.
-                    </div>
-                    <div>
-                      <strong className="text-foreground">Special Offer:</strong> Register interest to receive a 60-day free trial coupon (subject to availability). 
-                      After 60 days, your subscription continues at your chosen rate (£25/month or £250/year).
-                    </div>
-                    <div className="text-xs pt-2 text-muted-foreground/80">
-                      Cancel anytime from Settings—no emails, no calls.
-                    </div>
-                  </p>
-                </div>
-                <Button
-                  size="xl"
-                  onClick={() => {
-                    if (typeof window !== 'undefined' && (window as any).gtag) {
-                      (window as any).gtag('event', 'click', {
-                        event_category: 'CTA',
-                        event_label: 'Pricing Pro Tier',
-                        value: 1
-                      });
-                    }
-                    navigate('/auth?mode=signup');
-                  }}
-                  className="w-full h-14 text-base font-semibold shadow-xl bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90 text-white border-0 hover:scale-105 active:scale-95 transition-all duration-300 ease-out focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 relative z-20"
-                  style={{ position: 'relative', zIndex: 20 }}
-                  aria-label="Subscribe - Register Interest for 60-Day Trial"
-                >
-                  Subscribe - Register for 60-Day Trial
-                </Button>
-              </div>
-            </motion.div>
-          </div>
-
-          {/* Special Offer Explanation */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, ease: "easeOut", delay: 0.2 }}
-            className="bg-gradient-to-br from-emerald-50/50 via-primary/10 to-emerald-50/50 dark:from-emerald-950/20 dark:via-primary/10 dark:to-emerald-950/20 rounded-2xl p-8 md:p-10 border-2 border-emerald-500/20 dark:border-emerald-500/30 mb-12 shadow-lg"
-          >
-            <div className="text-center">
-              <motion.div
-                initial={{ scale: 0.9 }}
-                whileInView={{ scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ delay: 0.3 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold mb-6 border border-emerald-500/20"
-              >
-                <Sparkles className="w-4 h-4" />
-                Special 60-Day Free Trial Offer
-              </motion.div>
-              <h3 className="text-2xl md:text-3xl font-bold text-foreground mb-4 flex items-center justify-center gap-2">
-                <span>How It Works</span>
-              </h3>
-              <div className="text-base md:text-lg text-muted-foreground max-w-3xl mx-auto leading-relaxed space-y-4">
-                <p>
-                  We're offering a <strong className="text-foreground">60-day free trial</strong> of our unlimited Pro subscription (£25/month or £250/year) 
-                  to the first customers who register interest.
-                </p>
-                <p>
-                  <strong className="text-foreground">How it works:</strong> Start with your 10 free jobs. When you're ready to upgrade, 
-                  register your interest for the 60-day trial. If selected, you'll receive a coupon code via email. 
-                  Use the code when subscribing to get 60 days free of unlimited access.
-                </p>
-                <p className="text-sm pt-2 text-muted-foreground/90">
-                  After 60 days, your subscription automatically continues at your chosen rate (£25/month or £250/year). 
-                  Subject to availability. No credit card required until after the trial period.
-                </p>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center text-sm text-muted-foreground space-y-2"
-          >
-            <p><strong className="text-foreground">No setup fees.</strong> No credit card required for free tier. No commitment.</p>
-            <p>Cancel anytime from inside Settings—no emails, no calls.</p>
-            <p className="pt-4"><strong className="text-foreground">£25/month or £250/year.</strong> 60-day free trial available to first customers who register interest (subject to availability). GDPR compliant. GoCardless Direct Debit ready.</p>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section id="faq" className="py-28 px-4 md:px-6 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
-        {/* Decorative background */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-primary/5 rounded-full blur-3xl" />
-        </div>
-        
-        <div className="max-w-4xl mx-auto relative">
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true, margin: "-100px" }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="text-center mb-20"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 dark:bg-primary/20 text-primary text-sm font-semibold mb-6 border border-primary/20 dark:border-primary/30">
-              <MessageSquare className="w-4 h-4" />
-              Questions & Answers
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
-              Frequently Asked Questions
-            </h2>
-            <p className="text-lg md:text-xl lg:text-2xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
-              Everything you need to know before you start automating your round.
-            </p>
-          </motion.div>
-
-          <div className="space-y-4 md:space-y-6">
-            {faqItems.map((item, index) => (
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            {problems.map((problem, index) => (
               <motion.div
                 key={index}
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ 
-                  duration: 0.4, 
-                  delay: index * 0.05,
-                  type: "spring",
-                  stiffness: 100
-                }}
-                whileHover={{ 
-                  y: -2,
-                  scale: 1.01,
-                  transition: { duration: 0.2 }
-                }}
-                className="rounded-xl border-2 border-border/60 dark:border-border/80 bg-card p-6 md:p-8 shadow-depth-2 hover:shadow-depth-3 transition-all duration-300 ease-out group card-premium"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className="p-8 rounded-2xl bg-card border border-border/50 text-center space-y-4"
               >
-                <h3 className="text-base md:text-lg font-bold text-foreground mb-4 flex items-start gap-3 leading-snug">
-                  <span className="mt-0.5 text-primary text-xl font-extrabold flex-shrink-0">Q.</span>
-                  <span className="group-hover:text-primary/90 transition-colors">{item.question}</span>
-                </h3>
-                <p className="text-sm md:text-base text-muted-foreground leading-relaxed flex items-start gap-3 group-hover:text-foreground/80 transition-colors">
-                  <span className="mt-0.5 text-emerald-600 text-lg font-extrabold flex-shrink-0">A.</span>
-                  <span>{item.answer}</span>
+                <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center mx-auto">
+                  <problem.icon className="w-6 h-6 text-destructive" />
+                </div>
+                <p className="text-muted-foreground leading-relaxed">
+                  {problem.text}
                 </p>
               </motion.div>
             ))}
           </div>
-
-          <motion.div 
-            className="text-center mt-12"
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-          >
-            <Button
-              size="xl"
-              onClick={() => navigate('/auth?mode=signup')}
-              className="min-w-[280px] h-14 text-base font-bold shadow-depth-3 hover:shadow-depth-4 btn-premium"
-            >
-              Automate Your First 10 Jobs Free
-              <ArrowRight className="ml-2 w-5 h-5" />
-            </Button>
-          </motion.div>
         </div>
       </section>
 
-      {/* Final CTA Section - Premium Design */}
-      <section className="py-28 px-4 md:px-6 bg-gradient-to-br from-primary/10 via-emerald-500/10 to-primary/10 relative overflow-hidden" style={{ position: 'relative', zIndex: 30 }}>
-        {/* Simplified background effects */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ zIndex: 1 }}>
-          <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/15 rounded-full blur-3xl opacity-60" />
-          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-emerald-500/15 rounded-full blur-3xl opacity-60" />
+      {/* SOLUTION SECTION - Premium Split Layout with floating image */}
+      <section id="solution" ref={solutionRef} className="py-32 px-6 bg-gradient-to-b from-background via-muted/20 to-background relative overflow-hidden">
+        {/* Background blend layer */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_right_center,_var(--tw-gradient-stops))] from-transparent via-background/30 to-background/70 pointer-events-none z-[1]" />
+        
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            {/* Left: Text - positioned above image */}
+            <motion.div
+              initial={{ opacity: 0, x: -30 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.8 }}
+              className="space-y-8 relative z-20"
+            >
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight tracking-tight">
+                SoloWipe automates everything
+              </h2>
+              <p className="text-xl text-muted-foreground leading-relaxed">
+                Your round runs itself. Jobs reschedule automatically. Payments collect via Direct Debit. 
+                Reminders send themselves. You focus on the work, not the admin.
+              </p>
+              <p className="text-lg text-muted-foreground leading-relaxed">
+                Built specifically for UK service businesses. Works completely offline. 
+                No complicated setup. No training required.
+              </p>
+              <Button
+                onClick={() => {
+                  if (typeof window !== 'undefined' && (window as any).gtag) {
+                    (window as any).gtag('event', 'click', {
+                      event_category: 'CTA',
+                      event_label: 'Solution CTA',
+                      value: 1
+                    });
+                  }
+                  navigate('/auth?mode=signup');
+                }}
+                size="lg"
+                className="h-14 px-8 text-base font-semibold bg-foreground text-background hover:bg-foreground/90 shadow-depth-2 hover:shadow-depth-3 transition-all"
+              >
+                Start Free Trial
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+            </motion.div>
+            
+            {/* Right: app-image-2.png - FLOATING & LAYERED */}
+            <motion.div
+              initial={{ opacity: 0, x: 50, rotate: 2 }}
+              whileInView={{ opacity: 1, x: 0, rotate: 1.5 }}
+              viewport={{ once: true }}
+              transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+              style={{ y: solutionY }}
+              className="relative z-[8]"
+            >
+              {/* Soft shadow layers */}
+              <div className="absolute -inset-10 bg-primary/8 rounded-[3rem] blur-2xl opacity-50 -z-10" />
+              <div className="absolute -inset-6 bg-accent/4 rounded-[3rem] blur-xl opacity-30 -z-10" />
+              
+              {/* Image container */}
+              <div className="relative rounded-3xl overflow-hidden shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] border border-border/20 bg-card/50 backdrop-blur-sm">
+                <img
+                  src="/app-image-2.png"
+                  alt="SoloWipe solution"
+                  className="w-full h-auto"
+                  loading="lazy"
+                />
+                {/* Radial gradient overlay */}
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_left_center,_transparent_40%,_hsl(var(--background)/0.5)_80%)] pointer-events-none" />
+              </div>
+              
+              {/* Floating glow */}
+              <motion.div
+                animate={{
+                  scale: [1, 1.08, 1],
+                  opacity: [0.2, 0.4, 0.2],
+                }}
+                transition={{
+                  duration: 5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                className="absolute -inset-12 bg-primary/4 rounded-[3rem] blur-3xl -z-20"
+              />
+            </motion.div>
+          </div>
         </div>
         
-        <div className="max-w-4xl mx-auto text-center relative z-40" style={{ position: 'relative', zIndex: 40 }}>
+        {/* Section divider overlap */}
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent z-[9]" />
+      </section>
+
+      {/* FEATURES SECTION - Apple Grid with floating image */}
+      <section id="features" ref={featuresRef} className="py-32 px-6 bg-background relative overflow-hidden">
+        {/* Background blend */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-background/20 to-background/60 pointer-events-none z-[1]" />
+        
+        <div className="max-w-7xl mx-auto relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-20 relative z-20"
+          >
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 tracking-tight">
+              Everything you need
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              No bloat. No complexity. Just the tools you actually use.
+            </p>
+          </motion.div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-20 relative z-20">
+            {features.map((feature, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{ y: -4 }}
+                className="p-8 rounded-2xl bg-card border border-border/50 hover:border-border shadow-sm hover:shadow-depth-2 transition-all"
+              >
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-6">
+                  <feature.icon className="w-6 h-6 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold text-foreground mb-3">{feature.title}</h3>
+                <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Floating app-image-1.png - CENTERED & LAYERED */}
+          <motion.div
+            initial={{ opacity: 0, y: 60, rotate: -1 }}
+            whileInView={{ opacity: 1, y: 0, rotate: -0.5 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+            style={{ y: featuresY }}
+            className="relative max-w-4xl mx-auto z-[8] mt-20"
+          >
+            {/* Multi-layer shadows for depth */}
+            <div className="absolute -inset-16 bg-accent/10 rounded-[3rem] blur-3xl opacity-40 -z-10" />
+            <div className="absolute -inset-12 bg-primary/6 rounded-[3rem] blur-2xl opacity-30 -z-10" />
+            <div className="absolute -inset-8 bg-accent/4 rounded-[3rem] blur-xl opacity-20 -z-10" />
+            
+            {/* Image container */}
+            <div className="relative rounded-3xl overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] border border-border/20 bg-card/50 backdrop-blur-sm">
+              <img
+                src="/app-image-1.png"
+                alt="SoloWipe features"
+                className="w-full h-auto"
+                loading="lazy"
+              />
+              {/* Radial gradient overlay */}
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_transparent_35%,_hsl(var(--background)/0.4)_75%,_hsl(var(--background)/0.9))] pointer-events-none" />
+            </div>
+            
+            {/* Animated floating glow */}
+            <motion.div
+              animate={{
+                scale: [1, 1.1, 1],
+                opacity: [0.25, 0.45, 0.25],
+                y: [0, -10, 0],
+              }}
+              transition={{
+                duration: 6,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              className="absolute -inset-20 bg-accent/5 rounded-[3rem] blur-3xl -z-20"
+            />
+          </motion.div>
+        </div>
+        
+        {/* Section divider overlap */}
+        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-background to-transparent z-[9]" />
+      </section>
+
+      {/* REAL WORKDAY SECTION */}
+      <section className="py-32 px-6 bg-muted/20">
+        <div className="max-w-7xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-20"
+          >
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 tracking-tight">
+              Built for real workdays
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              See how UK service businesses use SoloWipe every day.
+            </p>
+          </motion.div>
+          
+          <div className="grid md:grid-cols-3 gap-6">
+            {tradeImages.map((image, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className="relative rounded-2xl overflow-hidden aspect-[4/3] bg-card border border-border/30 shadow-sm hover:shadow-depth-2 transition-all"
+              >
+                <img
+                  src={image}
+                  alt={`Service business ${index + 1}`}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING PREVIEW */}
+      <section id="pricing" className="py-32 px-6 bg-background">
+        <div className="max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-20"
+          >
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 tracking-tight">
+              Simple pricing
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Start free. Upgrade when you're ready.
+            </p>
+          </motion.div>
+          
+          <div className="grid md:grid-cols-2 gap-8">
+            {/* Free Tier */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="p-8 rounded-2xl border-2 border-border bg-card"
+            >
+              <h3 className="text-2xl font-semibold text-foreground mb-2">Free</h3>
+              <div className="mb-6">
+                <span className="text-5xl font-bold text-foreground">£0</span>
+                <span className="text-muted-foreground">/month</span>
+              </div>
+              <ul className="space-y-4 mb-8">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">10 jobs per month</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">All core features</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">Offline support</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">No credit card required</span>
+                </li>
+              </ul>
+              <Button
+                onClick={() => {
+                  if (typeof window !== 'undefined' && (window as any).gtag) {
+                    (window as any).gtag('event', 'click', {
+                      event_category: 'CTA',
+                      event_label: 'Pricing Free CTA',
+                      value: 1
+                    });
+                  }
+                  navigate('/auth?mode=signup');
+                }}
+                variant="outline"
+                className="w-full h-12"
+              >
+                Get Started
+              </Button>
+            </motion.div>
+            
+            {/* Pro Tier */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="p-8 rounded-2xl border-2 border-primary bg-card relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 px-4 py-1 bg-primary text-primary-foreground text-sm font-semibold rounded-bl-lg">
+                Popular
+              </div>
+              <h3 className="text-2xl font-semibold text-foreground mb-2">Pro</h3>
+              <div className="mb-6">
+                <span className="text-5xl font-bold text-foreground">£25</span>
+                <span className="text-muted-foreground">/month</span>
+                <div className="text-sm text-muted-foreground mt-2">
+                  or £250/year (save £50)
+                </div>
+              </div>
+              <ul className="space-y-4 mb-8">
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">Unlimited jobs</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">Direct Debit integration</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">Helper management</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">Route optimisation</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-accent mt-0.5 flex-shrink-0" />
+                  <span className="text-muted-foreground">60-day trial available</span>
+                </li>
+              </ul>
+              <Button
+                onClick={() => {
+                  if (typeof window !== 'undefined' && (window as any).gtag) {
+                    (window as any).gtag('event', 'click', {
+                      event_category: 'CTA',
+                      event_label: 'Pricing Pro CTA',
+                      value: 1
+                    });
+                  }
+                  navigate('/auth?mode=signup');
+                }}
+                className="w-full h-12 bg-foreground text-background hover:bg-foreground/90"
+              >
+                Start Free Trial
+              </Button>
+            </motion.div>
+          </div>
+          
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="relative z-40"
-            style={{ position: 'relative', zIndex: 40 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mt-12 text-center text-sm text-muted-foreground"
           >
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/20 dark:bg-primary/30 text-primary text-sm font-semibold mb-6 border border-primary/30 dark:border-primary/40">
-              <Sparkles className="w-4 h-4" />
-              Get Started Today
-            </div>
-            <h2 className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-foreground mb-6 leading-tight tracking-tight">
-              Ready to Transform Your Business?
-            </h2>
-            <p className="text-xl md:text-2xl lg:text-3xl text-muted-foreground mb-8 max-w-2xl mx-auto font-medium leading-relaxed">
-              Start with 10 free jobs. Register interest for a 60-day unlimited trial. No credit card required.
+            <p className="mb-2">
+              <strong className="text-foreground">Add helpers:</strong> £5/month per active helper
             </p>
-            
-            {/* Special Offer Reminder */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="mb-8 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold border border-emerald-500/20 dark:border-emerald-500/30"
-            >
-              <Clock className="w-4 h-4" />
-              <span>60-Day Free Trial Available - Register Interest Now</span>
-            </motion.div>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center relative z-50" style={{ position: 'relative', zIndex: 50 }}>
+            <p>
+              No setup fees. Cancel anytime. 60-day free trial available to first customers who register interest.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Final CTA */}
+      <section className="py-32 px-6 bg-gradient-to-b from-background to-muted/20">
+        <div className="max-w-4xl mx-auto text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="space-y-8"
+          >
+            <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 tracking-tight">
+              Ready to transform your round?
+            </h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Start with 10 free jobs. No credit card required.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               <Button
                 size="xl"
                 onClick={() => {
@@ -2123,107 +754,54 @@ const Landing = () => {
                   }
                   navigate('/auth?mode=signup');
                 }}
-                className="w-full sm:w-auto min-w-[280px] h-14 text-base font-semibold shadow-2xl bg-gradient-to-r from-primary to-emerald-600 hover:from-primary/90 hover:to-emerald-600/90 text-white border-0 hover:scale-105 active:scale-95 transition-all duration-300 ease-out focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 relative z-50"
-                style={{ position: 'relative', zIndex: 50 }}
-                aria-label="Start Free - Automate Your First 10 Jobs"
+                className="h-16 px-10 text-lg font-semibold bg-foreground text-background hover:bg-foreground/90 shadow-depth-3 hover:shadow-depth-4 transition-all btn-premium"
               >
-                Automate Your First 10 Jobs Free
+                Start Free — 10 Jobs
                 <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-              <Button
-                variant="outline"
-                size="xl"
-                onClick={() => {
-                  scrollToSection('pricing');
-                }}
-                className="w-full sm:w-auto h-14 text-base border-2 hover:scale-105 active:scale-95 transition-all duration-300 ease-out font-semibold focus:outline-none focus:ring-4 focus:ring-primary/50 focus:ring-offset-2 relative z-50"
-                style={{ position: 'relative', zIndex: 50 }}
-                aria-label="See Pricing & Special Offers"
-              >
-                See Pricing & Offers
               </Button>
             </div>
           </motion.div>
         </div>
       </section>
 
-      {/* Footer - Premium Design */}
-      <footer 
-        className="py-20 px-4 md:px-6 border-t border-border/50 dark:border-border/60 bg-gradient-to-b from-muted/30 to-background relative z-40"
-        style={{ position: 'relative', zIndex: 40 }}
-        role="contentinfo"
-      >
-        <div className="max-w-6xl mx-auto">
-          {/* Newsletter Signup */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="mb-16 pb-16 border-b border-border/50 dark:border-border/60"
-          >
-            <div className="max-w-md mx-auto text-center">
-              <h3 className="text-xl font-bold text-foreground mb-2">
-                Stay Updated
-              </h3>
-              <p className="text-muted-foreground mb-6">
-                Get weekly tips to automate and grow your window cleaning business
-              </p>
-              <EmailCaptureForm
-                variant="banner"
-                placeholder="Enter your email"
-                buttonText="Subscribe"
-                onSuccess={(email) => {
-                  if (typeof window !== 'undefined' && (window as any).gtag) {
-                    (window as any).gtag('event', 'newsletter_signup', {
-                      event_category: 'Lead Generation',
-                      event_label: 'Footer Newsletter',
-                      value: 1
-                    });
-                  }
-                }}
-              />
-            </div>
-          </motion.div>
-          
+      {/* Footer */}
+      <footer className="py-16 px-6 border-t border-border/30 bg-muted/20">
+        <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center gap-6">
             <div className="flex items-center gap-3">
               <img 
                 src="/SoloLogo.jpg" 
                 alt="SoloWipe" 
-                className="h-12 w-auto md:h-16 opacity-80"
+                className="h-16 md:h-20 w-auto opacity-80"
                 loading="lazy"
-                width="auto"
-                height="auto"
               />
-              <span className="text-muted-foreground font-medium">© 2025 SoloWipe. All rights reserved.</span>
+              <span className="text-muted-foreground">© 2025 SoloWipe. All rights reserved.</span>
             </div>
-            <nav className="flex gap-8" aria-label="Footer navigation">
+            <nav className="flex gap-6">
               <button
                 onClick={() => navigate('/terms')}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md px-2 py-1"
-                aria-label="View Terms of Service"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Terms
               </button>
               <button
                 onClick={() => navigate('/privacy')}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md px-2 py-1"
-                aria-label="View Privacy Policy"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Privacy
-              </button>
-              <button
-                onClick={() => navigate('/legal')}
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 rounded-md px-2 py-1"
-                aria-label="View Legal Information"
-              >
-                Legal
               </button>
             </nav>
           </div>
         </div>
       </footer>
+
+      {/* Exit Intent Popup */}
+      {showExitIntent && (
+        <ExitIntentPopup
+          onClose={handleExitIntentClose}
+          onSuccess={handleExitIntentSuccess}
+        />
+      )}
     </div>
   );
 };

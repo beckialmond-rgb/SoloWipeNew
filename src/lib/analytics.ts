@@ -18,12 +18,17 @@ type EventName =
   | 'signup_completed'
   | 'signup_failed'
   | 'signup_email_verification_sent'
+  | 'signup_switched_to_login'
   | 'login_started'
   | 'login_completed'
   | 'login_failed'
   | 'oauth_signin_started'
   | 'oauth_signin_completed'
-  | 'oauth_signin_failed';
+  | 'oauth_signin_failed'
+  | 'magic_link_sent'
+  | 'helper_invite_validated'
+  | 'helper_invite_accepted'
+  | 'helper_invite_acceptance_failed';
 
 interface EventProperties {
   [key: string]: string | number | boolean | undefined;

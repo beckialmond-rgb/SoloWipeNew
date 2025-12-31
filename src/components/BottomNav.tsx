@@ -1,8 +1,9 @@
-import { Home, Users, Wallet, CalendarDays, Settings } from 'lucide-react';
+import { Home, Users, Wallet, CalendarDays, Settings, Calendar } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { cn } from '@/lib/utils';
 import { useOffline } from '@/contexts/OfflineContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useRole } from '@/hooks/useRole';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -10,6 +11,7 @@ import { format } from 'date-fns';
 export function BottomNav() {
   const { user } = useAuth();
   const { pendingCount } = useOffline();
+  const { isOwner, isHelper } = useRole();
   const today = format(new Date(), 'yyyy-MM-dd');
 
   // Count unpaid jobs (includes archived customers for accurate financial tracking)
@@ -63,11 +65,13 @@ export function BottomNav() {
     staleTime: 20000, // Keep data fresh for 20 seconds
   });
 
+  // Build nav items based on role
   const navItems = [
     { to: '/dashboard', icon: Home, label: 'Today', badge: pendingTodayCount, badgeColor: 'bg-primary' },
-    { to: '/customers', icon: Users, label: 'Customers', badge: 0, badgeColor: '' },
-    { to: '/money', icon: Wallet, label: 'Money', badge: unpaidCount, badgeColor: 'bg-amber-500' },
-    { to: '/calendar', icon: CalendarDays, label: 'Calendar', badge: 0, badgeColor: '' },
+    ...(isOwner ? [{ to: '/customers', icon: Users, label: 'Customers', badge: 0, badgeColor: '' }] : []),
+    ...(isOwner ? [{ to: '/money', icon: Wallet, label: 'Money', badge: unpaidCount, badgeColor: 'bg-amber-500' }] : []),
+    ...(isHelper && !isOwner ? [{ to: '/my-schedule', icon: Calendar, label: 'Schedule', badge: 0, badgeColor: '' }] : []),
+    ...(isOwner ? [{ to: '/calendar', icon: CalendarDays, label: 'Calendar', badge: 0, badgeColor: '' }] : []),
     { to: '/settings', icon: Settings, label: 'Settings', badge: pendingCount, badgeColor: 'bg-orange-500' },
   ];
 

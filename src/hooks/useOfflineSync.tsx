@@ -67,6 +67,57 @@ export function useOfflineSync() {
           const isGoCardless = hasActiveMandate;
           const amountCollected = customAmount ?? customerData.price;
 
+          // Calculate helper payment amount (revenue split)
+          // Check BEFORE cleanup to see if completer was assigned as helper
+          let helperPaymentAmount: number | null = null;
+          
+          try {
+            // Get current user ID (completer)
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            
+            if (currentUser?.id) {
+              // Check if completer is a helper (assigned to this job)
+              const { data: assignmentCheck } = await supabase
+                .from('job_assignments')
+                .select('assigned_to_user_id')
+                .eq('job_id', jobId)
+                .eq('assigned_to_user_id', currentUser.id)
+                .maybeSingle();
+              
+              const isHelperCompleter = !!assignmentCheck;
+              
+              if (isHelperCompleter) {
+                // Fetch customer to get owner_id (profile_id)
+                const { data: customer } = await supabase
+                  .from('customers')
+                  .select('profile_id')
+                  .eq('id', customerData.customer_id)
+                  .maybeSingle();
+                
+                if (customer?.profile_id) {
+                  // Fetch commission percentage from team_members
+                  const { data: teamMember } = await supabase
+                    .from('team_members')
+                    .select('commission_percentage')
+                    .eq('owner_id', customer.profile_id)
+                    .eq('helper_id', currentUser.id)
+                    .maybeSingle();
+                  
+                  if (teamMember && teamMember.commission_percentage > 0) {
+                    const commission = teamMember.commission_percentage / 100;
+                    // Round to 2 decimal places
+                    helperPaymentAmount = Math.round(amountCollected * commission * 100) / 100;
+                    console.log(`[Offline Sync] Helper payment calculated: £${amountCollected} × ${teamMember.commission_percentage}% = £${helperPaymentAmount}`);
+                  }
+                }
+              }
+            }
+          } catch (revenueSplitError) {
+            // Non-critical: log error but don't fail job completion
+            console.error('[Offline Sync] Failed to calculate helper payment:', revenueSplitError);
+            // Continue with helperPaymentAmount = null (no payment)
+          }
+
           // Update current job
           const { error: updateError } = await supabase
             .from('jobs')
@@ -78,6 +129,7 @@ export function useOfflineSync() {
               payment_method: isGoCardless ? 'gocardless' : null,
               payment_date: null, // Only set when paid_out (via webhook)
               photo_url: photoUrl || null,
+              helper_payment_amount: helperPaymentAmount,
             })
             .eq('id', jobId)
             .eq('status', 'pending');

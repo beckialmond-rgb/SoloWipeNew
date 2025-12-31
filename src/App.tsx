@@ -36,6 +36,13 @@ const TrialGateModal = lazy(() =>
 const Customers = lazy(() => import("./pages/Customers"));
 const Money = lazy(() => import("./pages/Money"));
 const Earnings = lazy(() => import("./pages/Earnings"));
+const HelperEarnings = lazy(() => import("./pages/HelperEarnings"));
+const HelperPerformance = lazy(() => import("./pages/HelperPerformance"));
+const HelperSchedule = lazy(() => import("./pages/HelperSchedule"));
+const HelperDashboard = lazy(() => import("./pages/HelperDashboard"));
+const HelperInvoices = lazy(() => import("./pages/HelperInvoices"));
+const HelperMyInvoices = lazy(() => import("./pages/HelperMyInvoices"));
+const MySchedule = lazy(() => import("./pages/MySchedule"));
 const Calendar = lazy(() => import("./pages/Calendar"));
 const Settings = lazy(() => import("./pages/Settings"));
 const SMSTemplates = lazy(() => import("./pages/SMSTemplates"));
@@ -147,6 +154,62 @@ const App = () => {
                             element={
                               <ProtectedRoute>
                                 <Earnings />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/helper"
+                            element={
+                              <ProtectedRoute>
+                                <HelperDashboard />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/helper-earnings"
+                            element={
+                              <ProtectedRoute>
+                                <HelperEarnings />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/helper-performance"
+                            element={
+                              <ProtectedRoute>
+                                <HelperPerformance />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/helper-schedule"
+                            element={
+                              <ProtectedRoute>
+                                <HelperSchedule />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/helper-invoices"
+                            element={
+                              <ProtectedRoute>
+                                <HelperInvoices />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/helper-my-invoices"
+                            element={
+                              <ProtectedRoute>
+                                <HelperMyInvoices />
+                              </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/my-schedule"
+                            element={
+                              <ProtectedRoute>
+                                <MySchedule />
                               </ProtectedRoute>
                             }
                           />

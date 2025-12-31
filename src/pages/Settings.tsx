@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff, RefreshCw, CloudOff, Cloud, FileJson, MessageCircle, FileText, AlertTriangle, MessageSquare, Database, CheckCircle2, Smartphone, Mail } from 'lucide-react';
+import { User, Building, LogOut, ChevronRight, Download, FileSpreadsheet, Moon, Sun, Monitor, TrendingUp, Trash2, RotateCcw, Link as LinkIcon, BarChart3, Star, HelpCircle, Bell, BellOff, RefreshCw, CloudOff, Cloud, FileJson, MessageCircle, FileText, AlertTriangle, MessageSquare, Database, CheckCircle2, Smartphone, Mail, Calendar, Receipt, PoundSterling } from 'lucide-react';
 import { useOffline } from '@/contexts/OfflineContext';
 import { syncStatus } from '@/lib/offlineStorage';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -10,15 +10,21 @@ import { BottomNav } from '@/components/BottomNav';
 import { EditBusinessNameModal } from '@/components/EditBusinessNameModal';
 import { EditGoogleReviewLinkModal } from '@/components/EditGoogleReviewLinkModal';
 import { ExportEarningsModal } from '@/components/ExportEarningsModal';
+import { ExportSubscriptionHistory } from '@/components/ExportSubscriptionHistory';
 import { BusinessInsights } from '@/components/BusinessInsights';
 import { WelcomeTour, useWelcomeTour } from '@/components/WelcomeTour';
 import { SubscriptionSection } from '@/components/SubscriptionSection';
 import { GoCardlessSection } from '@/components/GoCardlessSection';
 import { HelpSection } from '@/components/HelpSection';
+import { HelperBillingCard } from '@/components/HelperBillingCard';
+import { HelperInvoiceView } from '@/components/HelperInvoiceView';
+import { BillingHistory } from '@/components/BillingHistory';
+import { BillingExport } from '@/components/BillingExport';
 import { DataExportModal } from '@/components/DataExportModal';
 import { EmptyState } from '@/components/EmptyState';
 import { PriceIncreaseWizard } from '@/components/PriceIncreaseWizard';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { useRole } from '@/hooks/useRole';
 import { useAuth } from '@/hooks/useAuth';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -35,6 +41,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const Settings = () => {
   const { businessName, userEmail, updateBusinessName, updateGoogleReviewLink, recentlyArchivedCustomers, allArchivedCustomers, unarchiveCustomer, scrubCustomerData, weeklyEarnings, customers, profile, refetchAll, upcomingJobs, assignedJobs, teamMemberships } = useSupabaseData();
+  const { isOwner, isHelper } = useRole();
   const { signOut, deleteAccount } = useAuth();
   const { isOnline, isSyncing, pendingCount, syncPendingMutations } = useOffline();
   const { checkSubscription } = useSubscription();
@@ -53,6 +60,11 @@ const Settings = () => {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [customerToDelete, setCustomerToDelete] = useState<{ id: string; name: string } | null>(null);
   const [insightsOpen, setInsightsOpen] = useState(false);
+  const [billingHistoryOpen, setBillingHistoryOpen] = useState(false);
+  const [helperInvoicesOpen, setHelperInvoicesOpen] = useState(false);
+  const [exportsOpen, setExportsOpen] = useState(false);
+  const [helperBillingExportOpen, setHelperBillingExportOpen] = useState(false);
+  const [subscriptionHistoryOpen, setSubscriptionHistoryOpen] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isDataExportOpen, setIsDataExportOpen] = useState(false);
@@ -65,6 +77,21 @@ const Settings = () => {
   useEffect(() => {
     setLastSynced(syncStatus.getLastSynced());
   }, [isSyncing]); // Refresh when sync completes
+
+  // Handle URL hash for auto-expanding Exports section
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash === '#exports' && isOwner) {
+      setExportsOpen(true);
+      // Scroll to section after a brief delay to ensure it's rendered
+      setTimeout(() => {
+        const element = document.getElementById('exports-section');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, [isOwner]);
 
   // Handle subscription callback from Stripe
   useEffect(() => {
@@ -207,19 +234,24 @@ const Settings = () => {
 
       <main className="px-4 py-6 max-w-lg mx-auto">
         <Tabs defaultValue="settings" className="w-full">
-          <TabsList className="w-full grid grid-cols-2 h-12 mb-6">
+          <TabsList className={cn(
+            "w-full h-12 mb-6",
+            isOwner ? "grid grid-cols-2" : "grid grid-cols-1"
+          )}>
             <TabsTrigger value="settings" className="text-sm">
               Settings
             </TabsTrigger>
-            <TabsTrigger value="archived" className="text-sm flex items-center gap-2">
-              <Trash2 className="w-4 h-4" />
-              Archived Customers
-              {allArchivedCustomers.length > 0 && (
-                <span className="px-1.5 py-0.5 bg-muted rounded-full text-xs font-medium">
-                  {allArchivedCustomers.length}
-                </span>
-              )}
-            </TabsTrigger>
+            {isOwner && (
+              <TabsTrigger value="archived" className="text-sm flex items-center gap-2">
+                <Trash2 className="w-5 h-5" />
+                Archived Customers
+                {allArchivedCustomers.length > 0 && (
+                  <span className="px-1.5 py-0.5 bg-muted rounded-full text-xs font-medium">
+                    {allArchivedCustomers.length}
+                  </span>
+                )}
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="settings" className="mt-0">
@@ -228,12 +260,13 @@ const Settings = () => {
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
-              {/* Financial Card */}
-              <div className="bg-card rounded-xl border border-border shadow-sm p-4 space-y-3">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Financial</h3>
-                
-                {/* Business Insights */}
-                <Collapsible open={insightsOpen} onOpenChange={setInsightsOpen}>
+              {/* Billing & Payments Card - Only show for owners */}
+              {isOwner && (
+                <div className="bg-card rounded-xl border border-border shadow-sm p-4 space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Billing & Payments</h3>
+                  
+                  {/* Business Insights */}
+                  <Collapsible open={insightsOpen} onOpenChange={setInsightsOpen}>
                   <CollapsibleTrigger asChild>
                     <button
                       className={cn(
@@ -242,9 +275,9 @@ const Settings = () => {
                         "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
                       )}
                     >
-                      <BarChart3 className="w-4 h-4 text-accent flex-shrink-0" />
+                      <BarChart3 className="w-5 h-5 text-accent flex-shrink-0" />
                       <span className="flex-1 font-medium text-foreground">Business Insights</span>
-                      <ChevronRight className={cn("w-4 h-4 text-muted-foreground transition-transform", insightsOpen && "rotate-90")} />
+                      <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", insightsOpen && "rotate-90")} />
                     </button>
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-3 pb-32">
@@ -258,161 +291,244 @@ const Settings = () => {
                   </CollapsibleContent>
                 </Collapsible>
 
-                {/* Price Increase Wizard */}
-                <Collapsible open={priceWizardOpen} onOpenChange={setPriceWizardOpen}>
-                  <CollapsibleTrigger asChild>
-                    <button
-                      className={cn(
-                        "w-full flex items-center gap-3 text-left py-2",
-                        "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
-                        "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
-                      )}
-                    >
-                      <TrendingUp className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                      <span className="flex-1 font-medium text-foreground">Price Increase Wizard</span>
-                      <ChevronRight className={cn("w-4 h-4 text-muted-foreground transition-transform", priceWizardOpen && "rotate-90")} />
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-3">
-                    <PriceIncreaseWizard 
-                      customers={customers}
-                      businessName={businessName || 'Your Business'}
-                      onUpdateComplete={refetchAll}
-                    />
-                  </CollapsibleContent>
-                </Collapsible>
-
-                {/* Subscription Section - Only show for owners, not helpers */}
-                {(() => {
-                  // Determine if user is owner or helper
-                  // Owner: has customers
-                  // Helper: has assigned jobs OR is in team_members (even if no current assignments)
-                  const isOwner = customers.length > 0;
-                  const isHelper = assignedJobs.length > 0 || (teamMemberships?.length ?? 0) > 0;
-                  
-                  // Only show subscription section for owners
-                  if (!isOwner && isHelper) {
-                    return null;
-                  }
-                  
-                  return (
+                  {/* Subscription Section - Only show for owners */}
+                  {isOwner && (
                     <div className="pt-2 border-t border-border">
                       <SubscriptionSection />
                     </div>
-                  );
-                })()}
-
-                {/* GoCardless Section */}
-                <div className="pt-2 border-t border-border">
-                  <GoCardlessSection profile={profile} onRefresh={refetchAll} />
-                </div>
-
-                {/* Earnings Report */}
-                <button
-                  onClick={() => navigate('/earnings')}
-                  className={cn(
-                    "w-full flex items-center gap-3 text-left py-2",
-                    "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
-                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
                   )}
-                >
-                  <TrendingUp className="w-4 h-4 text-accent flex-shrink-0" />
-                  <span className="flex-1 font-medium text-foreground">Earnings & Stats</span>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </button>
 
-                {/* Export to Xero */}
-                <button
-                  onClick={() => setIsExportOpen(true)}
-                  className={cn(
-                    "w-full flex items-center gap-3 text-left py-2",
-                    "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
-                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
-                  )}
-                >
-                  <FileSpreadsheet className="w-4 h-4 text-green-600 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground">Export for Xero</p>
-                    <p className="text-xs text-muted-foreground">Accountant Export</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </button>
-              </div>
-
-              {/* Account Card */}
-              <div className="bg-card rounded-xl border border-border shadow-sm p-4 space-y-3">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Account</h3>
-                
-                {/* Business Name */}
-                <button
-                  onClick={() => setIsEditBusinessNameOpen(true)}
-                  className={cn(
-                    "w-full flex items-center gap-3 text-left py-2",
-                    "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
-                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
-                  )}
-                >
-                  <Building className="w-4 h-4 text-primary flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground truncate">{businessName}</p>
-                    <p className="text-xs text-muted-foreground">Business Name</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </button>
-
-                {/* Google Review Link */}
-                <button
-                  onClick={() => setIsEditGoogleReviewLinkOpen(true)}
-                  className={cn(
-                    "w-full flex items-center gap-3 text-left py-2",
-                    "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
-                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
-                  )}
-                >
-                  <Star className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground truncate">
-                      {profile?.google_review_link ? 'Link configured ✓' : 'Not set up'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Google Reviews</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </button>
-
-                {/* Email - Not clickable */}
-                <div className="flex items-center gap-3 py-2">
-                  <User className="w-4 h-4 text-primary flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground truncate">{userEmail}</p>
-                    <p className="text-xs text-muted-foreground">Account</p>
-                  </div>
-                </div>
-
-                {/* Theme Toggle */}
-                <div className="flex items-center justify-between gap-3 py-2">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    <ThemeIcon className="w-4 h-4 text-primary flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground">Dark Mode</p>
-                      <p className="text-xs text-muted-foreground">{getThemeLabel()}</p>
+                  {/* Helper Billing Section - Only show for owners */}
+                  {isOwner && (
+                    <div className="pt-2 border-t border-border">
+                      <HelperBillingCard />
                     </div>
-                  </div>
-                  <Switch
-                    checked={theme === 'dark'}
-                    onCheckedChange={(checked) => {
-                      setTheme(checked ? 'dark' : 'light');
-                    }}
-                  />
-                </div>
+                  )}
 
-                {/* Notifications Toggle */}
+                  {/* Helper Invoices Section - Only show for owners */}
+                  {isOwner && (
+                    <Collapsible open={helperInvoicesOpen} onOpenChange={setHelperInvoicesOpen}>
+                      <CollapsibleTrigger asChild>
+                        <button
+                          className={cn(
+                            "w-full flex items-center gap-3 text-left py-2",
+                            "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                            "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                          )}
+                        >
+                          <Receipt className="w-5 h-5 text-primary flex-shrink-0" />
+                          <span className="flex-1 font-medium text-foreground">Helper Invoices</span>
+                          <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", helperInvoicesOpen && "rotate-90")} />
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-3">
+                        <HelperInvoiceView />
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+
+                  {/* Billing History Section - Only show for owners */}
+                  {isOwner && (
+                    <Collapsible open={billingHistoryOpen} onOpenChange={setBillingHistoryOpen}>
+                      <CollapsibleTrigger asChild>
+                        <button
+                          className={cn(
+                            "w-full flex items-center gap-3 text-left py-2",
+                            "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                            "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                          )}
+                        >
+                          <PoundSterling className="w-5 h-5 text-primary flex-shrink-0" />
+                          <span className="flex-1 font-medium text-foreground">Billing History</span>
+                          <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", billingHistoryOpen && "rotate-90")} />
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-3">
+                        <BillingHistory />
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+
+                  {/* Exports Section - Only show for owners */}
+                  {isOwner && (
+                    <Collapsible open={exportsOpen} onOpenChange={setExportsOpen}>
+                      <CollapsibleTrigger asChild>
+                        <button
+                          id="exports-section"
+                          className={cn(
+                            "w-full flex items-center gap-3 text-left py-2",
+                            "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                            "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                          )}
+                        >
+                          <Download className="w-5 h-5 text-green-600 flex-shrink-0" />
+                          <span className="flex-1 font-medium text-foreground">Exports</span>
+                          <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", exportsOpen && "rotate-90")} />
+                        </button>
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-3 space-y-4 pl-7 border-l-2 border-border ml-2">
+                        {/* Export Earnings Report */}
+                        <button
+                          onClick={() => setIsExportOpen(true)}
+                          className={cn(
+                            "w-full flex items-center gap-3 text-left py-2",
+                            "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                            "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                          )}
+                        >
+                          <FileSpreadsheet className="w-5 h-5 text-green-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground">Export Earnings Report</p>
+                            <p className="text-xs text-muted-foreground">Completed jobs CSV export</p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                        </button>
+
+                        {/* Export Helper Billing Report */}
+                        <Collapsible open={helperBillingExportOpen} onOpenChange={setHelperBillingExportOpen}>
+                          <CollapsibleTrigger asChild>
+                            <button
+                              className={cn(
+                                "w-full flex items-center gap-3 text-left py-2",
+                                "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                                "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                              )}
+                            >
+                              <FileSpreadsheet className="w-5 h-5 text-green-600 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-foreground">Export Helper Billing Report</p>
+                                <p className="text-xs text-muted-foreground">Helper billing CSV/Excel</p>
+                              </div>
+                              <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", helperBillingExportOpen && "rotate-90")} />
+                            </button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="mt-2">
+                            <BillingExport />
+                          </CollapsibleContent>
+                        </Collapsible>
+
+                        {/* Export Subscription History */}
+                        <button
+                          onClick={() => setSubscriptionHistoryOpen(true)}
+                          className={cn(
+                            "w-full flex items-center gap-3 text-left py-2",
+                            "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                            "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                          )}
+                        >
+                          <FileSpreadsheet className="w-5 h-5 text-green-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground">Export Subscription History</p>
+                            <p className="text-xs text-muted-foreground">Payment history export</p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                        </button>
+
+                        {/* Export All Data */}
+                        <button
+                          onClick={() => setIsDataExportOpen(true)}
+                          className={cn(
+                            "w-full flex items-center gap-3 text-left py-2",
+                            "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                            "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                          )}
+                        >
+                          <FileJson className="w-5 h-5 text-purple-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground">Export All Data</p>
+                            <p className="text-xs text-muted-foreground">GDPR compliant JSON export</p>
+                          </div>
+                          <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                        </button>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+
+                  {/* GoCardless Section - Only show for owners */}
+                  {isOwner && (
+                    <div className="pt-2 border-t border-border">
+                      <GoCardlessSection profile={profile} onRefresh={refetchAll} />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Helpers Card - Only show for owners */}
+              {isOwner && (
+                <div className="bg-card rounded-xl border border-border shadow-sm p-4 space-y-4">
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Helpers</h3>
+                  
+                  {/* Helper Schedule - Only show for owners */}
+                  <button
+                    onClick={() => navigate('/helper-schedule')}
+                    className={cn(
+                      "w-full flex items-center gap-3 text-left py-2",
+                      "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                      "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                    )}
+                  >
+                    <Calendar className="w-5 h-5 text-primary flex-shrink-0" />
+                    <span className="flex-1 font-medium text-foreground">Helper Schedule</span>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </div>
+              )}
+
+              {/* Tools Card */}
+              <div className="bg-card rounded-xl border border-border shadow-sm p-4 space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Tools</h3>
+                
+                {/* SMS Templates */}
+                <button
+                  onClick={() => navigate('/settings/sms-templates')}
+                  className={cn(
+                    "w-full flex items-center gap-3 text-left py-2",
+                    "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                  )}
+                >
+                  <MessageSquare className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground">SMS Templates</p>
+                    <p className="text-xs text-muted-foreground">Customize message templates</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </button>
+
+                {/* Price Increase Wizard - Only show for owners */}
+                {isOwner && (
+                  <Collapsible open={priceWizardOpen} onOpenChange={setPriceWizardOpen}>
+                    <CollapsibleTrigger asChild>
+                      <button
+                        className={cn(
+                          "w-full flex items-center gap-3 text-left py-2",
+                          "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                          "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                        )}
+                      >
+                        <TrendingUp className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                        <span className="flex-1 font-medium text-foreground">Price Wizard</span>
+                        <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", priceWizardOpen && "rotate-90")} />
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-3">
+                      <PriceIncreaseWizard 
+                        customers={customers}
+                        businessName={businessName || 'Your Business'}
+                        onUpdateComplete={refetchAll}
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+
+                {/* Job Reminders */}
                 {notificationsSupported && (
                   <div className="flex items-center justify-between gap-3 py-2">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {notificationsEnabled ? (
-                        <Bell className="w-4 h-4 text-action-green flex-shrink-0" />
+                        <Bell className="w-5 h-5 text-action-green flex-shrink-0" />
                       ) : (
-                        <BellOff className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <BellOff className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground">Job Reminders</p>
@@ -434,113 +550,163 @@ const Settings = () => {
                   </div>
                 )}
 
-                {/* SMS Templates */}
+                {/* Google Reviews */}
                 <button
-                  onClick={() => navigate('/settings/sms-templates')}
+                  onClick={() => setIsEditGoogleReviewLinkOpen(true)}
                   className={cn(
                     "w-full flex items-center gap-3 text-left py-2",
                     "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
                     "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
                   )}
                 >
-                  <MessageSquare className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <Star className="w-5 h-5 text-amber-500 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-foreground">SMS Templates</p>
-                    <p className="text-xs text-muted-foreground">Customize message templates</p>
+                    <p className="font-medium text-foreground truncate">
+                      {profile?.google_review_link ? 'Link configured ✓' : 'Not set up'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Google Reviews</p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
                 </button>
               </div>
 
-              {/* Install App Card - Prominent placement */}
-              {!isInstalled ? (() => {
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                const isAndroid = /Android/.test(navigator.userAgent);
+              {/* Account Card */}
+              <div className="bg-card rounded-xl border border-border shadow-sm p-4 space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Account</h3>
                 
-                return (
-                  <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background rounded-xl border-2 border-primary/20 shadow-lg p-5 space-y-4">
-                    <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Smartphone className="w-6 h-6 text-primary" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base font-semibold text-foreground mb-1">
-                          Install SoloWipe
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-3">
-                          {canInstall 
-                            ? "Click below to add SoloWipe to your home screen instantly"
-                            : isIOS
-                            ? "Follow the guide to add SoloWipe to your iPhone or iPad home screen"
-                            : isAndroid
-                            ? "Add SoloWipe to your Android home screen for quick access"
-                            : "Add to your home screen for quick access and a better experience"
-                          }
-                        </p>
-                        {canInstall ? (
-                          <Button
-                            onClick={async () => {
-                              const success = await promptInstall();
-                              if (success) {
-                                toast({
-                                  title: "App installed!",
-                                  description: "SoloWipe has been added to your home screen.",
-                                });
-                              } else {
-                                toast({
-                                  title: "Installation cancelled",
-                                  description: "You can install later from your browser menu.",
-                                  variant: "default",
-                                });
-                              }
-                            }}
-                            className="w-full h-11 rounded-lg bg-primary hover:bg-primary/90 text-base font-semibold shadow-sm"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Install Now
-                          </Button>
-                        ) : (
-                          <Button
-                            onClick={() => navigate('/install')}
-                            variant="outline"
-                            className="w-full h-11 rounded-lg border-2 border-primary/30 hover:bg-primary/5 hover:border-primary/40"
-                          >
-                            View Installation Guide
-                            <ChevronRight className="w-4 h-4 ml-2" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg p-2.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="font-medium text-foreground mb-0.5">Benefits:</p>
-                        <p>Works offline • Faster access • Home screen icon • Native feel</p>
-                      </div>
-                    </div>
+                {/* Business Name */}
+                <button
+                  onClick={() => setIsEditBusinessNameOpen(true)}
+                  className={cn(
+                    "w-full flex items-center gap-3 text-left py-2",
+                    "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
+                  )}
+                >
+                  <Building className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">{businessName}</p>
+                    <p className="text-xs text-muted-foreground">Business Name</p>
                   </div>
-                );
-              })() : (
-                <div className="bg-gradient-to-br from-action-green/10 via-action-green/5 to-background rounded-xl border-2 border-action-green/20 shadow-sm p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-action-green/10 flex items-center justify-center flex-shrink-0">
-                      <CheckCircle2 className="w-5 h-5 text-action-green" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground text-sm">App Installed</p>
-                      <p className="text-xs text-muted-foreground">SoloWipe is available on your home screen</p>
-                    </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </button>
+
+                {/* Email - Not clickable */}
+                <div className="flex items-center gap-3 py-2">
+                  <User className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-foreground truncate">{userEmail}</p>
+                    <p className="text-xs text-muted-foreground">Email</p>
                   </div>
                 </div>
-              )}
+
+                {/* Theme Toggle */}
+                <div className="flex items-center justify-between gap-3 py-2">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <ThemeIcon className="w-5 h-5 text-primary flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-foreground">Dark Mode</p>
+                      <p className="text-xs text-muted-foreground">{getThemeLabel()}</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={theme === 'dark'}
+                    onCheckedChange={(checked) => {
+                      setTheme(checked ? 'dark' : 'light');
+                    }}
+                  />
+                </div>
+
+                {/* Install SoloWipe */}
+                {!isInstalled ? (() => {
+                  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                  const isAndroid = /Android/.test(navigator.userAgent);
+                  
+                  return (
+                    <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background rounded-xl border-2 border-primary/20 shadow-lg p-5 space-y-4">
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <Smartphone className="w-6 h-6 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-base font-semibold text-foreground mb-1">
+                            Install SoloWipe
+                          </h3>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            {canInstall 
+                              ? "Click below to add SoloWipe to your home screen instantly"
+                              : isIOS
+                              ? "Follow the guide to add SoloWipe to your iPhone or iPad home screen"
+                              : isAndroid
+                              ? "Add SoloWipe to your Android home screen for quick access"
+                              : "Add to your home screen for quick access and a better experience"
+                            }
+                          </p>
+                          {canInstall ? (
+                            <Button
+                              onClick={async () => {
+                                const success = await promptInstall();
+                                if (success) {
+                                  toast({
+                                    title: "App installed!",
+                                    description: "SoloWipe has been added to your home screen.",
+                                  });
+                                } else {
+                                  toast({
+                                    title: "Installation cancelled",
+                                    description: "You can install later from your browser menu.",
+                                    variant: "default",
+                                  });
+                                }
+                              }}
+                              className="w-full h-11 rounded-lg bg-primary hover:bg-primary/90 text-base font-semibold shadow-sm"
+                            >
+                              <Download className="w-5 h-5 mr-2" />
+                              Install Now
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() => navigate('/install')}
+                              variant="outline"
+                              className="w-full h-11 rounded-lg border-2 border-primary/30 hover:bg-primary/5 hover:border-primary/40"
+                            >
+                              View Installation Guide
+                              <ChevronRight className="w-5 h-5 ml-2" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg p-2.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-medium text-foreground mb-0.5">Benefits:</p>
+                          <p>Works offline • Faster access • Home screen icon • Native feel</p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <div className="bg-gradient-to-br from-action-green/10 via-action-green/5 to-background rounded-xl border-2 border-action-green/20 shadow-sm p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-action-green/10 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="w-5 h-5 text-action-green" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-foreground text-sm">App Installed</p>
+                        <p className="text-xs text-muted-foreground">SoloWipe is available on your home screen</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Support Card */}
-              <div className="bg-card rounded-xl border border-border shadow-sm p-4 space-y-3">
+              <div className="bg-card rounded-xl border border-border shadow-sm p-4 space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Support</h3>
 
                 {/* Sync Status */}
                 <div className="flex items-center gap-3 py-2">
-                  <Cloud className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                  <Cloud className="w-5 h-5 text-emerald-500 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground">{formatLastSynced()}</p>
                     <p className="text-xs text-muted-foreground">Last Synced</p>
@@ -560,9 +726,9 @@ const Settings = () => {
                     )}
                   >
                     {isOnline ? (
-                      <RefreshCw className={cn("w-4 h-4 text-amber-500 flex-shrink-0", isSyncing && "animate-spin")} />
+                      <RefreshCw className={cn("w-5 h-5 text-amber-500 flex-shrink-0", isSyncing && "animate-spin")} />
                     ) : (
-                      <CloudOff className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <CloudOff className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-foreground">
@@ -573,7 +739,7 @@ const Settings = () => {
                       </p>
                     </div>
                     {isOnline && !isSyncing && (
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
                     )}
                   </button>
                 )}
@@ -587,12 +753,12 @@ const Settings = () => {
                     "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
                   )}
                 >
-                  <RotateCcw className="w-4 h-4 text-primary flex-shrink-0" />
+                  <RotateCcw className="w-5 h-5 text-primary flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground">Replay App Tour</p>
                     <p className="text-xs text-muted-foreground">Need a refresher?</p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
                 </button>
 
                 {/* Help & Support */}
@@ -604,12 +770,12 @@ const Settings = () => {
                     "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
                   )}
                 >
-                  <MessageCircle className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                  <MessageCircle className="w-5 h-5 text-blue-500 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-foreground">Help & Support</p>
                     <p className="text-xs text-muted-foreground">Questions?</p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
                 </button>
 
                 {/* Data Management Collapsible */}
@@ -622,32 +788,15 @@ const Settings = () => {
                         "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
                       )}
                     >
-                      <Database className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                      <Database className="w-5 h-5 text-purple-500 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground">Data Management</p>
                         <p className="text-xs text-muted-foreground">Export & Archive</p>
                       </div>
-                      <ChevronRight className={cn("w-4 h-4 text-muted-foreground transition-transform", isDataManagementOpen && "rotate-90")} />
+                      <ChevronRight className={cn("w-5 h-5 text-muted-foreground transition-transform", isDataManagementOpen && "rotate-90")} />
                     </button>
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 space-y-2 pl-7 border-l-2 border-border ml-2">
-                    {/* Export All Data */}
-                    <button
-                      onClick={() => setIsDataExportOpen(true)}
-                      className={cn(
-                        "w-full flex items-center gap-3 text-left py-2",
-                        "hover:bg-muted/50 transition-colors rounded-lg px-2 -mx-2",
-                        "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
-                      )}
-                    >
-                      <FileJson className="w-4 h-4 text-purple-500 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground">Export All Data</p>
-                        <p className="text-xs text-muted-foreground">Your Data</p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </button>
-
+                  <CollapsibleContent className="mt-2 space-y-4 pl-7 border-l-2 border-border ml-2">
                     {/* Get Import Help */}
                     <button
                       onClick={() => window.location.href = 'mailto:aaron@solowipe.co.uk?subject=Help me import my customers'}
@@ -657,12 +806,12 @@ const Settings = () => {
                         "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
                       )}
                     >
-                      <Mail className="w-4 h-4 text-primary flex-shrink-0" />
+                      <Mail className="w-5 h-5 text-primary flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground">Get Import Help</p>
                         <p className="text-xs text-muted-foreground">We can import for you</p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
                     </button>
 
                     {/* Archived Customers - Navigate to tab */}
@@ -678,14 +827,14 @@ const Settings = () => {
                         "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-card rounded-lg"
                       )}
                     >
-                      <Trash2 className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <Trash2 className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-foreground">Archived Customers</p>
                         <p className="text-xs text-muted-foreground">
                           {allArchivedCustomers.length > 0 ? `${allArchivedCustomers.length} archived` : 'None archived'}
                         </p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
                     </button>
                   </CollapsibleContent>
                 </Collapsible>
@@ -722,7 +871,8 @@ const Settings = () => {
             </motion.div>
           </TabsContent>
 
-          <TabsContent value="archived" className="mt-0">
+          {isOwner && (
+            <TabsContent value="archived" className="mt-0">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -818,8 +968,9 @@ const Settings = () => {
                   </AnimatePresence>
                 </div>
               )}
-            </motion.div>
-          </TabsContent>
+              </motion.div>
+            </TabsContent>
+          )}
         </Tabs>
 
           {/* Privacy Scrub (Hard Archive) Confirmation Dialog */}
@@ -831,7 +982,7 @@ const Settings = () => {
             <AlertDialogContent className="bg-card">
               <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                  <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
                   Hard Archive (Scrub Data)?
                 </AlertDialogTitle>
                 <AlertDialogDescription className="pt-2">
@@ -876,7 +1027,7 @@ const Settings = () => {
             <AlertDialogContent className="bg-card">
               <AlertDialogHeader>
                 <AlertDialogTitle className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                  <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
                   Delete Account?
                 </AlertDialogTitle>
                 <AlertDialogDescription className="pt-2">
@@ -931,6 +1082,12 @@ const Settings = () => {
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         businessName={businessName}
+      />
+
+      {/* Export Subscription History Modal */}
+      <ExportSubscriptionHistory
+        isOpen={subscriptionHistoryOpen}
+        onClose={() => setSubscriptionHistoryOpen(false)}
       />
 
       {/* Edit Google Review Link Modal */}

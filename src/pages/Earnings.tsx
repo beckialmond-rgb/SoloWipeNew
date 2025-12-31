@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { PoundSterling, Filter, Calendar, Users, List, Download, Search, X, TrendingUp, CreditCard, Banknote, ArrowRight, Target, ChevronDown, ChevronUp, Wallet, ChevronRight } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { PoundSterling, Filter, Calendar, Users, List, Download, Search, X, TrendingUp, CreditCard, Banknote, ArrowRight, Target, ChevronDown, ChevronUp, Wallet, ChevronRight, FileText } from 'lucide-react';
 import { format, startOfWeek, startOfMonth, subMonths, startOfYear, endOfMonth } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '@/components/Header';
@@ -9,9 +9,11 @@ import { CompletedJobItem } from '@/components/CompletedJobItem';
 import { WeeklyEarningsSummary } from '@/components/WeeklyEarningsSummary';
 import { MonthlyEarningsChart } from '@/components/MonthlyEarningsChart';
 import { MarkPaidModal } from '@/components/MarkPaidModal';
+import { AccountantExportModal } from '@/components/AccountantExportModal';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { useRole } from '@/hooks/useRole';
 import { JobWithCustomer } from '@/types/database';
 import { Toggle } from '@/components/ui/toggle';
 import { Button } from '@/components/ui/button';
@@ -30,6 +32,7 @@ import {
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { downloadCSV } from '@/utils/exportCSV';
+import { exportJobsToCSV } from '@/services/csv';
 import { toast } from '@/hooks/use-toast';
 
 type DateRange = 'today' | 'week' | 'month' | 'year';
@@ -70,6 +73,7 @@ const Earnings = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { todayEarnings, weeklyEarnings, markJobPaid, isLoading: baseLoading, isMarkingPaid, upcomingJobs, customers, businessName } = useSupabaseData();
+  const { isOwner, isHelper, isLoading: roleLoading } = useRole();
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
   const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
   const [showUnpaidOnly, setShowUnpaidOnly] = useState(false);
@@ -79,6 +83,14 @@ const Earnings = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [includeArchivedForExport, setIncludeArchivedForExport] = useState(true);
   const [monthlyOverviewExpanded, setMonthlyOverviewExpanded] = useState(false);
+  const [accountantExportModalOpen, setAccountantExportModalOpen] = useState(false);
+
+  // Redirect helpers to helper-earnings (unless they're also owners)
+  useEffect(() => {
+    if (!roleLoading && isHelper && !isOwner) {
+      navigate('/helper-earnings', { replace: true });
+    }
+  }, [isOwner, isHelper, roleLoading, navigate]);
 
   const startDate = getDateRangeStart(dateRange);
 
@@ -314,12 +326,7 @@ const Earnings = () => {
   };
 
   const handleExportCSV = () => {
-    // Filter jobs for export based on includeArchivedForExport toggle
-    const jobsToExport = includeArchivedForExport 
-      ? filteredJobs 
-      : filteredJobs.filter(job => !job.customer?.is_archived);
-    
-    if (jobsToExport.length === 0) {
+    if (filteredJobs.length === 0) {
       toast({
         title: 'No data to export',
         description: includeArchivedForExport 
@@ -330,31 +337,24 @@ const Earnings = () => {
       return;
     }
 
-    const headers = ['Customer', 'Address', 'Date', 'Gross Amount', 'Payment Status', 'Payment Method', 'Platform Fee', 'GoCardless Fee', 'Net Amount'];
-    const rows = jobsToExport.map(job => {
-      const isGoCardless = job.payment_method === 'gocardless';
-      const grossAmount = job.amount_collected || 0;
-      const platformFee = job.platform_fee ?? (isGoCardless ? (grossAmount * 0.0075) + 0.30 : 0);
-      const gocardlessFee = job.gocardless_fee ?? (isGoCardless ? Math.min((grossAmount * 0.01) + 0.20, 4.00) : 0);
-      const netAmount = job.net_amount ?? (isGoCardless ? grossAmount - platformFee - gocardlessFee : grossAmount);
-      
-      return [
-        job.customer.name,
-        job.customer.address,
-        job.completed_at ? format(new Date(job.completed_at), 'dd/MM/yyyy') : '',
-        grossAmount.toFixed(2),
-        job.payment_status,
-        job.payment_method || '',
-        platformFee.toFixed(2),
-        gocardlessFee.toFixed(2),
-        netAmount.toFixed(2),
-      ];
+    // Use centralized CSV service - handles archived filtering, fee calculation, and formatting
+    const csvContent = exportJobsToCSV(filteredJobs, { 
+      includeArchived: includeArchivedForExport 
     });
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
+    // Count exported jobs (service filters archived internally)
+    const exportedCount = includeArchivedForExport 
+      ? filteredJobs.length 
+      : filteredJobs.filter(job => !job.customer?.is_archived).length;
+
+    if (exportedCount === 0) {
+      toast({
+        title: 'No data to export',
+        description: 'No jobs found. Try enabling "Include Archived" to export jobs from archived customers.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const rangeLabel = dateRangeOptions.find(o => o.value === dateRange)?.label || dateRange;
     const filename = `Completed_Jobs_${rangeLabel.replace(/\s/g, '_')}_${format(new Date(), 'yyyy-MM-dd')}.csv`;
@@ -363,11 +363,29 @@ const Earnings = () => {
     
     toast({
       title: 'Export complete',
-      description: `Exported ${jobsToExport.length} job${jobsToExport.length !== 1 ? 's' : ''} to CSV.`,
+      description: `Exported ${exportedCount} job${exportedCount !== 1 ? 's' : ''} to CSV.`,
     });
   };
 
-  const isLoading = baseLoading || jobsLoading;
+  const isLoading = baseLoading || jobsLoading || roleLoading;
+
+  // Show loading while checking role
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <Header showLogo={false} title="Earnings" />
+        <main className="px-4 py-6 max-w-lg mx-auto">
+          <LoadingState message="Loading..." />
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  // Don't render owner content if user is helper-only (redirect will happen)
+  if (isHelper && !isOwner) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -739,6 +757,17 @@ const Earnings = () => {
                   </Toggle>
                 )}
 
+                {isOwner && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 gap-1.5 touch-sm"
+                    onClick={() => setAccountantExportModalOpen(true)}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span className="text-sm">Accountant</span>
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
@@ -861,6 +890,13 @@ const Earnings = () => {
         onClose={() => !isMarkingPaid && setIsMarkPaidOpen(false)}
         onConfirm={handleConfirmPaid}
       />
+
+      {isOwner && (
+        <AccountantExportModal
+          isOpen={accountantExportModalOpen}
+          onClose={() => setAccountantExportModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

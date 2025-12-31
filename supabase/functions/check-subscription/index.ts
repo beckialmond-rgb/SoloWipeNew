@@ -41,23 +41,47 @@ serve(async (req) => {
     logStep("User authenticated", { userId: user.id, email: user.email });
 
     // Check if user is a helper - if so, check owner's subscription instead
-    const { data: teamMemberships } = await supabaseClient
-      .from('team_members')
-      .select('owner_id')
-      .eq('helper_id', user.id)
-      .limit(1);
+    // Phase 4: Use explicit role field with fallback to inference
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
 
-    const { data: userCustomers } = await supabaseClient
-      .from('customers')
-      .select('id')
-      .eq('profile_id', user.id)
-      .limit(1);
+    let isHelper = false;
+    let ownerId: string | null = null;
+    
+    if (profile?.role === 'helper') {
+      isHelper = true;
+      // Need to get owner_id from team_members
+      const { data: teamMemberships } = await supabaseClient
+        .from('team_members')
+        .select('owner_id')
+        .eq('helper_id', user.id)
+        .limit(1);
+      ownerId = teamMemberships?.[0]?.owner_id || null;
+    } else if (profile?.role === 'both' || profile?.role === 'owner') {
+      isHelper = false;
+    } else {
+      // Fallback: infer from data relationships (temporary during migration)
+      const { data: teamMemberships } = await supabaseClient
+        .from('team_members')
+        .select('owner_id')
+        .eq('helper_id', user.id)
+        .limit(1);
 
-    const isHelper = (teamMemberships?.length ?? 0) > 0 && (userCustomers?.length ?? 0) === 0;
+      const { data: userCustomers } = await supabaseClient
+        .from('customers')
+        .select('id')
+        .eq('profile_id', user.id)
+        .limit(1);
 
-    if (isHelper && teamMemberships?.[0]?.owner_id) {
+      isHelper = (teamMemberships?.length ?? 0) > 0 && (userCustomers?.length ?? 0) === 0;
+      ownerId = teamMemberships?.[0]?.owner_id || null;
+    }
+
+    if (isHelper && ownerId) {
       // Helper detected - check owner's subscription from database instead of Stripe
-      const ownerId = teamMemberships[0].owner_id;
       logStep("Helper detected - checking owner subscription", { helperId: user.id, ownerId });
       
       // Get owner's subscription status from their profile

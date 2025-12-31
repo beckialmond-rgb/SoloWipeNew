@@ -1,16 +1,23 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, CheckCircle, Clock, CheckSquare, Square, CreditCard, MessageSquare, TrendingUp, AlertCircle, Target, Banknote, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Wallet, CheckCircle, Clock, CheckSquare, Square, CreditCard, MessageSquare, TrendingUp, AlertCircle, Target, Banknote, ArrowRight, Sparkles, Loader2, FileText, PoundSterling, Plus, Receipt } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/Header';
 import { BottomNav } from '@/components/BottomNav';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { useRole } from '@/hooks/useRole';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { StatSummaryCard } from '@/components/StatSummaryCard';
 import { UnpaidJobCard } from '@/components/UnpaidJobCard';
 import { MarkPaidModal } from '@/components/MarkPaidModal';
 import { BatchPaymentModal } from '@/components/BatchPaymentModal';
+import { AccountantExportModal } from '@/components/AccountantExportModal';
+import { AddExpenseModal } from '@/components/AddExpenseModal';
+import { ExpenseList } from '@/components/ExpenseList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { ToastAction } from '@/components/ui/toast';
@@ -22,12 +29,22 @@ import { useSMSTemplateContext } from '@/contexts/SMSTemplateContext';
 import { prepareSMSContext, openSMSApp } from '@/utils/openSMS';
 
 const Money = () => {
-  const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, batchMarkPaid, undoMarkPaid, isLoading, profile, isMarkingPaid, isBatchMarkingPaid, weeklyEarnings, businessName } = useSupabaseData();
+  const navigate = useNavigate();
+  const { unpaidJobs, paidThisWeek, totalOutstanding, markJobPaid, batchMarkPaid, undoMarkPaid, isLoading, profile, isMarkingPaid, isBatchMarkingPaid, weeklyEarnings, businessName, refetchAll, expenses, totalExpensesThisMonth } = useSupabaseData();
+  const { isOwner, isHelper, isLoading: roleLoading } = useRole();
   const { toast, dismiss } = useToast();
   const { requirePremium } = useSoftPaywall();
   const { showTemplatePicker } = useSMSTemplateContext();
+  const { user } = useAuth();
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
   const [isMarkPaidOpen, setIsMarkPaidOpen] = useState(false);
+
+  // Redirect helpers to helper-earnings (unless they're also owners)
+  useEffect(() => {
+    if (!roleLoading && isHelper && !isOwner) {
+      navigate('/helper-earnings', { replace: true });
+    }
+  }, [isOwner, isHelper, roleLoading, navigate]);
 
   // Calculate estimated payout date for GoCardless payments (3-5 working days)
   const calculateEstimatedPayoutDate = (paymentDate: string | null): string | null => {
@@ -51,6 +68,9 @@ const Money = () => {
   const [paymentFilter, setPaymentFilter] = useState<'all' | 'gocardless' | 'cash' | 'transfer'>('all');
   const [successAnimationId, setSuccessAnimationId] = useState<string | null>(null);
   const [collectingJobId, setCollectingJobId] = useState<string | null>(null);
+  const [accountantExportModalOpen, setAccountantExportModalOpen] = useState(false);
+  const [receiptSentJobs, setReceiptSentJobs] = useState<Set<string>>(new Set());
+  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
 
   // Calculate overdue jobs and sort: Active DD first, then overdue, then current
   const { sortedUnpaidJobs, overdueCount, overdueAmount } = useMemo(() => {
@@ -246,7 +266,7 @@ const Money = () => {
           jobId,
           customerId: job.customer_id,
           amount,
-          description: `Window cleaning - ${customerName}`,
+          description: `Service - ${customerName}`,
         },
       });
 
@@ -494,6 +514,152 @@ const Money = () => {
 
   // Get jobs with phone numbers for bulk reminder
   const jobsWithPhones = sortedUnpaidJobs.filter(j => j.customer.mobile_phone);
+  
+  // Get completed jobs with phone numbers for bulk receipt
+  const completedJobsWithPhones = sortedUnpaidJobs.filter(j => 
+    j.status === 'completed' && 
+    j.completed_at && 
+    j.customer.mobile_phone
+  );
+  
+  // Get selected completed jobs with phones for bulk receipt
+  const selectedCompletedJobsWithPhones = selectMode 
+    ? sortedUnpaidJobs.filter(j => 
+        selectedJobIds.has(j.id) &&
+        j.status === 'completed' && 
+        j.completed_at && 
+        j.customer.mobile_phone
+      )
+    : [];
+
+  const handleBulkReceipt = () => {
+    const jobsToProcess = selectMode ? selectedCompletedJobsWithPhones : completedJobsWithPhones;
+    
+    if (jobsToProcess.length === 0) {
+      toast({
+        title: 'No jobs selected',
+        description: selectMode 
+          ? 'Please select completed jobs with phone numbers to send receipts.'
+          : 'No completed jobs with phone numbers found.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Use the first job to get template context
+    const firstJob = jobsToProcess[0];
+    const customerName = firstJob.customer?.name || 'Customer';
+    const fullAddress = firstJob.customer?.address || '';
+    const jobAmount = (firstJob.amount_collected && firstJob.amount_collected > 0) 
+      ? firstJob.amount_collected 
+      : ((firstJob.customer?.price && firstJob.customer.price > 0) ? firstJob.customer.price : undefined);
+    const completedDateFormatted = firstJob.completed_at 
+      ? format(new Date(firstJob.completed_at), 'd MMM yyyy')
+      : '';
+    
+    // Format payment method helper
+    const formatPaymentMethod = (method: string | null, preferredMethod: string | null): string => {
+      if (method) {
+        if (method === 'gocardless') return 'Direct Debit';
+        if (method === 'cash') return 'Cash';
+        if (method === 'transfer') return 'Bank Transfer';
+        return method.charAt(0).toUpperCase() + method.slice(1);
+      }
+      if (preferredMethod === 'gocardless') return 'Direct Debit (Expected)';
+      if (preferredMethod === 'cash') return 'Cash (Expected)';
+      if (preferredMethod === 'transfer') return 'Bank Transfer (Expected)';
+      return 'Not specified';
+    };
+    
+    const context = prepareSMSContext({
+      customerName,
+      customerAddress: fullAddress,
+      price: jobAmount,
+      jobTotal: jobAmount,
+      completedDate: completedDateFormatted,
+      photoUrl: firstJob.photo_url,
+      businessName,
+      paymentMethod: formatPaymentMethod(firstJob.payment_method, firstJob.customer.preferred_payment_method),
+    });
+    
+    showTemplatePicker('receipt_sms', context, async (templateMessage) => {
+      // Extract first customer's name for replacement
+      const firstCustomerName = firstJob.customer?.name || 'Customer';
+      const firstCustomerFirstName = firstCustomerName.split(' ')[0] || 'there';
+      
+      let openedCount = 0;
+      
+      // Send personalized messages to all customers
+      for (const job of jobsToProcess) {
+        const phone = job.customer.mobile_phone;
+        if (!phone) continue;
+        
+        // Personalize message for this customer
+        let personalizedMessage = templateMessage;
+        const customerName = job.customer?.name || 'Customer';
+        const customerFirstName = customerName.split(' ')[0] || 'there';
+        
+        // Replace customer-specific variables
+        personalizedMessage = personalizedMessage.replace(
+          new RegExp(firstCustomerFirstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+          customerFirstName
+        );
+        personalizedMessage = personalizedMessage.replace(
+          new RegExp(firstCustomerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'),
+          customerName
+        );
+        
+        // Replace job-specific variables
+        const jobAmount = (job.amount_collected && job.amount_collected > 0) 
+          ? job.amount_collected 
+          : ((job.customer?.price && job.customer.price > 0) ? job.customer.price : 0);
+        personalizedMessage = personalizedMessage.replace(/\{\{job_total\}\}/g, jobAmount.toFixed(2));
+        
+        // Handle photo URL shortening if needed
+        let photoUrl = job.photo_url;
+        if (photoUrl) {
+          try {
+            const encodedUrl = encodeURIComponent(photoUrl);
+            const tinyUrlResponse = await fetch(`https://tinyurl.com/api-create.php?url=${encodedUrl}`, {
+              method: 'GET',
+              headers: { 'Accept': 'text/plain' }
+            });
+            
+            if (tinyUrlResponse.ok) {
+              const shortUrl = await tinyUrlResponse.text();
+              if (shortUrl && !shortUrl.toLowerCase().includes('error') && shortUrl.startsWith('http')) {
+                photoUrl = shortUrl.trim();
+              }
+            }
+          } catch (error) {
+            console.warn('[Bulk Receipt SMS] Failed to shorten photo URL:', error);
+          }
+        }
+        
+        if (photoUrl && personalizedMessage.includes('{{photo_url}}')) {
+          personalizedMessage = personalizedMessage.replace(/\{\{photo_url\}\}/g, photoUrl);
+        }
+        
+        setTimeout(() => {
+          openSMSApp(phone, personalizedMessage, user?.id, job.id);
+          setReceiptSentJobs(prev => new Set(prev).add(job.id));
+        }, openedCount * 300);
+        
+        openedCount++;
+      }
+      
+      toast({
+        title: `Opening ${openedCount} receipt SMS${openedCount !== 1 ? 's' : ''}`,
+        description: 'Individual receipts prepared for each customer',
+        duration: 4000,
+      });
+      
+      if (selectMode) {
+        setSelectMode(false);
+        setSelectedJobIds(new Set());
+      }
+    });
+  };
 
   const handleBulkReminder = () => {
     if (jobsWithPhones.length === 0) return;
@@ -542,12 +708,47 @@ const Money = () => {
     });
   };
 
+  // Show loading while checking role
+  if (roleLoading) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <Header showLogo />
+        <main className="px-4 py-6 max-w-lg mx-auto">
+          <LoadingState message="Loading..." />
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  // Don't render owner content if user is helper-only (redirect will happen)
+  if (isHelper && !isOwner) {
+    return null;
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background pb-20">
         <Header showLogo />
         <main className="px-4 py-6 max-w-lg mx-auto">
           <LoadingState message="Loading payments..." />
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
+
+  // Helper-only restriction: Helpers cannot access financial data
+  if (isHelper && !isOwner) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <Header showLogo />
+        <main className="px-4 py-6 max-w-lg mx-auto">
+          <EmptyState
+            icon={<Wallet className="w-12 h-12 text-muted-foreground" />}
+            title="Helper Access"
+            description="This page is only available to business owners. As a helper, you can view and complete your assigned jobs from the dashboard."
+          />
         </main>
         <BottomNav />
       </div>
@@ -581,27 +782,44 @@ const Money = () => {
                 <p className="text-slate-200 dark:text-slate-300 text-sm font-semibold mb-1 uppercase tracking-wide">Revenue Dashboard</p>
                 <p className="text-3xl font-extrabold text-white dark:text-white">This Week</p>
               </div>
-              <div className="w-14 h-14 rounded-full bg-white/20 dark:bg-white/15 backdrop-blur-sm flex items-center justify-center border-2 border-white/40 dark:border-white/30">
-                <TrendingUp className="w-7 h-7 text-white dark:text-white" strokeWidth={2.5} />
+              <div className="flex items-center gap-3">
+                {isOwner && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAccountantExportModalOpen(true)}
+                    className="bg-white/10 dark:bg-white/10 border-white/30 dark:border-white/30 text-white hover:bg-white/20 dark:hover:bg-white/20"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Export
+                  </Button>
+                )}
+                <div className="w-14 h-14 rounded-full bg-white/20 dark:bg-white/15 backdrop-blur-sm flex items-center justify-center border-2 border-white/40 dark:border-white/30">
+                  <TrendingUp className="w-7 h-7 text-white dark:text-white" strokeWidth={2.5} />
+                </div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 border-2 border-white/30 dark:border-white/20 shadow-lg">
-                <p className="text-slate-200 dark:text-slate-300 text-xs font-semibold mb-2 uppercase tracking-wide">Outstanding</p>
-                <p className="text-3xl font-extrabold text-white dark:text-white leading-tight">£{totalOutstanding.toFixed(0)}</p>
-                {overdueCount > 0 && (
+              <StatSummaryCard
+                value={`£${totalOutstanding.toFixed(0)}`}
+                label="Outstanding"
+                valueColor="text-white dark:text-white"
+                showIcon={false}
+                subText={overdueCount > 0 ? (
                   <p className="text-red-300 dark:text-red-400 text-xs mt-2 font-semibold flex items-center gap-1.5">
                     <AlertCircle className="w-4 h-4" strokeWidth={2.5} />
                     {overdueCount} overdue
                   </p>
-                )}
-              </div>
-              <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 border-2 border-white/30 dark:border-white/20 shadow-lg">
-                <p className="text-slate-200 dark:text-slate-300 text-xs font-semibold mb-2 uppercase tracking-wide">Collected</p>
-                <p className="text-3xl font-extrabold text-green-200 dark:text-green-300 leading-tight">£{paidTotal.toFixed(0)}</p>
-                <p className="text-slate-200 dark:text-slate-300 text-xs mt-2 font-medium">{paidThisWeek.length} payments</p>
-              </div>
+                ) : undefined}
+              />
+              <StatSummaryCard
+                value={`£${paidTotal.toFixed(0)}`}
+                label="Collected"
+                valueColor="text-green-200 dark:text-green-300"
+                showIcon={false}
+                subText={`${paidThisWeek.length} payments`}
+              />
             </div>
 
             {/* Weekly Goal Progress - Enhanced */}
@@ -684,20 +902,162 @@ const Money = () => {
           </motion.div>
         )}
 
+        {/* Expenses Section */}
+        {isOwner && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="bg-card rounded-xl border border-border shadow-sm p-4"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                  <PoundSterling className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Expenses</p>
+                  <p className="text-xs text-muted-foreground">This Month: £{totalExpensesThisMonth.toFixed(2)}</p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => setIsAddExpenseOpen(true)}
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Expense
+              </Button>
+            </div>
+            <ExpenseList
+              expenses={expenses.slice(0, 5)}
+              onExpenseUpdated={() => refetchAll()}
+            />
+            {expenses.length > 5 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full mt-3"
+                onClick={() => {
+                  // TODO: Navigate to full expenses view or expand list
+                }}
+              >
+                View All ({expenses.length})
+              </Button>
+            )}
+          </motion.div>
+        )}
+
+        {/* Payouts Summary */}
+        {isOwner && profile?.gocardless_organisation_id && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-card rounded-xl border border-border shadow-sm p-4"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                <CreditCard className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">GoCardless Payouts</p>
+                <p className="text-xs text-muted-foreground">Direct Debit payments</p>
+              </div>
+            </div>
+
+            {/* Calculate payout summary */}
+            {(() => {
+              // Get processing payments (pending payout)
+              const processingPayments = paidThisWeek.filter(
+                job => job.payment_method === 'gocardless' && job.payment_status === 'processing'
+              );
+              const pendingAmount = processingPayments.reduce((sum, job) => {
+                const net = job.net_amount ?? (job.amount_collected || 0) - (job.platform_fee || 0) - (job.gocardless_fee || 0);
+                return sum + net;
+              }, 0);
+
+              // Get last paid out payment
+              const paidOutPayments = paidThisWeek.filter(
+                job => job.payment_method === 'gocardless' && job.payment_status === 'paid' && job.gocardless_payment_status === 'paid_out'
+              );
+              const lastPaidOut = paidOutPayments.length > 0
+                ? paidOutPayments.sort((a, b) => 
+                    new Date(b.payment_date || 0).getTime() - new Date(a.payment_date || 0).getTime()
+                  )[0]
+                : null;
+
+              // Calculate next payout estimate
+              const nextPayoutDate = processingPayments.length > 0 && processingPayments[0].payment_date
+                ? calculateEstimatedPayoutDate(processingPayments[0].payment_date)
+                : null;
+
+              return (
+                <div className="space-y-4">
+                  {lastPaidOut && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Last Payout</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-lg font-bold text-foreground">
+                          £{(lastPaidOut.net_amount || (lastPaidOut.amount_collected || 0) - (lastPaidOut.platform_fee || 0) - (lastPaidOut.gocardless_fee || 0)).toFixed(2)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {lastPaidOut.payment_date ? format(new Date(lastPaidOut.payment_date), 'd MMM yyyy') : ''}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {pendingAmount > 0 && (
+                    <>
+                      <div className="h-px bg-border" />
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Next Payout (Estimated)</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-lg font-bold text-success">
+                            £{pendingAmount.toFixed(2)}
+                          </p>
+                          {nextPayoutDate && (
+                            <p className="text-sm text-muted-foreground">
+                              ~{nextPayoutDate}
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {processingPayments.length} payment{processingPayments.length !== 1 ? 's' : ''} processing
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {pendingAmount === 0 && !lastPaidOut && (
+                    <p className="text-sm text-muted-foreground text-center py-2">
+                      No payouts yet
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+          </motion.div>
+        )}
+
         {/* Tabs */}
         <Tabs defaultValue="unpaid" className="w-full">
           <TabsList className="w-full grid grid-cols-2 h-12">
             <TabsTrigger value="unpaid" className="flex items-center gap-2 text-sm">
-              <Clock className="w-4 h-4" />
+              <Clock className="w-4 h-4" strokeWidth={2.5} />
               Unpaid ({sortedUnpaidJobs.length})
               {overdueCount > 0 && (
-                <span className="px-2 py-0.5 bg-destructive/15 dark:bg-destructive/25 text-destructive dark:text-destructive rounded-full text-xs font-bold border border-destructive/30 dark:border-destructive/40">
-                  {overdueCount}
+                <span 
+                  className="inline-flex items-center justify-center min-w-[24px] px-2 py-0.5 bg-destructive/15 dark:bg-destructive/25 text-destructive dark:text-destructive rounded-full text-xs font-bold border border-destructive/30 dark:border-destructive/40 shrink-0"
+                  aria-label={`${overdueCount} overdue job${overdueCount !== 1 ? 's' : ''}`}
+                >
+                  {overdueCount > 99 ? '99+' : overdueCount}
                 </span>
               )}
             </TabsTrigger>
             <TabsTrigger value="paid" className="flex items-center gap-2 text-sm">
-              <CheckCircle className="w-4 h-4" />
+              <CheckCircle className="w-4 h-4" strokeWidth={2.5} />
               Paid This Week
             </TabsTrigger>
           </TabsList>
@@ -731,16 +1091,31 @@ const Money = () => {
                       </>
                     )}
                   </Button>
-                  {!selectMode && jobsWithPhones.length > 1 && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleBulkReminder}
-                      className="gap-2"
-                    >
-                      <MessageSquare className="w-4 h-4" />
-                      Remind All ({jobsWithPhones.length})
-                    </Button>
+                  {!selectMode && (
+                    <div className="flex gap-2">
+                      {completedJobsWithPhones.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleBulkReceipt}
+                          className="gap-2"
+                        >
+                          <FileText className="w-4 h-4" />
+                          Send Receipts ({completedJobsWithPhones.length})
+                        </Button>
+                      )}
+                      {jobsWithPhones.length > 1 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleBulkReminder}
+                          className="gap-2"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Remind All ({jobsWithPhones.length})
+                        </Button>
+                      )}
+                    </div>
                   )}
                   {selectMode && (
                     <div className="flex gap-2">
@@ -751,6 +1126,18 @@ const Money = () => {
                       >
                         All
                       </Button>
+                      {selectedCompletedJobsWithPhones.length > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleBulkReceipt}
+                          disabled={selectedCompletedJobsWithPhones.length === 0}
+                          className="gap-2"
+                        >
+                          <FileText className="w-4 h-4" />
+                          Receipt ({selectedCompletedJobsWithPhones.length})
+                        </Button>
+                      )}
                       <Button
                         variant="success"
                         size="sm"
@@ -829,11 +1216,13 @@ const Money = () => {
                               onMarkPaid={() => !selectMode && !isMarkingPaid && handleMarkPaid(job)}
                               onCollectNow={(job) => !selectMode && handleCollectNow(job)}
                               onSyncPayment={(job) => !selectMode && handleSyncPayment(job)}
+                              onReceiptSent={(jobId) => setReceiptSentJobs(prev => new Set(prev).add(jobId))}
                               isProcessing={isMarkingPaid}
                               isCollecting={collectingJobId === job.id}
                               isOverdue={isOverdue}
                               daysSince={daysSince}
                               showSuccessAnimation={isSuccessAnimating}
+                              receiptSent={receiptSentJobs.has(job.id)}
                             />
                           </div>
                         </motion.div>
@@ -979,6 +1368,21 @@ const Money = () => {
         onClose={() => !isBatchMarkingPaid && setBatchModalOpen(false)}
         onConfirm={handleBatchConfirm}
       />
+
+      {isOwner && (
+        <AccountantExportModal
+          isOpen={accountantExportModalOpen}
+          onClose={() => setAccountantExportModalOpen(false)}
+        />
+      )}
+
+      {isOwner && (
+        <AddExpenseModal
+          isOpen={isAddExpenseOpen}
+          onClose={() => setIsAddExpenseOpen(false)}
+          onSuccess={() => refetchAll()}
+        />
+      )}
     </div>
   );
 };

@@ -31,7 +31,7 @@ export function SetupChecklistPage() {
     {
       id: 'vehicle',
       title: 'Set Up Your Vehicle',
-      description: 'Organize equipment storage, water tanks if needed, signage',
+      description: 'Organise equipment storage, water tanks if needed, signage',
       category: 'Equipment',
     },
     {

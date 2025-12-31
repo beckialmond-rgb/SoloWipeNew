@@ -9,14 +9,16 @@ import { JobAssignmentPicker } from '@/components/JobAssignmentPicker';
 import { JobAssignmentAvatar } from '@/components/JobAssignmentAvatar';
 import { useRouteSorting } from '@/hooks/useRouteSorting';
 import { JobWithCustomerAndAssignment } from '@/types/database';
-import { CompletedJobItem } from '@/components/CompletedJobItem';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { UpcomingJobsSection } from '@/components/UpcomingJobsSection';
+import { TodaySection } from '@/components/TodaySection';
+import { StatSummaryCard } from '@/components/StatSummaryCard';
 import { TextCustomerButton } from '@/components/TextCustomerButton';
 import { TomorrowSMSButton } from '@/components/TomorrowSMSButton';
 import { RescheduleJobModal } from '@/components/RescheduleJobModal';
 import { BulkRescheduleModal } from '@/components/BulkRescheduleModal';
+import { BulkAssignmentModal } from '@/components/BulkAssignmentModal';
 import { JobNotesModal } from '@/components/JobNotesModal';
 import { OnMyWayButton } from '@/components/OnMyWayButton';
 import { QuickAddCustomerModal } from '@/components/QuickAddCustomerModal';
@@ -24,7 +26,6 @@ import { WelcomeFlow } from '@/components/WelcomeFlow';
 import { WelcomeTour, useWelcomeTour } from '@/components/WelcomeTour';
 import { SetupChecklist } from '@/components/SetupChecklist';
 import { HelperWelcomeCelebration } from '@/components/HelperWelcomeCelebration';
-import { AskForReviewButton } from '@/components/AskForReviewButton';
 import { PriceAdjustModal } from '@/components/PriceAdjustModal';
 import { PhotoCaptureModal } from '@/components/PhotoCaptureModal';
 import { OptimizeRouteButton } from '@/components/OptimizeRouteButton';
@@ -32,6 +33,7 @@ import { MarkPaidModal } from '@/components/MarkPaidModal';
 import { BusinessNameModal } from '@/components/BusinessNameModal';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
 import { useAuth } from '@/hooks/useAuth';
+import { useRole } from '@/hooks/useRole';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useUsageCounters } from '@/hooks/useUsageCounters';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
@@ -93,17 +95,12 @@ const Index = () => {
     localStorage.setItem('solowipe_dd_prompt_dismissed', 'true');
   };
   
-  // Enable job reminders for upcoming jobs
+  // Enable job reminders for upcoming jobs (includes tomorrow)
   const allUpcomingJobs = [...pendingJobs, ...upcomingJobs];
   useJobReminders(allUpcomingJobs);
   
-  // Filter jobs for tomorrow
-  const tomorrowDate = format(addDays(new Date(), 1), 'yyyy-MM-dd');
-  const tomorrowJobs = useMemo(() => {
-    return [...pendingJobs, ...upcomingJobs].filter(job => 
-      job.scheduled_date === tomorrowDate
-    );
-  }, [pendingJobs, upcomingJobs, tomorrowDate]);
+  // All upcoming jobs (including tomorrow) - no filtering needed
+  // Tomorrow jobs are now included in Upcoming section
   
   const [localJobs, setLocalJobs] = useState<JobWithCustomerAndAssignment[]>([]);
   // Track previous job IDs to prevent unnecessary updates
@@ -111,18 +108,12 @@ const Index = () => {
   const [completingJobId, setCompletingJobId] = useState<string | null>(null);
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<JobWithCustomer | null>(null);
-  const [skipConfirmOpen, setSkipConfirmOpen] = useState(false);
-  const [jobToSkip, setJobToSkip] = useState<JobWithCustomer | null>(null);
   const [notesJob, setNotesJob] = useState<JobWithCustomer | null>(null);
   const [assignmentPickerOpen, setAssignmentPickerOpen] = useState(false);
   const [selectedJobForAssignment, setSelectedJobForAssignment] = useState<JobWithCustomerAndAssignment | null>(null);
   
-  // Determine if user is Owner or Helper
-  // Owner: has customers
-  // Helper: has assigned jobs OR is in team_members (even if no current assignments)
-  // This prevents helper status from being lost when all jobs are completed
-  const isOwner = customers.length > 0;
-  const isHelper = assignedJobs.length > 0 || (teamMemberships?.length ?? 0) > 0;
+  // Get user role (Phase 4: Explicit role field)
+  const { isOwner, isHelper, isBoth, effectiveRole } = useRole();
   
   // For Helpers: use route sorting
   const { sortedJobs: sortedAssignedJobs } = useRouteSorting(assignedJobs);
@@ -156,25 +147,7 @@ const Index = () => {
   const handleUnassign = async (jobId: string, userId?: string) => {
     await unassignJob(jobId, userId);
   };
-  const [completedOpen, setCompletedOpen] = useState(true);
-  const [smsQueue, setSmsQueue] = useState<{ index: number; jobIds: string[] } | null>(null);
-  const [showNextSMS, setShowNextSMS] = useState(false);
-  const [receiptQueue, setReceiptQueue] = useState<{ index: number; jobIds: string[] } | null>(null);
-  const [showNextReceipt, setShowNextReceipt] = useState(false);
-  const [sentReceipts, setSentReceipts] = useState<Set<string>>(() => {
-    const stored = localStorage.getItem('solowipe_sent_receipts');
-    if (stored) {
-      try {
-        return new Set(JSON.parse(stored));
-      } catch {
-        return new Set();
-      }
-    }
-    return new Set();
-  });
-  const [tomorrowJobsHidden, setTomorrowJobsHidden] = useState(() => {
-    return localStorage.getItem('solowipe_tomorrow_jobs_hidden') === 'true';
-  });
+  // SMS queue moved to UpcomingJobsSection component
   const [completeConfirmOpen, setCompleteConfirmOpen] = useState(false);
   const [jobToComplete, setJobToComplete] = useState<JobWithCustomer | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -190,11 +163,12 @@ const Index = () => {
   const [showBusinessNameModal, setShowBusinessNameModal] = useState(false);
   const [bulkRescheduleMode, setBulkRescheduleMode] = useState(false);
   const [bulkRescheduleModeForUpcoming, setBulkRescheduleModeForUpcoming] = useState(false);
+  const [bulkAssignmentMode, setBulkAssignmentMode] = useState(false);
   const [selectedJobIds, setSelectedJobIds] = useState<Set<string>>(new Set());
   const [bulkRescheduleModalOpen, setBulkRescheduleModalOpen] = useState(false);
+  const [bulkAssignmentModalOpen, setBulkAssignmentModalOpen] = useState(false);
   const [bulkCompleteConfirmOpen, setBulkCompleteConfirmOpen] = useState(false);
   const [isBulkCompleting, setIsBulkCompleting] = useState(false);
-  const [jobFilter, setJobFilter] = useState<'all' | 'today' | 'overdue' | 'unpaid'>('all');
   const [showSetupChecklist, setShowSetupChecklist] = useState(false);
   
   // Show setup checklist for new users after welcome flow
@@ -239,278 +213,11 @@ const Index = () => {
     localStorage.setItem('solowipe_trial_banner_dismissed', 'true');
   };
 
-  // Handle sequential SMS sending - detect when user returns from SMS app
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && smsQueue) {
-        // User returned to app - show "Next" button or auto-continue
-        setShowNextSMS(true);
-      }
-    };
+  // SMS queue handlers moved to UpcomingJobsSection component
+  // These are now handled within the Upcoming section for bulk reminders
 
-    const handleFocus = () => {
-      if (smsQueue) {
-        setShowNextSMS(true);
-      }
-    };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [smsQueue]);
-
-  // Handle "Send All" SMS workflow
-  const handleSendAllSMS = () => {
-    const jobsWithPhone = tomorrowJobs.filter(job => job.customer?.mobile_phone);
-    if (jobsWithPhone.length === 0) return;
-
-    // Store queue in state and localStorage
-    const jobIds = jobsWithPhone.map(job => job.id);
-    const queue = { index: 0, jobIds };
-    setSmsQueue(queue);
-    localStorage.setItem('solowipe_sms_queue', JSON.stringify(queue));
-
-    // Open first SMS
-    openSMSForJob(jobsWithPhone[0], 0, jobIds);
-  };
-
-  const openSMSForJob = (job: JobWithCustomer, index: number, jobIds: string[]) => {
-    if (!job.customer?.mobile_phone) return;
-
-    const customerName = job.customer.name || 'Customer';
-    const customerAddress = job.customer.address || 'No address';
-    // Use actual job price from customer, ensure it's a valid number
-    const jobPrice = (job.customer.price && job.customer.price > 0) ? job.customer.price : undefined;
-    const isGoCardlessActive = job.customer?.gocardless_mandate_status === 'active' && !!job.customer?.gocardless_id;
-
-    const context = prepareSMSContext({
-      customerName,
-      customerAddress,
-      price: jobPrice,
-      jobTotal: jobPrice, // Also set jobTotal for consistency
-      scheduledDate: job.scheduled_date,
-      isGoCardlessActive,
-      businessName,
-      serviceType: 'Window Clean',
-    });
-
-    showTemplatePicker('tomorrow_sms_button', context, (message) => {
-      // Mark as sent in queue (but don't mark individual receipts)
-      setShowNextSMS(false);
-      openSMSApp(job.customer.mobile_phone!, message, user?.id, job.id);
-    });
-  };
-
-  const handleNextSMS = () => {
-    if (!smsQueue) return;
-
-    const nextIndex = smsQueue.index + 1;
-    const nextJobId = smsQueue.jobIds[nextIndex];
-
-    if (nextIndex >= smsQueue.jobIds.length) {
-      // All done
-      setSmsQueue(null);
-      setShowNextSMS(false);
-      localStorage.removeItem('solowipe_sms_queue');
-      toast({
-        title: 'All reminders sent!',
-        description: `Sent ${smsQueue.jobIds.length} reminder${smsQueue.jobIds.length > 1 ? 's' : ''}.`,
-      });
-      return;
-    }
-
-    // Find next job
-    const nextJob = tomorrowJobs.find(job => job.id === nextJobId);
-    if (nextJob) {
-      const updatedQueue = { ...smsQueue, index: nextIndex };
-      setSmsQueue(updatedQueue);
-      localStorage.setItem('solowipe_sms_queue', JSON.stringify(updatedQueue));
-      openSMSForJob(nextJob, nextIndex, smsQueue.jobIds);
-    }
-  };
-
-  const handleCancelSMSQueue = () => {
-    setSmsQueue(null);
-    setShowNextSMS(false);
-    localStorage.removeItem('solowipe_sms_queue');
-  };
-
-  // Handle sequential receipt sending - detect when user returns from SMS app
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && receiptQueue) {
-        setShowNextReceipt(true);
-      }
-    };
-
-    const handleFocus = () => {
-      if (receiptQueue) {
-        setShowNextReceipt(true);
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, [receiptQueue]);
-
-  // Handle "Send All Service Receipts" workflow
-  const handleSendAllReceipts = () => {
-    const jobsWithPhone = completedToday.filter(job => job.customer?.mobile_phone && !sentReceipts.has(job.id));
-    if (jobsWithPhone.length === 0) return;
-
-    // Store queue in state and localStorage
-    const jobIds = jobsWithPhone.map(job => job.id);
-    const queue = { index: 0, jobIds };
-    setReceiptQueue(queue);
-    localStorage.setItem('solowipe_receipt_queue', JSON.stringify(queue));
-
-    // Open first receipt SMS
-    openReceiptSMS(jobsWithPhone[0], 0, jobIds);
-  };
-
-  const openReceiptSMS = async (job: JobWithCustomer, index: number, jobIds: string[]) => {
-    if (!job.customer?.mobile_phone) return;
-
-    const customerName = job.customer.name || 'Customer';
-    const customerAddress = job.customer.address || 'No address';
-    // Use actual job amount_collected, fallback to customer price - ensure it's a valid number
-    const jobAmount = (job.amount_collected && job.amount_collected > 0) 
-      ? job.amount_collected 
-      : ((job.customer.price && job.customer.price > 0) ? job.customer.price : undefined);
-    const completedDateFormatted = job.completed_at 
-      ? format(new Date(job.completed_at), 'd MMM yyyy')
-      : '';
-
-    // Handle photo URL shortening if needed (template system will handle inclusion)
-    let photoUrl = job.photo_url;
-    if (photoUrl) {
-      try {
-        const encodedUrl = encodeURIComponent(photoUrl);
-        const tinyUrlResponse = await fetch(`https://tinyurl.com/api-create.php?url=${encodedUrl}`, {
-          method: 'GET',
-          headers: { 'Accept': 'text/plain' }
-        });
-        
-        if (tinyUrlResponse.ok) {
-          const shortUrl = await tinyUrlResponse.text();
-          if (shortUrl && !shortUrl.toLowerCase().includes('error') && shortUrl.startsWith('http')) {
-            photoUrl = shortUrl.trim();
-          }
-        }
-      } catch (error) {
-        console.warn('[Receipt SMS] Failed to shorten URL, using original:', error);
-      }
-    }
-
-    // Format payment method for receipt - use actual, fallback to preferred
-    const formatPaymentMethod = (method: string | null, preferredMethod: string | null): string => {
-      // Actual payment method set - use it
-      if (method) {
-        if (method === 'gocardless') return 'Direct Debit';
-        if (method === 'cash') return 'Cash';
-        if (method === 'transfer') return 'Bank Transfer';
-        return method.charAt(0).toUpperCase() + method.slice(1);
-      }
-      
-      // No actual method - try preferred as fallback
-      if (preferredMethod === 'gocardless') return 'Direct Debit (Expected)';
-      if (preferredMethod === 'cash') return 'Cash (Expected)';
-      if (preferredMethod === 'transfer') return 'Bank Transfer (Expected)';
-      
-      return 'Not specified';
-    };
-
-    const context = prepareSMSContext({
-      customerName,
-      customerAddress,
-      price: jobAmount,
-      jobTotal: jobAmount,
-      completedDate: completedDateFormatted,
-      photoUrl: photoUrl,
-      businessName,
-      paymentMethod: formatPaymentMethod(job.payment_method, job.customer?.preferred_payment_method || null),
-    });
-
-    showTemplatePicker('receipt_sms', context, (message) => {
-      // Mark as sent
-      const newSentReceipts = new Set(sentReceipts);
-      newSentReceipts.add(job.id);
-      setSentReceipts(newSentReceipts);
-      localStorage.setItem('solowipe_sent_receipts', JSON.stringify([...newSentReceipts]));
-
-      setShowNextReceipt(false);
-              openSMSApp(job.customer.mobile_phone!, message, user?.id, job.id);
-    });
-  };
-
-  const handleNextReceipt = async () => {
-    if (!receiptQueue) return;
-
-    const nextIndex = receiptQueue.index + 1;
-    const nextJobId = receiptQueue.jobIds[nextIndex];
-
-    if (nextIndex >= receiptQueue.jobIds.length) {
-      // All done
-      setReceiptQueue(null);
-      setShowNextReceipt(false);
-      localStorage.removeItem('solowipe_receipt_queue');
-      toast({
-        title: 'All receipts sent!',
-        description: `Sent ${receiptQueue.jobIds.length} service receipt${receiptQueue.jobIds.length > 1 ? 's' : ''}.`,
-      });
-      return;
-    }
-
-    // Find next job
-    const nextJob = completedToday.find(job => job.id === nextJobId);
-    if (nextJob) {
-      const updatedQueue = { ...receiptQueue, index: nextIndex };
-      setReceiptQueue(updatedQueue);
-      localStorage.setItem('solowipe_receipt_queue', JSON.stringify(updatedQueue));
-      await openReceiptSMS(nextJob, nextIndex, receiptQueue.jobIds);
-    }
-  };
-
-  const handleCancelReceiptQueue = () => {
-    setReceiptQueue(null);
-    setShowNextReceipt(false);
-    localStorage.removeItem('solowipe_receipt_queue');
-  };
-
-  // Restore SMS queue on mount
-  useEffect(() => {
-    const stored = localStorage.getItem('solowipe_sms_queue');
-    if (stored) {
-      try {
-        const queue = JSON.parse(stored);
-        setSmsQueue(queue);
-        setShowNextSMS(true);
-      } catch (e) {
-        localStorage.removeItem('solowipe_sms_queue');
-      }
-    }
-
-    // Restore receipt queue on mount
-    const receiptStored = localStorage.getItem('solowipe_receipt_queue');
-    if (receiptStored) {
-      try {
-        const queue = JSON.parse(receiptStored);
-        setReceiptQueue(queue);
-        setShowNextReceipt(true);
-      } catch (e) {
-        localStorage.removeItem('solowipe_receipt_queue');
-      }
-    }
-  }, []);
+  // SMS queue restoration moved to UpcomingJobsSection component
 
   // Pull to refresh - full cloud sync
   const { isPulling, isRefreshing, pullDistance, handlers } = usePullToRefresh({
@@ -866,82 +573,6 @@ const Index = () => {
     }
   };
 
-  const handleSkipRequest = (job: JobWithCustomer) => {
-    setJobToSkip(job);
-    setSkipConfirmOpen(true);
-  };
-
-  const handleSkipRequestById = (jobId: string) => {
-    const job = localJobs.find(j => j.id === jobId);
-    if (job) {
-      handleSkipRequest(job);
-    } else {
-      // Job not found - might have been completed or removed
-      toast({
-        title: 'Job not found',
-        description: 'This job may have already been completed or removed.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleConfirmSkip = async () => {
-    if (!jobToSkip) return;
-    
-    const jobId = jobToSkip.id;
-    const customerName = jobToSkip.customer?.name || 'Customer';
-    setSkipConfirmOpen(false);
-    
-    // Save current state for rollback
-    const previousJobs = [...localJobs];
-    
-    // Optimistically remove from local state
-    setLocalJobs(prev => prev.filter(job => job.id !== jobId));
-    
-    try {
-      const result = await skipJob(jobId);
-      
-      const { id: toastId } = toast({
-        title: 'Job skipped',
-        description: `${result.customerName} rescheduled to ${result.nextDate}`,
-        duration: 5000,
-        action: (
-          <ToastAction
-            altText="Undo"
-            onClick={async () => {
-              dismiss(toastId);
-              try {
-                await undoSkipJob(result.jobId, result.originalDate);
-                toast({
-                  title: 'Skip undone',
-                  description: `${result.customerName} restored to original date`,
-                });
-              } catch {
-                toast({
-                  title: 'Error',
-                  description: 'Failed to undo skip',
-                  variant: 'destructive',
-                });
-              }
-            }}
-          >
-            Undo
-          </ToastAction>
-        ),
-      });
-    } catch (error) {
-      // Rollback on error - refetch to get current state
-      await refetchAll();
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to skip job. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setJobToSkip(null);
-    }
-  };
-
   const handleJobClick = (job: JobWithCustomer) => {
     setSelectedJob(job);
     setRescheduleModalOpen(true);
@@ -1109,6 +740,126 @@ const Index = () => {
     setSelectedJobIds(new Set());
     setBulkRescheduleMode(false);
     setBulkRescheduleModeForUpcoming(false);
+    setBulkAssignmentMode(false);
+  };
+
+  const handleBulkAssign = async (jobIdOrUserId: string, userId?: string) => {
+    // Handle both signatures:
+    // 1. handleBulkAssign(userId) - from direct call (uses selectedJobIds from state)
+    // 2. handleBulkAssign(jobId, userId) - from BulkAssignmentModal (assigns single job)
+    let jobIdsArray: string[];
+    let actualUserId: string;
+    
+    if (userId !== undefined) {
+      // Called with (jobId, userId) - single job assignment from BulkAssignmentModal
+      jobIdsArray = [jobIdOrUserId];
+      actualUserId = userId;
+    } else {
+      // Called with (userId) - bulk assignment using selectedJobIds
+      if (selectedJobIds.size === 0) {
+        console.warn('[handleBulkAssign] No jobs selected');
+        return;
+      }
+      jobIdsArray = Array.from(selectedJobIds);
+      actualUserId = jobIdOrUserId;
+    }
+    
+    console.log('[handleBulkAssign] Starting assignment', { 
+      jobCount: jobIdsArray.length, 
+      userId: actualUserId,
+      jobIds: jobIdsArray 
+    });
+    
+    setBulkAssignmentModalOpen(false);
+    
+    try {
+      // Filter out placeholder helpers before attempting assignment
+      // Check if the selected helper is a placeholder
+      const selectedHelper = helpers.find(h => h.id === actualUserId);
+      if (selectedHelper) {
+        const isPlaceholder = selectedHelper.isPlaceholder || selectedHelper.email?.endsWith('@temp.helper');
+        if (isPlaceholder) {
+          const helperName = selectedHelper.name || 'This helper';
+          console.warn('[handleBulkAssign] Attempted to assign to placeholder helper', {
+            helperId: actualUserId,
+            helperName,
+            helperEmail: selectedHelper.email
+          });
+          toast({
+            title: 'Helper needs to sign up first',
+            description: `${helperName} needs to create an account before receiving job assignments. They're already added to your team!`,
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+      
+      // Assign each job sequentially (reuse existing assignJobMutation)
+      const results = await Promise.allSettled(
+        jobIdsArray.map(jobId => {
+          console.log('[handleBulkAssign] Assigning job', { jobId, userId: actualUserId });
+          return assignJob(jobId, actualUserId);
+        })
+      );
+      
+      // Log detailed results
+      const errors: Array<{ jobId: string; error: any }> = [];
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          console.log('[handleBulkAssign] Job assigned successfully', { 
+            jobId: jobIdsArray[index], 
+            userId: actualUserId 
+          });
+        } else {
+          const error = result.reason;
+          errors.push({ jobId: jobIdsArray[index], error });
+          console.error('[handleBulkAssign] Job assignment failed', { 
+            jobId: jobIdsArray[index], 
+            userId: actualUserId,
+            error: error instanceof Error ? error.message : String(error),
+            fullError: error
+          });
+        }
+      });
+      
+      const succeeded = results.filter(r => r.status === 'fulfilled').length;
+      const failed = results.filter(r => r.status === 'rejected').length;
+      
+      console.log('[handleBulkAssign] Assignment summary', { 
+        succeeded, 
+        failed, 
+        total: jobIdsArray.length,
+        errors: errors.map(e => ({ jobId: e.jobId, error: e.error instanceof Error ? e.error.message : String(e.error) }))
+      });
+      
+      if (failed === 0) {
+        toast({
+          title: 'Jobs assigned',
+          description: `Assigned ${succeeded} job${succeeded !== 1 ? 's' : ''} successfully.`,
+        });
+      } else {
+        const errorMessages = errors.map(e => e.error instanceof Error ? e.error.message : String(e.error)).join('; ');
+        toast({
+          title: 'Partial success',
+          description: `Assigned ${succeeded} job${succeeded !== 1 ? 's' : ''}. ${failed} failed. ${errorMessages}`,
+          variant: 'destructive',
+        });
+      }
+      
+      // Force refetch to ensure UI updates
+      console.log('[handleBulkAssign] Forcing query refetch after assignment');
+      refetchAll();
+      
+      // Clear selection and exit bulk mode
+      setSelectedJobIds(new Set());
+      setBulkAssignmentMode(false);
+    } catch (error) {
+      toast({
+        title: 'Assignment failed',
+        description: error instanceof Error ? error.message : 'Failed to assign jobs',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleBulkComplete = async () => {
@@ -1196,28 +947,6 @@ const Index = () => {
   };
 
   const nextJob = localJobs[0];
-
-  // Filter jobs based on selected filter
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const filteredLocalJobs = useMemo(() => {
-    if (jobFilter === 'all') {
-      return localJobs;
-    } else if (jobFilter === 'today') {
-      return localJobs.filter(job => job.scheduled_date === today);
-    } else if (jobFilter === 'overdue') {
-      return localJobs.filter(job => job.scheduled_date < today);
-    } else if (jobFilter === 'unpaid') {
-      // For unpaid, we need to check completedToday since localJobs are pending
-      return completedToday.filter(job => job.payment_status === 'unpaid');
-    }
-    return localJobs;
-  }, [localJobs, jobFilter, today, completedToday]);
-
-  // Use filtered jobs for display, but keep localJobs for operations in bulk mode
-  const jobsToShow = bulkRescheduleMode ? localJobs : filteredLocalJobs;
-  
-  // Bulk mode can only be used when not viewing unpaid (completed) jobs
-  const canUseBulkMode = jobFilter !== 'unpaid';
 
   return (
     <div 
@@ -1405,27 +1134,27 @@ const Index = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-4 md:gap-6">
-                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 md:p-5 border-2 border-white/30 dark:border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 ease-out">
-                    <div className="w-12 h-12 md:w-14 md:h-14 mx-auto rounded-full bg-blue-500 dark:bg-blue-500 flex items-center justify-center mb-3 shadow-md">
-                      <Clock className="w-6 h-6 md:w-7 md:h-7 text-white dark:text-white" />
-                    </div>
-                    <p className="text-3xl md:text-4xl font-extrabold text-white dark:text-white text-center leading-tight">{localJobs.length}</p>
-                    <p className="text-slate-200 dark:text-slate-200 text-xs md:text-sm font-semibold text-center mt-2 uppercase tracking-wide">{isHelper && !isOwner ? 'Assigned' : 'Pending'}</p>
-                  </div>
-                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 md:p-5 border-2 border-white/30 dark:border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 ease-out">
-                    <div className="w-12 h-12 md:w-14 md:h-14 mx-auto rounded-full bg-emerald-500 dark:bg-emerald-500 flex items-center justify-center mb-3 shadow-md">
-                      <CheckCircle className="w-6 h-6 md:w-7 md:h-7 text-white dark:text-white" />
-                    </div>
-                    <p className="text-3xl md:text-4xl font-extrabold text-white dark:text-white text-center leading-tight">{completedToday.length}</p>
-                    <p className="text-slate-200 dark:text-slate-200 text-xs md:text-sm font-semibold text-center mt-2 uppercase tracking-wide">Done</p>
-                  </div>
-                  <div className="bg-white/20 dark:bg-white/10 backdrop-blur-md rounded-xl p-4 md:p-5 border-2 border-white/30 dark:border-white/20 shadow-lg hover:shadow-xl transition-all duration-300 ease-out">
-                    <div className="w-12 h-12 md:w-14 md:h-14 mx-auto rounded-full bg-green-500 dark:bg-green-500 flex items-center justify-center mb-3 shadow-md">
-                      <PoundSterling className="w-6 h-6 md:w-7 md:h-7 text-white dark:text-white" />
-                    </div>
-                    <p className="text-3xl md:text-4xl font-extrabold text-green-200 dark:text-green-300 text-center leading-tight">£{todayEarnings}</p>
-                    <p className="text-slate-200 dark:text-slate-200 text-xs md:text-sm font-semibold text-center mt-2 uppercase tracking-wide">Earned</p>
-                  </div>
+                  <StatSummaryCard
+                    icon={Clock}
+                    value={localJobs.length}
+                    label={isHelper && !isOwner ? 'Assigned' : 'Pending'}
+                    iconBg="bg-blue-500 dark:bg-blue-500"
+                    valueColor="text-white dark:text-white"
+                  />
+                  <StatSummaryCard
+                    icon={CheckCircle}
+                    value={completedToday.length}
+                    label="Done"
+                    iconBg="bg-emerald-500 dark:bg-emerald-500"
+                    valueColor="text-white dark:text-white"
+                  />
+                  <StatSummaryCard
+                    icon={PoundSterling}
+                    value={`£${todayEarnings}`}
+                    label="Earned"
+                    iconBg="bg-green-500 dark:bg-green-500"
+                    valueColor="text-green-200 dark:text-green-300"
+                  />
                 </div>
               </div>
             </motion.div>
@@ -1445,26 +1174,13 @@ const Index = () => {
               </motion.div>
             )}
 
-            {/* Jobs count badge and action buttons */}
-            {localJobs.length > 0 && (
+            {/* Quick Add Button */}
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, ease: "easeOut" }}
-                className="mb-6 flex items-center justify-between gap-4"
-              >
-                <div className="inline-flex items-center gap-3 px-4 md:px-5 py-2.5 md:py-3 bg-primary/15 dark:bg-primary/20 text-primary dark:text-primary rounded-xl border-2 border-primary/40 dark:border-primary/40 shadow-md hover:shadow-lg transition-all duration-300 ease-out">
-                  <span className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-base md:text-lg font-extrabold shadow-sm">
-                    {localJobs.length}
-                  </span>
-                  <span className="font-semibold text-base md:text-lg text-foreground dark:text-foreground">
-                    {localJobs.length === 1 ? 'job' : 'jobs'} today
-                  </span>
-                </div>
-                
-                <div className="flex items-center gap-3 md:gap-4">
-                  {!bulkRescheduleMode ? (
-                    <>
+              className="mb-6 flex justify-end"
+            >
                       <Button
                         variant="outline"
                         size="default"
@@ -1476,627 +1192,129 @@ const Index = () => {
                         <span className="hidden sm:inline">Quick Add</span>
                         <span className="sm:hidden">Add</span>
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="default"
-                        onClick={() => setBulkRescheduleMode(true)}
-                        disabled={completingJobId !== null || bulkRescheduleModeForUpcoming}
-                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ease-out"
-                      >
-                        <Calendar className="w-4 h-4 md:w-5 md:h-5" />
-                        <span className="hidden sm:inline">Bulk Reschedule</span>
-                        <span className="sm:hidden">Reschedule</span>
-                      </Button>
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Button
-                        variant="outline"
-                        size="default"
-                        onClick={selectAllJobs}
-                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
-                      >
-                        Select All
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="default"
-                        onClick={clearBulkSelection}
-                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
-                      >
-                        <X className="w-4 h-4" />
-                        Cancel
-                      </Button>
-                      <Button
-                        size="default"
-                        onClick={() => setBulkCompleteConfirmOpen(true)}
-                        disabled={selectedJobIds.size === 0 || isBulkCompleting}
-                        className="gap-2 bg-success hover:bg-success/90 text-success-foreground font-semibold shadow-sm hover:shadow-md"
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                        Complete ({selectedJobIds.size})
-                      </Button>
-                      <Button
-                        size="default"
-                        onClick={() => setBulkRescheduleModalOpen(true)}
-                        disabled={selectedJobIds.size === 0}
-                        className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm hover:shadow-md"
-                      >
-                        <Calendar className="w-4 h-4" />
-                        Reschedule ({selectedJobIds.size})
-                      </Button>
-                    </div>
-                  )}
-                </div>
               </motion.div>
-            )}
 
-            {/* Quick Filters */}
-            {(localJobs.length > 0 || (jobFilter === 'unpaid' && completedToday.length > 0)) && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 flex flex-col sm:flex-row gap-2"
-              >
-                <button
-                  onClick={() => setJobFilter('all')}
-                  className={cn(
-                    "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
-                    jobFilter === 'all'
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
-                  )}
-                >
-                  All
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
-                    jobFilter === 'all' ? "bg-primary-foreground/20" : "bg-background"
-                  )}>
-                    {localJobs.length}
-                  </span>
-                </button>
-                <button
-                  onClick={() => setJobFilter('today')}
-                  className={cn(
-                    "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
-                    jobFilter === 'today'
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
-                  )}
-                >
-                  Today
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
-                    jobFilter === 'today' ? "bg-primary-foreground/20" : "bg-background"
-                  )}>
-                    {localJobs.filter(j => j.scheduled_date === today).length}
-                  </span>
-                </button>
-                <button
-                  onClick={() => setJobFilter('overdue')}
-                  className={cn(
-                    "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
-                    jobFilter === 'overdue'
-                      ? "bg-destructive text-destructive-foreground shadow-sm"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
-                  )}
-                >
-                  Overdue
-                  <span className={cn(
-                    "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
-                    jobFilter === 'overdue' ? "bg-destructive-foreground/20" : "bg-background"
-                  )}>
-                    {localJobs.filter(j => j.scheduled_date < today).length}
-                  </span>
-                </button>
-                {completedToday.filter(j => j.payment_status === 'unpaid').length > 0 && (
-                  <button
-                    onClick={() => {
-                      // Exit bulk mode when switching to unpaid filter (incompatible)
-                      if (bulkRescheduleMode) {
-                        setBulkRescheduleMode(false);
-                        setSelectedJobIds(new Set());
-                      }
-                      setJobFilter('unpaid');
-                    }}
-                    className={cn(
-                      "px-4 py-2.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex items-center gap-2 touch-sm min-h-[44px]",
-                      jobFilter === 'unpaid'
-                        ? "bg-warning text-warning-foreground shadow-sm"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80 active:bg-muted/60"
-                    )}
-                  >
-                    Unpaid
-                    <span className={cn(
-                      "px-2 py-0.5 rounded-full text-xs font-bold min-w-[24px] text-center",
-                      jobFilter === 'unpaid' ? "bg-warning-foreground/20" : "bg-background"
-                    )}>
-                      {completedToday.filter(j => j.payment_status === 'unpaid').length}
-                    </span>
-                  </button>
-                )}
-              </motion.div>
-            )}
-
-            {/* Route optimization */}
-            {localJobs.length >= 2 && jobFilter === 'all' && (
-              <div className="mb-4">
-                <OptimizeRouteButton jobs={localJobs} onReorder={handleReorder} />
-              </div>
-            )}
-
-            {/* Bulk reschedule mode header */}
-            {(bulkRescheduleMode && canUseBulkMode && selectedJobIds.size > 0) && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="mb-4 p-3 bg-primary/10 rounded-xl border border-primary/20"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">
-                    {selectedJobIds.size} of {localJobs.length} job{localJobs.length !== 1 ? 's' : ''} selected
-                  </span>
-                </div>
-              </motion.div>
-            )}
-            
-            {/* Warning when unpaid filter is active - bulk mode disabled */}
-            {jobFilter === 'unpaid' && bulkRescheduleMode && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 p-3 bg-warning/10 rounded-xl border border-warning/20"
-              >
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-warning" />
-                  <span className="text-sm text-foreground">
-                    Bulk operations are not available for completed jobs. Switch to "All" or "Today" filter to use bulk actions.
-                  </span>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Jobs list - Drag to reorder (disabled in bulk mode) */}
-            {/* Bulk mode is disabled for unpaid filter (completed jobs) */}
-            {jobFilter === 'unpaid' ? (
-              // Show unpaid jobs from completedToday
-              <div className="space-y-4 md:space-y-6">
-                <AnimatePresence mode="popLayout">
-                  {filteredLocalJobs.map((job, index) => (
-                    <div key={job.id}>
-                      <CompletedJobItem
-                        job={job}
-                        index={index}
+            {/* Today Section */}
+            <TodaySection
+              jobs={localJobs}
                         businessName={businessName}
-                        onAddNote={(job) => setNotesJob(job)}
-                        onMarkPaid={(job) => !isMarkingPaid && handleMarkPaidRequest(job)}
-                        isProcessing={isMarkingPaid}
-                        receiptSent={sentReceipts.has(job.id)}
-                        isCurrentInQueue={receiptQueue && receiptQueue.jobIds[receiptQueue.index] === job.id}
-                        onReceiptSent={(jobId) => {
-                          const newSentReceipts = new Set(sentReceipts);
-                          newSentReceipts.add(jobId);
-                          setSentReceipts(newSentReceipts);
-                          localStorage.setItem('solowipe_sent_receipts', JSON.stringify([...newSentReceipts]));
-                        }}
-                      />
-                    </div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <Reorder.Group 
-                axis="y" 
-                values={(bulkRescheduleMode && canUseBulkMode) ? [] : jobsToShow} 
-                onReorder={(bulkRescheduleMode && canUseBulkMode) ? () => {} : handleReorder} 
-                className="space-y-4 md:space-y-6"
-              >
-                <AnimatePresence mode="popLayout">
-                  {jobsToShow.map((job, index) => {
-                    const isSelected = selectedJobIds.has(job.id);
-                    // Ensure job has assignment properties for assignment feature
-                    const jobWithAssignment: JobWithCustomerAndAssignment = {
-                      ...job,
-                      assignment: 'assignment' in job ? job.assignment : undefined,
-                      assignments: 'assignments' in job ? job.assignments : undefined
-                    };
-                    return (
-                      <div key={job.id} className="flex items-center gap-3">
-                        {(bulkRescheduleMode && canUseBulkMode) && (
-                          <button
-                            onClick={() => toggleSelectJob(job.id)}
-                            className="flex-shrink-0 transition-colors mt-2"
-                          >
-                            {isSelected ? (
-                              <CheckSquare className="w-6 h-6 text-primary" />
-                            ) : (
-                              <Square className="w-6 h-6 text-muted-foreground" />
-                            )}
-                          </button>
-                        )}
-                        <div className="flex-1">
-                          <JobCard
-                            job={jobWithAssignment}
-                            businessName={businessName}
+              isOwner={isOwner}
+              isHelper={isHelper}
+              customers={customers}
+              assignedJobs={assignedJobs}
+              showWelcome={showWelcome}
                             onComplete={handleCompleteRequest}
-                            onSkip={handleSkipRequestById}
-                            index={index}
-                            isNextUp={index === 0}
-                            onAssignClick={isOwner ? handleAssignClick : undefined}
-                            showAssignment={isOwner}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </AnimatePresence>
-              </Reorder.Group>
-            )}
+              onAssignClick={handleAssignClick}
+              onAssign={handleAssign}
+              onAssignMultiple={handleAssignMultiple}
+              onUnassign={handleUnassign}
+              onReschedule={handleJobClick}
+              onBulkReschedule={async (jobIds: string[], newDate: Date) => {
+                const dateString = format(newDate, 'yyyy-MM-dd');
+                // Temporarily set selectedJobIds for the existing handler
+                const previousIds = selectedJobIds;
+                setSelectedJobIds(new Set(jobIds));
+                await handleBulkReschedule(dateString, false);
+                setSelectedJobIds(previousIds);
+              }}
+              onBulkAssign={async (jobIds: string[], userId: string) => {
+                // Temporarily set selectedJobIds for the existing handler
+                const previousIds = selectedJobIds;
+                setSelectedJobIds(new Set(jobIds));
+                await handleBulkAssign(userId);
+                setSelectedJobIds(previousIds);
+              }}
+              onReorder={handleReorder}
+              onQuickAdd={() => setQuickAddOpen(true)}
+              completingJobId={completingJobId}
+              helpers={helpers.map(h => ({
+                id: h.id,
+                email: h.email || '',
+                name: h.name,
+                initials: h.initials,
+                isPlaceholder: h.isPlaceholder,
+                hasPendingInvite: h.hasPendingInvite,
+                inviteExpiresAt: h.inviteExpiresAt
+              }))}
+              currentUserId={user?.id}
+              isLoadingHelpers={helpersLoading || isLoading}
+              onCreateHelper={createHelper}
+              onRemoveHelper={removeHelper}
+              onInviteSent={refetchAll}
+            />
 
-            {/* Empty state for filtered results */}
-            {jobsToShow.length === 0 && localJobs.length > 0 && (
-              <EmptyState
-                title={`No ${jobFilter === 'today' ? 'today\'s' : jobFilter === 'overdue' ? 'overdue' : jobFilter === 'unpaid' ? 'unpaid' : ''} jobs`}
-                description={jobFilter === 'today' ? 'No jobs scheduled for today' : jobFilter === 'overdue' ? 'No overdue jobs' : jobFilter === 'unpaid' ? 'All jobs are paid' : 'No jobs found'}
-                icon={<Clock className="w-8 h-8 text-primary" />}
-              />
-            )}
-
-            {/* Empty state for today */}
-            {localJobs.length === 0 && completedToday.length === 0 && 
-             (isOwner ? customers.length > 0 : assignedJobs.length === 0) && (
-              <EmptyState
-                title="All done for today!"
-                description="Great work! You've completed all your scheduled jobs."
-                icon={<Sparkles className="w-8 h-8 text-accent" />}
-              />
-            )}
-
-            {/* Contextual empty state for helpers */}
-            {isHelper && !isOwner && assignedJobs.length === 0 && localJobs.length === 0 && (
-              <EmptyState
-                title="Waiting for job assignments"
-                description="Your owner will assign jobs to you here. You'll see them automatically when they're assigned, and you'll get notifications too."
-                icon={<UserCheck className="w-8 h-8 text-primary" />}
-              />
-            )}
-
-            {/* Empty state for new owners without welcome */}
-            {localJobs.length === 0 && customers.length === 0 && !showWelcome && isOwner && (
-              <div className="text-center py-12">
-                <Button
-                  onClick={() => setQuickAddOpen(true)}
-                  className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
-                >
-                  <UserPlus className="w-5 h-5 mr-2" />
-                  Add Your First Customer
-                </Button>
-              </div>
-            )}
-
-            {/* Tomorrow's Jobs Section */}
-            {tomorrowJobs.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.4, ease: "easeOut" }}
-                className="mt-10 md:mt-12"
-              >
-                <button
-                  onClick={() => {
-                    if (tomorrowJobsHidden) {
-                      setTomorrowJobsHidden(false);
-                      localStorage.removeItem('solowipe_tomorrow_jobs_hidden');
-                    } else {
-                      setTomorrowJobsHidden(true);
-                      localStorage.setItem('solowipe_tomorrow_jobs_hidden', 'true');
-                    }
-                  }}
-                  className="flex items-center justify-between w-full py-2 mb-4"
-                  aria-label={tomorrowJobsHidden ? "Show tomorrow's jobs" : "Hide tomorrow's jobs"}
-                >
-                  <h2 className="text-lg md:text-xl font-bold text-foreground tracking-tight">
-                    Tomorrow's Jobs ({tomorrowJobs.length})
-                  </h2>
-                  {tomorrowJobsHidden ? (
-                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
-                  ) : (
-                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
-                  )}
-                </button>
-                
-                {!tomorrowJobsHidden && (
-                  <>
-                    {/* Send All Button */}
-                    {tomorrowJobs.filter(job => job.customer?.mobile_phone).length > 1 && (
-                      <div className="mb-4">
-                        <Button
-                          onClick={handleSendAllSMS}
-                          className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
-                          disabled={!!smsQueue}
-                        >
-                          <MessageSquare className="w-4 h-4" />
-                          {smsQueue ? `Sending ${smsQueue.index + 1}/${smsQueue.jobIds.length}...` : 'Send All Reminders'}
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Next SMS Button (shown when queue is active) */}
-                    {showNextSMS && smsQueue && (
-                      <div className="mb-4 p-3 bg-primary/10 dark:bg-primary/20 border border-primary/30 dark:border-primary/40 rounded-lg">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-foreground">
-                              {smsQueue.index + 1} of {smsQueue.jobIds.length} sent
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              Ready for next reminder?
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              onClick={handleNextSMS}
-                              size="sm"
-                              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                            >
-                              Next
-                            </Button>
-                            <Button
-                              onClick={handleCancelSMSQueue}
-                              size="sm"
-                              variant="ghost"
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-3 md:space-y-4">
-                      {tomorrowJobs.map((job, index) => {
-                        const customerName = job.customer?.name || 'Customer';
-                        const isInQueue = smsQueue?.jobIds.includes(job.id);
-                        const isCurrentInQueue = smsQueue && smsQueue.jobIds[smsQueue.index] === job.id;
-                        
-                        return (
-                          <motion.div
-                            key={job.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                            className={cn(
-                              "bg-card rounded-xl border-2 border-border/60 dark:border-border/80 p-4 md:p-5 shadow-sm hover:shadow-md transition-all duration-300 ease-out",
-                              isCurrentInQueue && "ring-2 ring-primary shadow-md"
-                            )}
-                          >
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start gap-2 mb-1">
-                                  <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                                  <h3 className="font-semibold text-foreground text-base leading-tight truncate min-w-0">
-                                    {job.customer?.address || 'No address'}
-                                  </h3>
-                                </div>
-                                <div className="flex items-center gap-3 mt-2">
-                                  <span className="text-xl font-bold text-foreground">
-                                    £{job.customer?.price || 0}
-                                  </span>
-                                  <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
-                                    {customerName}
-                                  </span>
-                                </div>
-                              </div>
-                              
-                              {/* Assignment and SMS buttons */}
-                              <div className="flex items-center gap-2 shrink-0">
-                                {/* Assignment Avatar - only show for owners */}
-                                {isOwner && (
-                                  <JobAssignmentAvatar
-                                    job={job as JobWithCustomerAndAssignment}
-                                    onClick={() => handleAssignClick(job as JobWithCustomerAndAssignment)}
-                                    size="sm"
-                                  />
-                                )}
-                                
-                                {/* SMS Button with tomorrow reminder template */}
-                                <TomorrowSMSButton
-                                  phoneNumber={job.customer?.mobile_phone}
-                                  customerName={customerName}
-                                  customerAddress={job.customer?.address || 'your address'}
-                                  jobPrice={job.customer?.price || 0}
-                                  scheduledDate={job.scheduled_date}
-                                  isGoCardlessActive={job.customer?.gocardless_mandate_status === 'active' && !!job.customer?.gocardless_id}
-                                  businessName={businessName}
-                                  iconOnly={true}
-                                  jobId={job.id}
-                                />
-                              </div>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </motion.div>
-            )}
-
-            {/* Completed Today Section */}
-            {completedToday.length > 0 && (
-              <Collapsible open={completedOpen} onOpenChange={setCompletedOpen} className="mt-10 md:mt-12">
-                <CollapsibleTrigger className="flex items-center justify-between w-full py-2 hover:opacity-80 transition-opacity duration-300">
-                  <h2 className="text-lg md:text-xl font-bold text-foreground tracking-tight">
-                    Completed Today ({completedToday.length})
-                  </h2>
-                  <ChevronDown className={`w-5 h-5 text-muted-foreground transition-transform ${completedOpen ? 'rotate-180' : ''}`} />
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-3 md:space-y-4 mt-4 pb-24">
-                  {/* Send All Service Receipts Button */}
-                  {completedToday.filter(job => job.customer?.mobile_phone && !sentReceipts.has(job.id)).length > 1 && (
-                    <div className="mb-4">
-                      <Button
-                        onClick={handleSendAllReceipts}
-                        className="w-full gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
-                        disabled={!!receiptQueue}
-                      >
-                        <MessageSquare className="w-4 h-4" />
-                        {receiptQueue ? `Sending ${receiptQueue.index + 1}/${receiptQueue.jobIds.length}...` : 'Send All Service Receipts'}
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Next Receipt Button (shown when queue is active) */}
-                  {showNextReceipt && receiptQueue && (
-                    <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-foreground">
-                            {receiptQueue.index + 1} of {receiptQueue.jobIds.length} sent
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Ready for next receipt?
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            onClick={handleNextReceipt}
-                            size="sm"
-                            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                          >
-                            Next
-                          </Button>
-                          <Button
-                            onClick={handleCancelReceiptQueue}
-                            size="sm"
-                            variant="ghost"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {completedToday.map((job, index) => (
-                    <div key={job.id}>
-                      <CompletedJobItem
-                        job={job}
-                        index={index}
-                        businessName={businessName}
-                        onAddNote={(job) => setNotesJob(job)}
-                        onMarkPaid={(job) => !isMarkingPaid && handleMarkPaidRequest(job)}
-                        isProcessing={isMarkingPaid}
-                        receiptSent={sentReceipts.has(job.id)}
-                        isCurrentInQueue={receiptQueue && receiptQueue.jobIds[receiptQueue.index] === job.id}
-                        onReceiptSent={(jobId) => {
-                          const newSentReceipts = new Set(sentReceipts);
-                          newSentReceipts.add(jobId);
-                          setSentReceipts(newSentReceipts);
-                          localStorage.setItem('solowipe_sent_receipts', JSON.stringify([...newSentReceipts]));
-                        }}
-                      />
-                      {/* Ask for Review button after completion - only if google review link is configured */}
-                      {job.customer?.mobile_phone && profile?.google_review_link && (
-                        <div className="mt-3 mb-6 flex justify-end">
-                          <AskForReviewButton
-                            customerName={job.customer.name || 'Customer'}
-                            customerPhone={job.customer.mobile_phone}
-                            businessName={businessName}
-                            googleReviewLink={profile.google_review_link}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </CollapsibleContent>
-              </Collapsible>
-            )}
-
+            {/* 
+              UPCOMING SECTION: Future Planning Workflow
+              
+              This section displays all future jobs (including tomorrow).
+              It focuses on bulk operations for efficient future planning:
+              
+              Available Actions:
+              - Bulk Assign: Assign multiple jobs to helpers
+              - Bulk Reschedule: Reschedule multiple jobs efficiently
+              - Bulk Reminder: Send reminder messages to multiple customers
+              - Skip: Skip future jobs (advance scheduling)
+              - Text: Contact customers about future jobs
+              - Individual Reschedule: Click job card to reschedule individually
+              
+              Actions NOT Available:
+              - Complete: Future jobs cannot be completed (only today's jobs can)
+              
+              Why bulk-focused? Future planning benefits from bulk operations:
+              - Reschedule multiple jobs efficiently
+              - Plan weeks/months ahead
+              - Adjust schedules in batches
+            */}
             {/* Upcoming Jobs Section */}
             <div className="mt-8">
-              {/* Bulk Reschedule Toggle for Upcoming Jobs */}
-              {upcomingJobs.length > 0 && (
-                <div className="mb-4 flex items-center justify-end">
-                  {!bulkRescheduleModeForUpcoming ? (
-                    <Button
-                      variant="outline"
-                      size="default"
-                      onClick={() => setBulkRescheduleModeForUpcoming(true)}
-                      disabled={bulkRescheduleMode}
-                      className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md transition-all duration-300 ease-out"
-                    >
-                      <Calendar className="w-4 h-4 md:w-5 md:h-5" />
-                      <span className="hidden sm:inline">Bulk Reschedule</span>
-                      <span className="sm:hidden">Reschedule</span>
-                    </Button>
-                  ) : (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Button
-                        variant="outline"
-                        size="default"
-                        onClick={selectAllUpcomingJobs}
-                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
-                      >
-                        Select All
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="default"
-                        onClick={() => {
-                          // Only clear upcoming jobs from selection, keep pending if any
-                          setSelectedJobIds(prev => {
-                            const newSet = new Set(prev);
-                            upcomingJobs.forEach(job => newSet.delete(job.id));
-                            return newSet;
-                          });
-                          setBulkRescheduleModeForUpcoming(false);
-                        }}
-                        className="gap-2 border-2 font-semibold shadow-sm hover:shadow-md"
-                      >
-                        <X className="w-4 h-4" />
-                        Cancel
-                      </Button>
-                      <Button
-                        size="default"
-                        onClick={() => setBulkRescheduleModalOpen(true)}
-                        disabled={selectedJobIds.size === 0 || !Array.from(selectedJobIds).some(id => upcomingJobs.some(j => j.id === id))}
-                        className="gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-sm hover:shadow-md"
-                      >
-                        <Calendar className="w-4 h-4" />
-                        Reschedule ({Array.from(selectedJobIds).filter(id => upcomingJobs.some(j => j.id === id)).length})
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Bulk mode header for upcoming jobs */}
-              {(bulkRescheduleModeForUpcoming && selectedJobIds.size > 0 && Array.from(selectedJobIds).some(id => upcomingJobs.some(j => j.id === id))) && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-4 p-3 bg-primary/10 rounded-xl border border-primary/20"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-foreground">
-                      {Array.from(selectedJobIds).filter(id => upcomingJobs.some(j => j.id === id)).length} of {upcomingJobs.length} upcoming job{upcomingJobs.length !== 1 ? 's' : ''} selected
-                    </span>
-                  </div>
-                </motion.div>
-              )}
-
               <UpcomingJobsSection 
                 jobs={upcomingJobs} 
                 businessName={businessName} 
                 onJobClick={handleJobClick} 
-                onSkip={handleSkipRequest}
                 bulkMode={bulkRescheduleModeForUpcoming}
                 selectedJobIds={selectedJobIds}
                 onToggleSelect={toggleSelectJob}
                 onSelectAll={selectAllUpcomingJobs}
+                onBulkRescheduleToggle={() => {
+                  if (bulkRescheduleModeForUpcoming) {
+                    // Clear only upcoming jobs from selection
+                    setSelectedJobIds(prev => {
+                      const newSet = new Set(prev);
+                      upcomingJobs.forEach(job => newSet.delete(job.id));
+                      return newSet;
+                    });
+                    setBulkRescheduleModeForUpcoming(false);
+                  } else {
+                    setBulkRescheduleModeForUpcoming(true);
+                  }
+                }}
+                onBulkReschedule={() => {
+                  if (selectedJobIds.size > 0 && Array.from(selectedJobIds).some(id => upcomingJobs.some(j => j.id === id))) {
+                    setBulkRescheduleModalOpen(true);
+                  }
+                }}
+                onBulkAssign={async (jobIds: string[], userId: string) => {
+                  // Temporarily set selectedJobIds for the existing handler
+                  const previousIds = selectedJobIds;
+                  setSelectedJobIds(new Set(jobIds));
+                  await handleBulkAssign(userId);
+                  setSelectedJobIds(previousIds);
+                }}
+                helpers={helpers.map(h => ({
+                  id: h.id,
+                  email: h.email || '',
+                  name: h.name,
+                  initials: h.initials,
+                  isPlaceholder: h.isPlaceholder,
+                  hasPendingInvite: h.hasPendingInvite,
+                  inviteExpiresAt: h.inviteExpiresAt
+                }))}
+                currentUserId={user?.id}
+                isLoadingHelpers={helpersLoading || isLoading}
+                onCreateHelper={createHelper}
+                onRemoveHelper={removeHelper}
+                onInviteSent={refetchAll}
+                isOwner={isOwner}
               />
             </div>
           </>
@@ -2119,6 +1337,16 @@ const Index = () => {
         businessName={businessName}
       />
 
+      <BulkAssignmentModal
+        isOpen={bulkAssignmentModalOpen}
+        onClose={() => setBulkAssignmentModalOpen(false)}
+        selectedJobIds={selectedJobIds}
+        jobs={[...localJobs, ...upcomingJobs].filter(job => selectedJobIds.has(job.id))}
+        onAssign={handleBulkAssign}
+        helpers={helpers}
+        currentUserId={user?.id}
+      />
+
       <JobNotesModal
         job={notesJob}
         isOpen={!!notesJob}
@@ -2131,27 +1359,6 @@ const Index = () => {
         onClose={() => setQuickAddOpen(false)}
         onSubmit={addCustomer}
       />
-
-      <AlertDialog open={skipConfirmOpen} onOpenChange={setSkipConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Skip this job?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {jobToSkip && (
-                <>
-                  This will reschedule <strong>{jobToSkip.customer?.name || 'Customer'}</strong> at{' '}
-                  <strong>{jobToSkip.customer?.address || 'this address'}</strong> to the next scheduled interval 
-                  ({jobToSkip.customer?.frequency_weeks || 0} weeks from today).
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSkip}>Skip Job</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <AlertDialog open={bulkCompleteConfirmOpen} onOpenChange={setBulkCompleteConfirmOpen}>
         <AlertDialogContent>
@@ -2203,12 +1410,15 @@ const Index = () => {
         onUnassign={handleUnassign}
         onCreateHelper={createHelper}
         onRemoveHelper={removeHelper}
+        onInviteSent={refetchAll}
         helpers={helpers.map(h => ({
           id: h.id,
           email: h.email || '',
           name: h.name,
           initials: h.initials,
-          isPlaceholder: h.isPlaceholder
+          isPlaceholder: h.isPlaceholder,
+          hasPendingInvite: h.hasPendingInvite,
+          inviteExpiresAt: h.inviteExpiresAt
         }))}
         currentUserId={user?.id}
         isLoadingHelpers={helpersLoading || isLoading}

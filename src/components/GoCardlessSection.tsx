@@ -890,11 +890,11 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
   };
 
   const getHealthIcon = () => {
-    if (isCheckingHealth) return <Loader2 className="w-4 h-4 animate-spin" />;
+    if (isCheckingHealth) return <Loader2 className="w-5 h-5 animate-spin flex-shrink-0" />;
     switch (healthCheck.status) {
-      case 'ok': return <Wifi className="w-4 h-4 text-success" />;
-      case 'error': return <WifiOff className="w-4 h-4 text-destructive" />;
-      default: return <AlertTriangle className="w-4 h-4 text-warning" />;
+      case 'ok': return <Wifi className="w-5 h-5 text-success flex-shrink-0" />;
+      case 'error': return <WifiOff className="w-5 h-5 text-destructive flex-shrink-0" />;
+      default: return <AlertTriangle className="w-5 h-5 text-warning flex-shrink-0" />;
     }
   };
 
@@ -905,11 +905,11 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
               {isConnected ? (
-                <CheckCircle2 className="w-5 h-5 text-primary" />
+                <CheckCircle2 className="w-5 h-5 text-primary flex-shrink-0" />
               ) : needsReconnect ? (
-                <AlertTriangle className="w-5 h-5 text-destructive" />
+                <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
               ) : (
-                <Link2 className="w-5 h-5 text-muted-foreground" />
+                <Link2 className="w-5 h-5 text-muted-foreground flex-shrink-0" />
               )}
             </div>
             <div>
@@ -926,7 +926,7 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
@@ -936,7 +936,7 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
                 showDebug ? 'text-primary' : 'text-muted-foreground'
               )}
             >
-              <Bug className="w-4 h-4" />
+              <Bug className="w-5 h-5 flex-shrink-0" />
             </Button>
             {isConnected ? (
               <Badge variant="secondary" className="bg-success/10 text-success border-success/30">
@@ -956,12 +956,12 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
 
         {/* Connection Verification Status */}
         {(isVerifyingConnection || connectionVerificationMessage) && (
-          <div className="mt-4 p-3 bg-primary/10 rounded-xl border border-primary/20">
-            <div className="flex items-center gap-2">
+          <div className="mt-4 p-4 bg-primary/10 rounded-xl border border-primary/20">
+            <div className="flex items-center gap-3">
               {isVerifyingConnection && (
-                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                <Loader2 className="w-5 h-5 animate-spin text-primary flex-shrink-0" />
               )}
-              <span className={`text-sm font-medium ${isVerifyingConnection ? 'text-primary' : 'text-muted-foreground'}`}>
+              <span className={`text-sm font-semibold ${isVerifyingConnection ? 'text-primary' : 'text-muted-foreground'}`}>
                 {connectionVerificationMessage || 'Verifying connection...'}
               </span>
             </div>
@@ -976,12 +976,12 @@ export function GoCardlessSection({ profile, onRefresh }: GoCardlessSectionProps
           >
             {showTechnicalDetails ? (
               <>
-                <ChevronUp className="w-3 h-3" />
+                <ChevronUp className="w-3 h-3 flex-shrink-0" />
                 Hide Technical Details
               </>
             ) : (
               <>
-                <ChevronDown className="w-3 h-3" />
+                <ChevronDown className="w-3 h-3 flex-shrink-0" />
                 Show Technical Details
               </>
             )}

@@ -1,86 +1,24 @@
-import { JobWithCustomer, Customer } from '@/types/database';
+import { Customer } from '@/types/database';
 import { format } from 'date-fns';
 
-export interface ExportJob extends JobWithCustomer {
-  invoice_number: string | null;
-}
+/**
+ * CSV Export Utilities - Legacy Functions
+ * 
+ * NOTE: Job export functions have been migrated to src/services/csv.ts
+ * The following functions remain here temporarily:
+ * - downloadCSV() - Core download utility (still used across the app)
+ * - exportCustomersToXero() - Will be migrated when csv.ts implements customer export
+ * - downloadCustomersForXero() - Will be migrated when csv.ts implements customer export
+ * 
+ * See src/services/csv.ts for the centralized CSV service.
+ */
 
-// Calculate SoloWipe Platform Fee: (amount * 0.0075) + £0.30
-// This is the platform commission fee
-function calculatePlatformFee(amountPounds: number): number {
-  return (amountPounds * 0.0075) + 0.30;
-}
-
-// Calculate GoCardless Processing Fee: (amount * 0.01) + £0.20, capped at £4.00
-// This is the standard GoCardless fee (separate from our platform fee)
-function calculateProcessingFee(amountPounds: number): number {
-  const fee = (amountPounds * 0.01) + 0.20;
-  return Math.min(fee, 4.00);
-}
-
-export function generateXeroCSV(jobs: ExportJob[], businessName: string): string {
-  // Xero-compatible CSV headers with fee breakdown
-  const headers = [
-    '*ContactName',
-    'EmailAddress',
-    'POAddressLine1',
-    '*InvoiceNumber',
-    '*InvoiceDate',
-    '*DueDate',
-    '*Description',
-    '*Quantity',
-    '*UnitAmount',
-    'PlatformFee',
-    'ProcessingFee',
-    'NetPayout',
-    '*AccountCode',
-    '*TaxType',
-    'Currency',
-  ];
-
-  const rows = jobs.map(job => {
-    const invoiceDate = job.completed_at ? format(new Date(job.completed_at), 'dd/MM/yyyy') : '';
-    const dueDate = job.payment_date 
-      ? format(new Date(job.payment_date), 'dd/MM/yyyy') 
-      : invoiceDate;
-    
-    const amount = job.amount_collected || 0;
-    
-    // Application fees ONLY apply to GoCardless transactions
-    // Cash and Bank Transfer payments have NO fees
-    const isGoCardless = job.payment_method === 'gocardless';
-    const platformFee = isGoCardless ? calculatePlatformFee(amount) : 0;
-    const processingFee = isGoCardless ? calculateProcessingFee(amount) : 0;
-    const netPayout = amount - platformFee - processingFee;
-    
-    return [
-      job.customer.name,                                    // ContactName
-      '',                                                   // EmailAddress
-      job.customer.address,                                 // POAddressLine1
-      job.invoice_number || `INV-${job.id.slice(0, 8).toUpperCase()}`, // InvoiceNumber
-      invoiceDate,                                          // InvoiceDate
-      dueDate,                                              // DueDate
-      'Window Cleaning Service',                            // Description
-      '1',                                                  // Quantity
-      amount.toFixed(2),                                    // UnitAmount
-      platformFee.toFixed(2),                               // PlatformFee (0 for cash/transfer)
-      processingFee.toFixed(2),                             // ProcessingFee (0 for cash/transfer)
-      netPayout.toFixed(2),                                 // NetPayout (equals amount for cash/transfer)
-      '200',                                                // AccountCode (Sales)
-      'No VAT',                                             // TaxType
-      'GBP',                                                // Currency
-    ];
-  });
-
-  // Build CSV content
-  const csvContent = [
-    headers.join(','),
-    ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-  ].join('\n');
-
-  return csvContent;
-}
-
+/**
+ * Download CSV content as a file
+ * 
+ * @param content - CSV content string
+ * @param filename - Filename for the downloaded file
+ */
 export function downloadCSV(content: string, filename: string): void {
   const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
@@ -93,12 +31,6 @@ export function downloadCSV(content: string, filename: string): void {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
-}
-
-export function exportEarningsToXero(jobs: ExportJob[], businessName: string, dateRange: string): void {
-  const csv = generateXeroCSV(jobs, businessName);
-  const filename = `${businessName.replace(/\s+/g, '_')}_Earnings_${dateRange}.csv`;
-  downloadCSV(csv, filename);
 }
 
 /**
@@ -167,6 +99,9 @@ function parseUKAddress(address: string): {
 /**
  * Export customers to Xero Contacts format
  * Compliant with UK HMRC standards and Xero import requirements
+ * 
+ * TODO: Migrate to src/services/csv.ts when exportCustomersToXero() is implemented there
+ * This function is temporarily kept here until the migration is complete.
  */
 export function exportCustomersToXero(customers: Customer[]): string {
   // Xero Contacts import headers (exact format required)
@@ -222,6 +157,9 @@ export function exportCustomersToXero(customers: Customer[]): string {
 
 /**
  * Download customers as Xero Contacts CSV
+ * 
+ * TODO: Migrate to src/services/csv.ts when exportCustomersToXero() is implemented there
+ * This function is temporarily kept here until the migration is complete.
  */
 export function downloadCustomersForXero(customers: Customer[], businessName: string): void {
   const csv = exportCustomersToXero(customers);

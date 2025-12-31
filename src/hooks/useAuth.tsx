@@ -122,6 +122,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                     if (!updateError) {
                       console.log('[Helper Matching] Successfully matched helper to user');
+                      
+                      // Get the updated team_member record to check invite_accepted_at and activate billing
+                      const { data: updatedMember, error: fetchError } = await supabase
+                        .from('team_members')
+                        .select('id, owner_id, invite_accepted_at')
+                        .eq('id', match.id)
+                        .single();
+                      
+                      if (updatedMember && !fetchError) {
+                        // Set invite_accepted_at if not already set
+                        if (!updatedMember.invite_accepted_at) {
+                          const { error: inviteUpdateError } = await supabase
+                            .from('team_members')
+                            .update({
+                              invite_accepted_at: new Date().toISOString(),
+                            })
+                            .eq('id', match.id);
+                          
+                          if (inviteUpdateError) {
+                            console.error('[Helper Matching] Failed to set invite_accepted_at:', inviteUpdateError);
+                          }
+                        }
+                        
+                        // Activate billing for this helper
+                        try {
+                          const { data: billingResult, error: billingError } = await supabase.functions.invoke(
+                            'manage-helper-billing',
+                            {
+                              body: {
+                                action: 'activate',
+                                helper_id: updatedMember.id, // team_members.id, not helper_id column
+                              },
+                            }
+                          );
+                          
+                          if (billingError || !billingResult?.success) {
+                            console.error('[Helper Matching] Billing activation failed:', billingError || billingResult?.error);
+                            // Store error for potential notification (non-critical)
+                            sessionStorage.setItem('helper_billing_error', billingError?.message || billingResult?.error || 'Unknown error');
+                          } else {
+                            console.log('[Helper Matching] Billing activated successfully', { subscriptionItemId: billingResult.subscription_item_id });
+                          }
+                        } catch (billingErr) {
+                          console.error('[Helper Matching] Exception activating billing:', billingErr);
+                          // Non-critical - user is signed in, billing can be activated later
+                          sessionStorage.setItem('helper_billing_error', billingErr instanceof Error ? billingErr.message : 'Unknown error');
+                        }
+                      } else {
+                        console.warn('[Helper Matching] Could not retrieve updated team_member record:', fetchError);
+                      }
+                      
                       // Store flag to show celebration
                       sessionStorage.setItem('helper_matched', 'true');
                       if (match.owner_id) {
@@ -408,7 +459,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           status: error.status,
           name: error.name,
         });
-        return { error: new Error(error.message), needsEmailConfirmation: false };
+        // Create error with status code preserved for 422 detection
+        const signUpError = new Error(error.message);
+        (signUpError as any).status = error.status;
+        (signUpError as any).name = error.name;
+        return { error: signUpError, needsEmailConfirmation: false };
       }
       
       console.log('[SignUp] Signup successful:', {

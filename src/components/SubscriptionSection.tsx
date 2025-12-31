@@ -4,6 +4,9 @@ import { Crown, Check, Loader2, ExternalLink, Sparkles, Clock, Zap, Tag } from '
 import { Input } from '@/components/ui/input';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useUsageCounters } from '@/hooks/useUsageCounters';
+import { useHelperBilling } from '@/hooks/useHelperBilling';
+import { useBillingHistory } from '@/hooks/useBillingHistory';
+import { useRole } from '@/hooks/useRole';
 import { SUBSCRIPTION_TIERS } from '@/constants/subscription';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -13,6 +16,9 @@ import { format, differenceInDays } from 'date-fns';
 export function SubscriptionSection() {
   const { subscribed, tier, subscriptionEnd, status, trialEnd, loading, createCheckout, openCustomerPortal, checkSubscription } = useSubscription();
   const { data: usageCounters } = useUsageCounters();
+  const { activeHelpers } = useHelperBilling();
+  const { currentMonthTotal } = useBillingHistory();
+  const { isOwner } = useRole();
   const { toast } = useToast();
   const [checkoutLoading, setCheckoutLoading] = useState<'monthly' | 'annual' | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -92,8 +98,8 @@ export function SubscriptionSection() {
 
   if (loading) {
     return (
-      <div className="bg-card rounded-xl border border-border p-6 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      <div className="bg-card rounded-xl border border-border p-4 flex items-center justify-center">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -107,7 +113,7 @@ export function SubscriptionSection() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className={cn(
-          "bg-card rounded-xl p-6 space-y-4",
+          "bg-card rounded-xl p-4 space-y-4",
           isTrialing ? "border-2 border-amber-500" : "border-2 border-primary"
         )}
       >
@@ -117,9 +123,9 @@ export function SubscriptionSection() {
             isTrialing ? "bg-amber-500/10" : "bg-primary/10"
           )}>
             {isTrialing ? (
-              <Sparkles className="w-6 h-6 text-amber-500" />
+              <Sparkles className="w-5 h-5 text-amber-500" />
             ) : (
-              <Crown className="w-6 h-6 text-primary" />
+              <Crown className="w-5 h-5 text-primary" />
             )}
           </div>
           <div>
@@ -160,6 +166,39 @@ export function SubscriptionSection() {
           </p>
         )}
 
+        {/* Helper Billing Breakdown - Only show for owners */}
+        {isOwner && activeHelpers.length > 0 && (
+          <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 border border-border">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+              Monthly Billing Breakdown
+            </p>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Base subscription:</span>
+              <span className="font-medium text-foreground">£25/month</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Helpers:</span>
+              <span className="font-medium text-foreground">
+                {activeHelpers.length} × £5/month
+              </span>
+            </div>
+            {currentMonthTotal > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Current month (pro-rated):</span>
+                <span className="font-medium text-foreground">
+                  £{currentMonthTotal.toFixed(2)}
+                </span>
+              </div>
+            )}
+            <div className="flex items-center justify-between text-sm pt-1.5 border-t border-border">
+              <span className="font-semibold text-foreground">Total (projected):</span>
+              <span className="font-bold text-foreground">
+                £{25 + activeHelpers.length * 5}/month
+              </span>
+            </div>
+          </div>
+        )}
+
         <Button
           variant="outline"
           className="w-full min-h-[44px]"
@@ -167,9 +206,9 @@ export function SubscriptionSection() {
           disabled={portalLoading}
         >
           {portalLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            <Loader2 className="w-5 h-5 animate-spin mr-2" />
           ) : (
-            <ExternalLink className="w-4 h-4 mr-2" />
+            <ExternalLink className="w-5 h-5 mr-2" />
           )}
           Manage Subscription
         </Button>
@@ -189,11 +228,11 @@ export function SubscriptionSection() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-card rounded-xl border-2 border-emerald-500 p-6 space-y-4"
+          className="bg-card rounded-xl border-2 border-emerald-500 p-4 space-y-4"
         >
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <Zap className="w-6 h-6 text-emerald-500" />
+              <Zap className="w-5 h-5 text-emerald-500" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -238,10 +277,10 @@ export function SubscriptionSection() {
         </motion.div>
       )}
 
-      <div className="bg-card rounded-xl border border-border p-6 space-y-4">
+      <div className="bg-card rounded-xl border border-border p-4 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-            <Crown className="w-6 h-6 text-primary" />
+            <Crown className="w-5 h-5 text-primary" />
           </div>
           <div>
             <h3 className="font-semibold text-foreground">
@@ -260,7 +299,7 @@ export function SubscriptionSection() {
 
         {/* Free Trial Banner - show if user hasn't used free jobs yet */}
         {jobsCompleted === 0 && (
-          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center gap-2">
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-center gap-3">
             <Sparkles className="w-5 h-5 text-primary flex-shrink-0" />
             <p className="text-sm text-foreground">
               <span className="font-medium">First 10 jobs free</span> — no payment until you've automated 10 cleans
@@ -269,17 +308,17 @@ export function SubscriptionSection() {
         )}
 
         {/* Coupon Code Input */}
-        <div className="space-y-2">
+        <div className="space-y-4">
           {!showCouponInput ? (
             <button
               onClick={() => setShowCouponInput(true)}
-              className="w-full text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-2 transition-colors py-2 px-3 rounded-lg hover:bg-muted/50"
+              className="w-full text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-3 transition-colors py-2 px-3 rounded-lg hover:bg-muted/50"
             >
-              <Tag className="w-4 h-4" />
+              <Tag className="w-5 h-5" />
               Have a coupon or promo code?
             </button>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-4">
               <div className="flex gap-2">
                 <Input
                   type="text"
@@ -310,7 +349,7 @@ export function SubscriptionSection() {
         </div>
 
         {/* Monthly Plan */}
-        <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+        <div className="bg-muted/50 rounded-lg p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-foreground">Monthly</p>
@@ -328,7 +367,7 @@ export function SubscriptionSection() {
           >
             {checkoutLoading === 'monthly' ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
                 Processing...
               </>
             ) : (
@@ -338,7 +377,7 @@ export function SubscriptionSection() {
         </div>
 
         {/* Annual Plan */}
-        <div className="bg-primary/5 rounded-lg p-4 space-y-3 border-2 border-primary relative">
+        <div className="bg-primary/5 rounded-lg p-4 space-y-4 border-2 border-primary relative">
           <div className="absolute -top-3 left-4">
             <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-1 rounded-full">
               Save £{SUBSCRIPTION_TIERS.annual.savings}
@@ -360,7 +399,7 @@ export function SubscriptionSection() {
           >
             {checkoutLoading === 'annual' ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
                 Processing...
               </>
             ) : (
@@ -370,9 +409,9 @@ export function SubscriptionSection() {
         </div>
 
         {/* Features List */}
-        <div className="pt-2 space-y-2">
+        <div className="pt-2 space-y-4">
           <p className="text-sm font-medium text-muted-foreground">What's included:</p>
-          <ul className="space-y-1.5">
+          <ul className="space-y-2">
             {[
               'Unlimited customers & jobs',
               'SMS receipts included (covers SMS & GoCardless costs)',
@@ -381,8 +420,8 @@ export function SubscriptionSection() {
               'Business insights & reports',
               'Priority support',
             ].map((feature) => (
-              <li key={feature} className="flex items-center gap-2 text-sm text-foreground">
-                <Check className="w-4 h-4 text-primary flex-shrink-0" />
+              <li key={feature} className="flex items-center gap-3 text-sm text-foreground">
+                <Check className="w-5 h-5 text-primary flex-shrink-0" />
                 {feature}
               </li>
             ))}

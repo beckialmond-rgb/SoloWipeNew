@@ -1,4 +1,4 @@
-import { Check, MapPin, SkipForward, Navigation, Phone, GripVertical, CreditCard, Clock } from 'lucide-react';
+import { Check, MapPin, Navigation, Phone, GripVertical, CreditCard, Clock } from 'lucide-react';
 import { motion, useMotionValue, useTransform, PanInfo, Reorder, useDragControls } from 'framer-motion';
 import { JobWithCustomer, JobWithCustomerAndAssignment } from '@/types/database';
 import { cn } from '@/lib/utils';
@@ -14,17 +14,18 @@ import { JobAssignmentAvatar } from './JobAssignmentAvatar';
 interface JobCardProps {
   job: JobWithCustomer | JobWithCustomerAndAssignment;
   onComplete: (job: JobWithCustomer) => void;
-  onSkip: (jobId: string) => void;
   index: number;
   isNextUp?: boolean;
   businessName?: string;
   onAssignClick?: (job: JobWithCustomerAndAssignment) => void;
   showAssignment?: boolean;
+  isOverdue?: boolean;
+  daysOverdue?: number;
 }
 
 const SWIPE_THRESHOLD = 100;
 
-export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplete, onSkip, index, isNextUp = false, businessName = 'SoloWipe', onAssignClick, showAssignment = false }, ref) => {
+export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplete, index, isNextUp = false, businessName = 'SoloWipe', onAssignClick, showAssignment = false, isOverdue = false, daysOverdue = 0 }, ref) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isReordering, setIsReordering] = useState(false);
   const x = useMotionValue(0);
@@ -60,22 +61,12 @@ export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplet
       if (!hasPremium && !requirePremium('complete')) return;
       triggerHaptic('medium');
       onComplete(job);
-    } else if (info.offset.x > SWIPE_THRESHOLD) {
-      // Show paywall modal if not premium, otherwise skip
-      if (!hasPremium && !requirePremium('skip')) return;
-      triggerHaptic('light');
-      onSkip(job.id);
     }
   };
 
   const handleComplete = () => {
     if (!requirePremium('complete')) return;
     onComplete(job);
-  };
-
-  const handleSkip = () => {
-    if (!requirePremium('skip')) return;
-    onSkip(job.id);
   };
 
   const handleNavigate = (e: React.MouseEvent) => {
@@ -127,15 +118,6 @@ export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplet
         style={{ backgroundColor }}
       />
       
-      {/* Skip indicator (right swipe) */}
-      <motion.div 
-        className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-muted-foreground"
-        style={{ opacity: useTransform(x, [0, SWIPE_THRESHOLD], [0, 1]) }}
-      >
-        <SkipForward className="w-6 h-6" />
-        <span className="font-medium text-sm">Skip</span>
-      </motion.div>
-      
       {/* Complete indicator (left swipe) */}
       <motion.div 
         className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2 text-success-foreground"
@@ -179,7 +161,7 @@ export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplet
             {job.customer ? (
               <>
                 {/* Customer info - prioritized layout */}
-                <div className="mb-3 space-y-2.5">
+                <div className="mb-4 space-y-4">
                   {/* Customer name - larger, prominent, wraps if needed */}
                   <div className="flex items-start gap-2">
                     <h3 className="font-bold text-foreground text-xl leading-tight flex-1 min-w-0 pr-1">
@@ -187,6 +169,14 @@ export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplet
                     </h3>
                     {/* Status indicators and assignment */}
                     <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                      {isOverdue && (
+                        <span 
+                          title={daysOverdue > 0 ? `${daysOverdue} day${daysOverdue !== 1 ? 's' : ''} overdue` : 'Overdue'}
+                          className="px-1.5 py-0.5 text-xs font-semibold bg-destructive/10 text-destructive rounded border border-destructive/20"
+                        >
+                          {daysOverdue > 0 ? `${daysOverdue}d` : 'Overdue'}
+                        </span>
+                      )}
                       {showAssignment && onAssignClick && (
                         <JobAssignmentAvatar
                           job={job as JobWithCustomerAndAssignment}
@@ -195,16 +185,16 @@ export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplet
                         />
                       )}
                       {job.customer.gocardless_mandate_status === 'pending' ? (
-                        <span title="DD Pending"><Clock className="w-4 h-4 text-warning" /></span>
+                        <span title="DD Pending"><Clock className="w-5 h-5 text-warning flex-shrink-0" /></span>
                       ) : job.customer.gocardless_id ? (
-                        <span title="DD Active"><CreditCard className="w-4 h-4 text-success" /></span>
+                        <span title="DD Active"><CreditCard className="w-5 h-5 text-success flex-shrink-0" /></span>
                       ) : null}
                     </div>
                   </div>
                   
                   {/* Address - larger, more visible */}
-                  <div className="flex items-start gap-2">
-                    <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                  <div className="flex items-start gap-3">
+                    <MapPin className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
                     <p className="text-sm text-muted-foreground leading-snug flex-1 min-w-0 break-words">
                       {job.customer.address?.split(/[,\n]/)[0].trim() || 'No address'}
                     </p>
@@ -220,14 +210,14 @@ export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplet
                 </div>
 
                 {/* Quick action buttons - optimized for one-thumb use */}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-3">
                   <Button
                     variant="outline"
                     size="lg"
                     onClick={handleNavigate}
-                    className="flex-1 min-w-[140px] touch-sm min-h-[44px] gap-2"
+                    className="flex-1 min-w-[140px] touch-sm min-h-[44px] gap-3"
                   >
-                    <Navigation className="w-4 h-4 shrink-0" />
+                    <Navigation className="w-5 h-5 shrink-0" />
                     <span className="text-sm">Navigate</span>
                   </Button>
                   
@@ -236,10 +226,10 @@ export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplet
                       variant="outline"
                       size="lg"
                       onClick={handleCall}
-                      className="flex-1 min-w-[120px] touch-sm min-h-[44px] gap-2"
+                      className="flex-1 min-w-[120px] touch-sm min-h-[44px] gap-3"
                       aria-label="Call customer"
                     >
-                      <Phone className="w-4 h-4 shrink-0" />
+                      <Phone className="w-5 h-5 shrink-0" />
                       <span className="text-sm">Call</span>
                     </Button>
                   )}
@@ -275,25 +265,8 @@ export const JobCard = forwardRef<HTMLLIElement, JobCardProps>(({ job, onComplet
               </div>
             )}
             
-            {/* Complete/Skip buttons - vertical stack */}
+            {/* Complete button */}
             <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-              {/* Skip Button */}
-              <motion.button
-                whileTap={actionsDisabled ? {} : { scale: 0.95 }}
-                onClick={handleSkip}
-                disabled={actionsDisabled}
-                className={cn(
-                  "w-11 h-11 flex items-center justify-center flex-shrink-0 touch-sm min-h-[44px]",
-                  "bg-muted/50 hover:bg-muted transition-colors rounded-lg",
-                  "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-muted",
-                  actionsDisabled && "opacity-50 cursor-not-allowed"
-                )}
-                aria-label={`Skip ${job.customer?.name || 'job'}`}
-                title={actionsDisabled ? (isInGracePeriod ? "Upgrade to continue" : "Subscribe to continue") : undefined}
-              >
-                <SkipForward className="w-5 h-5 text-muted-foreground" />
-              </motion.button>
-
               {/* Complete Button */}
               <motion.button
                 whileTap={actionsDisabled ? {} : { scale: 0.95 }}

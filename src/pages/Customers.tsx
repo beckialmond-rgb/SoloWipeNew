@@ -12,11 +12,13 @@ import { EditCustomerModal } from '@/components/EditCustomerModal';
 import { CustomerHistoryModal } from '@/components/CustomerHistoryModal';
 import { ReferralSMSModal } from '@/components/ReferralSMSModal';
 import { ImportCustomersModal } from '@/components/ImportCustomersModal';
+import { BulkDDSendModal, BulkDDSendResult } from '@/components/BulkDDSendModal';
 import { EmptyState } from '@/components/EmptyState';
 import { LoadingState } from '@/components/LoadingState';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
+import { useRole } from '@/hooks/useRole';
 import { Customer } from '@/types/database';
 import { cn } from '@/lib/utils';
 import { useSoftPaywall } from '@/hooks/useSoftPaywall';
@@ -25,13 +27,17 @@ import { toast } from 'sonner';
 import { downloadCustomersForXero } from '@/utils/exportCSV';
 import { useSMSTemplateContext } from '@/contexts/SMSTemplateContext';
 import { prepareSMSContext, openSMSApp } from '@/utils/openSMS';
+import { useSMSTemplates } from '@/hooks/useSMSTemplates';
+import { replaceTemplateVariables, getDefaultTemplateId, getTemplateById } from '@/utils/smsTemplateUtils';
 
 type DDFilter = 'all' | 'with-dd' | 'without-dd' | 'pending';
 
 const Customers = () => {
   const { customers, businessName, profile, isLoading, addCustomer, updateCustomer, archiveCustomer, refetchAll } = useSupabaseData();
+  const { isOwner, isHelper, isLoading: roleLoading } = useRole();
   const { requirePremium } = useSoftPaywall();
   const { showTemplatePicker } = useSMSTemplateContext();
+  const { templates } = useSMSTemplates();
   const [searchQuery, setSearchQuery] = useState('');
   const [ddFilter, setDDFilter] = useState<DDFilter>('all');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -46,6 +52,14 @@ const Customers = () => {
   const [isUpdatingPaymentMethods, setIsUpdatingPaymentMethods] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  
+  // Bulk DD send modal state
+  const [isBulkDDSendModalOpen, setIsBulkDDSendModalOpen] = useState(false);
+  const [useDefaultTemplate, setUseDefaultTemplate] = useState(false);
+  const [bulkDDSendProgress, setBulkDDSendProgress] = useState({ current: 0, total: 0 });
+  const [bulkDDSendResults, setBulkDDSendResults] = useState<BulkDDSendResult[]>([]);
+  const [isBulkDDSending, setIsBulkDDSending] = useState(false);
+  const [bulkDDSendCancelled, setBulkDDSendCancelled] = useState(false);
 
   const isGoCardlessConnected = !!profile?.gocardless_organisation_id;
 
@@ -140,43 +154,85 @@ const Customers = () => {
     }
   }, [bulkMode, customersEligibleForDD, filteredCustomers]);
 
-  const handleBulkSendDDLink = async () => {
+  const handleBulkSendDDLink = () => {
     const selectedCustomers = customersEligibleForDD.filter(c => selectedIds.has(c.id));
     if (selectedCustomers.length === 0) {
       toast.error('No customers selected');
       return;
     }
 
-    // For bulk operations, we'll process each customer individually with template picker
-    // This ensures each customer gets a personalized message
+    // Reset state and open modal
+    setBulkDDSendResults([]);
+    setBulkDDSendProgress({ current: 0, total: selectedCustomers.length });
+    setUseDefaultTemplate(false);
+    setBulkDDSendCancelled(false);
+    setIsBulkDDSendModalOpen(true);
+  };
+
+  const handleStartBulkDDSend = async () => {
+    const selectedCustomers = customersEligibleForDD.filter(c => selectedIds.has(c.id));
+    if (selectedCustomers.length === 0) {
+      toast.error('No customers selected');
+      setIsBulkDDSendModalOpen(false);
+      return;
+    }
+
+    setIsBulkDDSending(true);
     setIsSendingBulkDD(true);
-    let processedCount = 0;
-    const totalCustomers = selectedCustomers.length;
+    setBulkDDSendCancelled(false);
+    setBulkDDSendResults([]);
+    setBulkDDSendProgress({ current: 0, total: selectedCustomers.length });
+
+    const results: BulkDDSendResult[] = [];
+
+    const addResult = (result: BulkDDSendResult) => {
+      results.push(result);
+      setBulkDDSendResults([...results]);
+    };
 
     const processNextCustomer = async (index: number) => {
+      // Check if cancelled
+      if (bulkDDSendCancelled) {
+        setIsBulkDDSending(false);
+        setIsSendingBulkDD(false);
+        return;
+      }
+
       if (index >= selectedCustomers.length) {
+        // All customers processed
+        setIsBulkDDSending(false);
         setIsSendingBulkDD(false);
         clearSelection();
         refetchAll();
-        toast.success(`Processed ${processedCount} customer${processedCount !== 1 ? 's' : ''}`);
         return;
       }
 
       const customer = selectedCustomers[index];
-      
+      setBulkDDSendProgress({ current: index + 1, total: selectedCustomers.length });
+
       try {
+        // Check if customer has phone number
+        if (!customer.mobile_phone) {
+          addResult({
+            customerId: customer.id,
+            customerName: customer.name,
+            success: false,
+            error: 'No phone number',
+          });
+          processNextCustomer(index + 1);
+          return;
+        }
+
+        // Create mandate link
         const { data, error } = await supabase.functions.invoke('gocardless-create-mandate', {
-          body: { customerId: customer.id }
+          body: { 
+            customerId: customer.id,
+            customerName: customer.name, // FIX: Add customerName
+          }
         });
 
         if (error) throw error;
         if (!data?.authorisationUrl) throw new Error('No authorization URL returned');
-
-        if (!customer.mobile_phone) {
-          console.warn(`Customer ${customer.name} has no phone number, skipping`);
-          processNextCustomer(index + 1);
-          return;
-        }
 
         const context = prepareSMSContext({
           customerName: customer.name,
@@ -184,16 +240,63 @@ const Customers = () => {
           businessName,
         });
 
-        // Show template picker for this customer
-        showTemplatePicker('dd_bulk_invite', context, (message) => {
-          openSMSApp(customer.mobile_phone, message);
-          processedCount++;
+        // Handle template selection
+        if (useDefaultTemplate) {
+          // Use default template without picker
+          try {
+            const categoryConfig = templates['direct_debit_invite'];
+            const defaultTemplateId = categoryConfig?.defaultTemplateId || getDefaultTemplateId('direct_debit_invite');
+            const defaultTemplate = getTemplateById('direct_debit_invite', defaultTemplateId);
+            
+            if (!defaultTemplate || !defaultTemplate.message) {
+              throw new Error('Default template not found');
+            }
+
+            const message = replaceTemplateVariables(defaultTemplate.message, context);
+            openSMSApp(customer.mobile_phone, message);
+            
+            addResult({
+              customerId: customer.id,
+              customerName: customer.name,
+              success: true,
+            });
+          } catch (templateError) {
+            console.error(`Failed to use default template for ${customer.name}:`, templateError);
+            addResult({
+              customerId: customer.id,
+              customerName: customer.name,
+              success: false,
+              error: 'Template error',
+            });
+          }
+          
           // Process next customer after a short delay to allow SMS app to open
           setTimeout(() => processNextCustomer(index + 1), 500);
-        });
+        } else {
+          // Show template picker - need to capture index in closure
+          const currentIndex = index;
+          showTemplatePicker('dd_bulk_invite', context, (message) => {
+            openSMSApp(customer.mobile_phone, message);
+            addResult({
+              customerId: customer.id,
+              customerName: customer.name,
+              success: true,
+            });
+            // Process next customer after a short delay to allow SMS app to open
+            setTimeout(() => processNextCustomer(currentIndex + 1), 500);
+          });
+          // Don't call processNextCustomer here - it will be called from the picker callback
+          return;
+        }
       } catch (error) {
         console.error(`Failed to generate DD link for ${customer.name}:`, error);
-        toast.error(`Failed for ${customer.name}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        addResult({
+          customerId: customer.id,
+          customerName: customer.name,
+          success: false,
+          error: errorMessage,
+        });
         // Continue with next customer even if this one failed
         processNextCustomer(index + 1);
       }
@@ -201,6 +304,24 @@ const Customers = () => {
 
     // Start processing from the first customer
     processNextCustomer(0);
+  };
+
+  const handleCancelBulkDDSend = () => {
+    setBulkDDSendCancelled(true);
+    setIsBulkDDSending(false);
+    setIsSendingBulkDD(false);
+  };
+
+  const handleCloseBulkDDSendModal = () => {
+    if (isBulkDDSending && bulkDDSendResults.length < bulkDDSendProgress.total) {
+      // Still sending - ask for confirmation
+      if (window.confirm('Bulk send is in progress. Are you sure you want to cancel?')) {
+        handleCancelBulkDDSend();
+        setIsBulkDDSendModalOpen(false);
+      }
+    } else {
+      setIsBulkDDSendModalOpen(false);
+    }
   };
 
   const handleBulkUpdatePaymentMethod = async () => {
@@ -304,12 +425,29 @@ const Customers = () => {
     }
   };
 
+  // Helper-only restriction: Helpers cannot access customer management
+  if (!isLoading && !roleLoading && isHelper && !isOwner) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <Header showLogo={false} title="Customers" />
+        <main className="px-4 py-6 max-w-lg mx-auto">
+          <EmptyState
+            icon={<Users className="w-12 h-12 text-muted-foreground" />}
+            title="Helper Access"
+            description="This page is only available to business owners. As a helper, you can view customer details for your assigned jobs from the dashboard."
+          />
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <Header showLogo={false} title="Customers" />
 
       <main className="px-4 py-6 max-w-lg mx-auto">
-        {isLoading ? (
+        {isLoading || roleLoading ? (
           <LoadingState type="skeleton" skeletonType="customer-card" skeletonCount={5} />
         ) : customers.length === 0 ? (
           <motion.div
@@ -594,17 +732,8 @@ const Customers = () => {
                               disabled={selectedIds.size === 0 || isSendingBulkDD}
                               className="flex-1 bg-primary hover:bg-primary/90 touch-sm min-h-[44px]"
                             >
-                              {isSendingBulkDD ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                                  Sending...
-                                </>
-                              ) : (
-                                <>
-                                  <Send className="w-4 h-4 mr-1.5" />
-                                  Send DD Links
-                                </>
-                              )}
+                              <Send className="w-4 h-4 mr-1.5" />
+                              Send DD Links
                             </Button>
                           </div>
                           <p className="text-xs text-muted-foreground">
@@ -871,6 +1000,21 @@ const Customers = () => {
           refetchAll();
         }}
         addCustomer={addCustomer}
+      />
+
+      {/* Bulk DD Send Modal */}
+      <BulkDDSendModal
+        isOpen={isBulkDDSendModalOpen}
+        onClose={handleCloseBulkDDSendModal}
+        customers={customersEligibleForDD.filter(c => selectedIds.has(c.id))}
+        useDefaultTemplate={useDefaultTemplate}
+        onToggleDefaultTemplate={setUseDefaultTemplate}
+        onStart={handleStartBulkDDSend}
+        isSending={isBulkDDSending}
+        progress={bulkDDSendProgress}
+        results={bulkDDSendResults}
+        isComplete={isBulkDDSending === false && bulkDDSendResults.length > 0 && bulkDDSendResults.length === bulkDDSendProgress.total}
+        onCancel={isBulkDDSending ? handleCancelBulkDDSend : undefined}
       />
     </div>
   );

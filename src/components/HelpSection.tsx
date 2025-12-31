@@ -64,11 +64,39 @@ const faqs: FAQItem[] = [
   },
   {
     question: "How do I export data for my accountant?",
-    answer: "Go to Settings > Financial > Export for Xero. Select a date range and download a CSV file that's compatible with Xero and other accounting software. You can also export all your data from Settings > Data Management.",
+    answer: "Go to Settings > Financial > Exports. You can export your earnings report, helper billing report, subscription history, or all your data. All exports are available in CSV format and compatible with Xero and other accounting software.",
   },
   {
     question: "What is route optimization?",
     answer: "Route optimization (available on the Today tab) helps you plan the most efficient route for your jobs. It considers distance and suggests the best order to visit customers, saving you time and fuel.",
+  },
+  {
+    question: "How does helper billing work?",
+    answer: "Helpers are charged £5 per month when active. You activate a helper from Settings > Team Members, which starts billing immediately. When you deactivate a helper, billing stops at the end of the current billing period. Only active helpers are charged. The cost is added to your base subscription (£25/month) and appears on your Stripe invoice.",
+  },
+  {
+    question: "How does subscription billing work?",
+    answer: "SoloWipe costs £25/month for the base subscription, which includes unlimited jobs, SMS receipts, route optimization, and all core features. You can also add helpers at £5 per helper per month. There's a 7-day free trial when you first subscribe. After the trial, billing starts automatically. You can manage or cancel your subscription anytime from Settings > Financial > Subscription.",
+  },
+  {
+    question: "What should I do if my GoCardless mandate expires or payment fails?",
+    answer: "If a customer's Direct Debit mandate expires or a payment fails, you'll see a warning badge on their customer card. To fix this: 1) Open the customer's details, 2) Click 'Send Direct Debit Invite' to set up a new mandate, or 3) Collect payment manually using cash or bank transfer. Failed payments are automatically retried by GoCardless, but expired mandates require customer re-authorization.",
+  },
+  {
+    question: "What's the difference between Stripe and GoCardless?",
+    answer: "Stripe handles your SoloWipe subscription billing (the £25/month base fee plus £5 per active helper). GoCardless handles customer Direct Debit payments (money from your customers for completed jobs). They work independently: Stripe charges you monthly for using SoloWipe, while GoCardless collects payments from your customers and pays you out (minus fees) 3-5 working days after job completion.",
+  },
+  {
+    question: "How does the Money page work?",
+    answer: "The Money page shows your payment flow: Unpaid jobs appear at the top (with Direct Debit jobs prioritized). When you complete a job with an active Direct Debit mandate, payment is automatically collected via GoCardless. The job shows as 'Processing' for 3-5 working days, then updates to 'Paid' when funds arrive. You can also manually mark jobs as paid (cash/transfer) or collect Direct Debit payments immediately using the 'Collect Now' button.",
+  },
+  {
+    question: "How do I manage helper schedules?",
+    answer: "Go to Settings > Helper Schedule to assign helpers to specific days of the week. Select which days each helper works and optionally add a round name (e.g., 'North Round'). Helper schedules help organise your team and don't affect billing - only activating/deactivating helpers changes your subscription cost. Active helpers are charged £5/month regardless of their schedule.",
+  },
+  {
+    question: "What exports are available?",
+    answer: "Go to Settings > Financial > Exports to access: Export Earnings Report (completed jobs CSV for Xero/accounting), Export Helper Billing Report (helper costs CSV/Excel with date ranges), Export Subscription History (your subscription payments), and Export All Data (GDPR-compliant JSON export of all your data). All exports can be filtered by date range and are compatible with accounting software.",
   },
 ];
 
@@ -112,7 +140,7 @@ export function HelpSection({ isOpen, onClose }: HelpSectionProps) {
             <div className="sticky top-0 z-10 bg-card border-b border-border p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <HelpCircle className="w-5 h-5 text-primary" />
+                  <HelpCircle className="w-5 h-5 text-primary flex-shrink-0" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-foreground">Help & Support</h2>
@@ -123,7 +151,7 @@ export function HelpSection({ isOpen, onClose }: HelpSectionProps) {
                 onClick={onClose}
                 className="p-2 rounded-full hover:bg-muted transition-colors"
               >
-                <X className="w-5 h-5 text-muted-foreground" />
+                <X className="w-5 h-5 text-muted-foreground flex-shrink-0" />
               </button>
             </div>
 
@@ -135,17 +163,17 @@ export function HelpSection({ isOpen, onClose }: HelpSectionProps) {
                   <Button
                     variant="outline"
                     onClick={handleContactSupport}
-                    className="h-auto py-4 flex flex-col items-center gap-2"
+                    className="h-auto py-4 flex flex-col items-center gap-3"
                   >
-                    <Mail className="w-5 h-5 text-primary" />
+                    <Mail className="w-5 h-5 text-primary flex-shrink-0" />
                     <span className="text-sm">Email Support</span>
                   </Button>
                   <Button
                     variant="outline"
                     onClick={handleTermsPrivacy}
-                    className="h-auto py-4 flex flex-col items-center gap-2"
+                    className="h-auto py-4 flex flex-col items-center gap-3"
                   >
-                    <FileText className="w-5 h-5 text-muted-foreground" />
+                    <FileText className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                     <span className="text-sm">Terms & Privacy</span>
                   </Button>
                   <Button
@@ -154,9 +182,9 @@ export function HelpSection({ isOpen, onClose }: HelpSectionProps) {
                       onClose();
                       navigate('/cookies');
                     }}
-                    className="h-auto py-4 flex flex-col items-center gap-2"
+                    className="h-auto py-4 flex flex-col items-center gap-3"
                   >
-                    <FileText className="w-5 h-5 text-muted-foreground" />
+                    <FileText className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                     <span className="text-sm">Cookie Policy</span>
                   </Button>
                 </div>
@@ -164,10 +192,10 @@ export function HelpSection({ isOpen, onClose }: HelpSectionProps) {
 
               {/* FAQ Section */}
               <div className="p-4">
-                <h3 className="text-sm font-medium text-muted-foreground mb-3">
+                <h3 className="text-sm font-semibold text-muted-foreground mb-4">
                   Frequently Asked Questions
                 </h3>
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {faqs.map((faq, index) => (
                     <motion.div
                       key={index}
@@ -176,9 +204,9 @@ export function HelpSection({ isOpen, onClose }: HelpSectionProps) {
                     >
                       <button
                         onClick={() => setExpandedIndex(expandedIndex === index ? null : index)}
-                        className="w-full p-4 flex items-center justify-between text-left"
+                        className="w-full p-4 flex items-center justify-between text-left gap-3"
                       >
-                        <span className="font-medium text-foreground pr-4">{faq.question}</span>
+                        <span className="font-medium text-foreground flex-1">{faq.question}</span>
                         {expandedIndex === index ? (
                           <ChevronUp className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                         ) : (
@@ -207,14 +235,14 @@ export function HelpSection({ isOpen, onClose }: HelpSectionProps) {
 
               {/* Still need help */}
               <div className="p-4 pt-0">
-                <div className="bg-primary/5 rounded-xl p-4 text-center">
-                  <MessageCircle className="w-8 h-8 text-primary mx-auto mb-2" />
-                  <h4 className="font-medium text-foreground mb-1">Still need help?</h4>
-                  <p className="text-sm text-muted-foreground mb-3">
+                <div className="bg-primary/5 rounded-xl p-4 space-y-4 text-center">
+                  <MessageCircle className="w-8 h-8 text-primary mx-auto flex-shrink-0" />
+                  <h4 className="font-semibold text-foreground">Still need help?</h4>
+                  <p className="text-sm text-muted-foreground">
                     We're here to help. Email us and we'll get back to you within 24 hours.
                   </p>
                   <Button onClick={handleContactSupport} className="min-h-[44px]">
-                    <Mail className="w-4 h-4 mr-2" />
+                    <Mail className="w-5 h-5 mr-2" />
                     Contact Support
                   </Button>
                 </div>

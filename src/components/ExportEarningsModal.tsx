@@ -19,7 +19,8 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
-import { exportEarningsToXero, ExportJob } from '@/utils/exportCSV';
+import { downloadCSV } from '@/utils/exportCSV';
+import { exportJobsToXero } from '@/services/csv';
 import { Customer, JobWithCustomer } from '@/types/database';
 import { toast } from '@/hooks/use-toast';
 
@@ -48,7 +49,7 @@ export function ExportEarningsModal({ isOpen, onClose, businessName }: ExportEar
       const startDate = format(startOfMonth(subMonths(new Date(), months)), 'yyyy-MM-dd');
       const endDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
-      let query = supabase
+      const query = supabase
         .from('jobs')
         .select(`
           *,
@@ -56,21 +57,25 @@ export function ExportEarningsModal({ isOpen, onClose, businessName }: ExportEar
         `)
         .eq('status', 'completed')
         .gte('completed_at', `${startDate}T00:00:00`)
-        .lte('completed_at', `${endDate}T23:59:59`);
+        .lte('completed_at', `${endDate}T23:59:59`)
+        .order('completed_at', { ascending: true });
       
-      // Filter out archived customers if toggle is off
-      if (!includeArchived) {
-        query = query.eq('customer.is_archived', false);
-      }
-      
-      const { data, error } = await query.order('completed_at', { ascending: true });
+      const { data, error } = await query;
 
       if (error) throw error;
 
-      const jobs = (data || []).map(job => ({
+      // Map and filter jobs
+      let jobs = (data || []).map(job => ({
         ...job,
         customer: job.customer as Customer,
-      })) as ExportJob[];
+      })) as JobWithCustomer[];
+
+      // Filter out archived customers if toggle is off (post-processing)
+      // This is necessary because Supabase query builder doesn't support filtering on joined table fields
+      // Note: exportJobsToXero doesn't filter archived, so we filter before calling
+      if (!includeArchived) {
+        jobs = jobs.filter(job => !job.customer?.is_archived);
+      }
 
       if (jobs.length === 0) {
         toast({
@@ -81,8 +86,16 @@ export function ExportEarningsModal({ isOpen, onClose, businessName }: ExportEar
         return;
       }
 
+      // Use centralized CSV service for Xero export
+      const csvContent = exportJobsToXero(jobs, 'Service');
+      
+      // Generate filename
       const rangeLabel = `${format(new Date(startDate), 'MMM_yyyy')}_to_${format(new Date(endDate), 'MMM_yyyy')}`;
-      exportEarningsToXero(jobs, businessName, rangeLabel);
+      const sanitizedBusinessName = businessName.replace(/\s+/g, '_');
+      const filename = `${sanitizedBusinessName}_Earnings_${rangeLabel}.csv`;
+      
+      // Download CSV
+      downloadCSV(csvContent, filename);
 
       toast({
         title: 'Export complete!',
@@ -104,9 +117,9 @@ export function ExportEarningsModal({ isOpen, onClose, businessName }: ExportEar
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md flex flex-col">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle>Export for Xero</DialogTitle>
+          <DialogTitle>Export Earnings Report</DialogTitle>
           <DialogDescription>
-            Download a Xero-compatible CSV file of your completed jobs.
+            Download a CSV file of your completed jobs. Compatible with Xero and other accounting software.
           </DialogDescription>
         </DialogHeader>
 

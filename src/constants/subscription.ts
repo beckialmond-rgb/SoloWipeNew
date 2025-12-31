@@ -1,7 +1,7 @@
 // SoloWipe Pro Subscription Tiers
 export const SUBSCRIPTION_TIERS = {
   monthly: {
-    price_id: "price_1SdstJ4hy5D3Fg1bnepMLpw6",
+    price_id: "price_1SjwvU4hy5D3Fg1bxwaOEPJt",
     product_id: "prod_Tb5gxc2at1xv9q",
     name: "Monthly",
     price: 25,
@@ -9,7 +9,7 @@ export const SUBSCRIPTION_TIERS = {
     interval: "month",
   },
   annual: {
-    price_id: "price_1SdstJ4hy5D3Fg1bliu55p34",
+    price_id: "price_1SjwvU4hy5D3Fg1bfIEAV8aj",
     product_id: "prod_Tb5gDMeCzU9gNN",
     name: "Annual",
     price: 250,

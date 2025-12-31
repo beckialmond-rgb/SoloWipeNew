@@ -23,7 +23,7 @@ const testimonials: Testimonial[] = [
   },
   {
     name: 'Sarah W.',
-    business: 'Window Cleaning Service',
+    business: 'Service Business',
     location: 'Birmingham',
     rating: 5,
     text: 'The SMS templates are a game-changer. I can send reminders and receipts in seconds instead of typing them out manually. My customers love the professional communication, and I love the time I save.',

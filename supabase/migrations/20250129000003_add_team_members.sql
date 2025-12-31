@@ -25,26 +25,31 @@ ALTER TABLE public.team_members ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies
 -- Owners can view their team members
+DROP POLICY IF EXISTS "Owners can view their team members" ON public.team_members;
 CREATE POLICY "Owners can view their team members"
   ON public.team_members FOR SELECT
   USING (owner_id = auth.uid());
 
 -- Owners can add team members
+DROP POLICY IF EXISTS "Owners can add team members" ON public.team_members;
 CREATE POLICY "Owners can add team members"
   ON public.team_members FOR INSERT
   WITH CHECK (owner_id = auth.uid());
 
 -- Owners can update their team members (e.g., change name)
+DROP POLICY IF EXISTS "Owners can update their team members" ON public.team_members;
 CREATE POLICY "Owners can update their team members"
   ON public.team_members FOR UPDATE
   USING (owner_id = auth.uid());
 
 -- Owners can remove team members
+DROP POLICY IF EXISTS "Owners can remove team members" ON public.team_members;
 CREATE POLICY "Owners can remove team members"
   ON public.team_members FOR DELETE
   USING (owner_id = auth.uid());
 
 -- Helpers can view if they're on someone's team (for verification)
+DROP POLICY IF EXISTS "Helpers can view their team memberships" ON public.team_members;
 CREATE POLICY "Helpers can view their team memberships"
   ON public.team_members FOR SELECT
   USING (helper_id = auth.uid());

@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Customer, JobWithCustomer, JobWithCustomerAndAssignment, JobAssignmentWithUser, TeamMember, Helper } from '@/types/database';
+import { Customer, JobWithCustomer, JobWithCustomerAndAssignment, JobAssignmentWithUser, TeamMember, Helper, ExpenseWithJob } from '@/types/database';
 import { format, addWeeks, startOfWeek, subWeeks } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { mutationQueue, localData } from '@/lib/offlineStorage';
@@ -315,6 +315,7 @@ export function useSupabaseData() {
       // NOTE: Only fetch PENDING jobs - completed jobs are removed from assignments
       // when they're completed (see completeJobMutation cleanup logic)
       // This ensures helpers only see active assignments, not completed ones
+      // IMPORTANT: Show ALL assigned jobs regardless of scheduled_date so helpers can see future assignments
       const { data, error } = await supabase
         .from('jobs')
         .select(`
@@ -331,7 +332,7 @@ export function useSupabaseData() {
         .in('id', jobIds)
         .eq('status', 'pending')  // Only pending jobs - assignments are cleaned up on completion
         .is('cancelled_at', null)
-        .lte('scheduled_date', today)
+        // Removed .lte('scheduled_date', today) filter - helpers should see all assigned jobs including future ones
         .order('scheduled_date', { ascending: true });
         
         if (error) {
@@ -402,9 +403,10 @@ export function useSupabaseData() {
       
       try {
         // Source 1: Get team members (proactively added helpers)
+        // Include invite tracking fields to show pending invite status
         const { data: teamMembers, error: teamError } = await supabase
           .from('team_members')
-          .select('*')
+          .select('*, invite_token, invited_at, invite_expires_at, invite_accepted_at')
           .eq('owner_id', user.id);
         
         if (teamError) {
@@ -445,6 +447,28 @@ export function useSupabaseData() {
           )
         ) as string[];
         
+        // NEW: Check which helper_ids exist in profiles table (have signed up)
+        // Get all unique helper_ids from team_members
+        const allHelperIds = Array.from(
+          new Set((teamMembers || []).map((m: TeamMember) => m.helper_id).filter(Boolean))
+        ) as string[];
+        
+        // Check which ones exist in profiles (have signed up)
+        let signedUpHelperIds: string[] = [];
+        if (allHelperIds.length > 0) {
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id')
+            .in('id', allHelperIds);
+            
+          if (!profilesError && profiles) {
+            signedUpHelperIds = profiles.map(p => p.id);
+          } else if (profilesError) {
+            console.error('[Helpers Query Error - Profiles]', profilesError);
+            // Continue with discoveredHelperIds only if profiles query fails
+          }
+        }
+        
         // Combine team members and discovered helpers
         const helperMap = new Map<string, Helper>();
         
@@ -454,13 +478,19 @@ export function useSupabaseData() {
             ? member.helper_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
             : member.helper_email.split('@')[0].slice(0, 2).toUpperCase();
         
-          // Detect placeholder: 
+          // FIXED: Detect placeholder correctly
           // 1. If email ends with @temp.helper, definitely a placeholder
-          // 2. If helper_id is NOT in discoveredHelperIds, they haven't signed up yet (placeholder)
-          //    (discoveredHelperIds come from assignments, which require real auth.users)
+          // 2. If helper_id exists in profiles table, they've signed up (NOT a placeholder)
+          // 3. If helper_id is in discoveredHelperIds, they've been assigned (also signed up)
           const isTempEmail = member.helper_email.endsWith('@temp.helper');
-          const hasSignedUp = discoveredHelperIds.includes(member.helper_id);
+          const hasSignedUp = signedUpHelperIds.includes(member.helper_id) || 
+                             discoveredHelperIds.includes(member.helper_id);
           const isPlaceholder = isTempEmail || !hasSignedUp;
+          
+          // Check for pending invite (has token, not expired, not accepted)
+          const hasPendingInvite = !!member.invite_token && 
+            !member.invite_accepted_at &&
+            (!member.invite_expires_at || new Date(member.invite_expires_at) > new Date());
         
           helperMap.set(member.helper_id, {
             id: member.helper_id,
@@ -469,6 +499,8 @@ export function useSupabaseData() {
             initials,
             isTeamMember: true,
             isPlaceholder: isPlaceholder,
+            hasPendingInvite: hasPendingInvite,
+            inviteExpiresAt: member.invite_expires_at || null,
           });
         });
         
@@ -883,6 +915,64 @@ export function useSupabaseData() {
           // Limit reached - will trigger modal on next render via useUsageCounters hook
         }
 
+        // Calculate helper payment amount (revenue split)
+        // Only calculate if completer is a helper assigned to this job
+        let helperPaymentAmount: number | null = null;
+        
+        try {
+          // Check if completer is a helper (assigned to this job)
+          // Note: We check BEFORE cleanup to see if user was assigned
+          const { data: assignmentCheck } = await supabase
+            .from('job_assignments')
+            .select('assigned_to_user_id')
+            .eq('job_id', jobId)
+            .eq('assigned_to_user_id', user.id)
+            .maybeSingle();
+          
+          const isHelperCompleter = !!assignmentCheck;
+          
+          if (isHelperCompleter) {
+            // CRITICAL: Null check for customer.profile_id before accessing
+            if (!job.customer?.profile_id) {
+              console.error('[Revenue Split] Customer profile_id is null - cannot calculate helper payment', {
+                jobId,
+                customerId: job.customer_id,
+                customerName: job.customer?.name,
+              });
+              // Continue with helperPaymentAmount = null (no payment)
+            } else {
+              // Fetch commission percentage from team_members
+              // Need: owner_id (from customer.profile_id) and helper_id (user.id)
+              const { data: teamMember, error: teamMemberError } = await supabase
+                .from('team_members')
+                .select('commission_percentage')
+                .eq('owner_id', job.customer.profile_id)
+                .eq('helper_id', user.id)
+                .maybeSingle();
+              
+              if (teamMemberError) {
+                console.error('[Revenue Split] Error fetching team member:', teamMemberError);
+                // Continue with helperPaymentAmount = null (no payment)
+              } else if (teamMember && teamMember.commission_percentage > 0) {
+                // Validate commission percentage is within valid range (0-100)
+                const commissionPercent = Math.max(0, Math.min(100, teamMember.commission_percentage));
+                const commission = commissionPercent / 100;
+                // Round to 2 decimal places using proper decimal arithmetic
+                helperPaymentAmount = Math.round(amountCollected * commission * 100) / 100;
+                console.log(`[Revenue Split] Helper payment calculated: £${amountCollected} × ${commissionPercent}% = £${helperPaymentAmount}`);
+              } else {
+                console.log('[Revenue Split] No commission set or commission is 0% - no helper payment');
+              }
+            }
+          } else {
+            console.log('[Revenue Split] Owner completed job - no helper payment');
+          }
+        } catch (revenueSplitError) {
+          // Non-critical: log error but don't fail job completion
+          console.error('[Revenue Split] Failed to calculate helper payment:', revenueSplitError);
+          // Continue with helperPaymentAmount = null (no payment)
+        }
+
         const { error: updateError } = await supabase
           .from('jobs')
           .update({
@@ -893,6 +983,7 @@ export function useSupabaseData() {
             payment_method: paymentMethod,
             payment_date: paymentDate,
             photo_url: photoUrl || null,
+            helper_payment_amount: helperPaymentAmount,
           })
           .eq('id', jobId)
           .eq('status', 'pending');
@@ -936,7 +1027,7 @@ export function useSupabaseData() {
                 jobId,
                 customerId: job.customer_id,
                 amount: amountCollected,
-                description: `Window cleaning - ${job.customer.name}`,
+                description: `Service - ${job.customer.name}`,
               },
             });
             
@@ -2434,27 +2525,28 @@ export function useSupabaseData() {
       // PROACTIVE CHECK: Verify helper exists in auth.users before attempting assignment
       // This prevents foreign key constraint errors and provides better UX
       try {
-        const { data: teamMember } = await supabase
-          .from('team_members')
-          .select('helper_id, helper_name, helper_email')
-          .eq('helper_id', userId)
-          .eq('owner_id', user.id)
+        // First check if helper exists in auth.users by checking profiles
+        // (We can't query auth.users directly, but profiles requires auth.users)
+        const { data: profileCheck, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', userId)
           .maybeSingle();
         
-        if (teamMember) {
-          // Check if this helper actually exists in auth.users by checking profiles
-          // (We can't query auth.users directly, but profiles requires auth.users)
-          const { data: profileCheck } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', userId)
+        // If profile doesn't exist, helper doesn't exist in auth.users
+        if (!profileCheck) {
+          // Check team_members to get helper details for better error message
+          const { data: teamMember } = await supabase
+            .from('team_members')
+            .select('helper_id, helper_name, helper_email, is_active')
+            .eq('helper_id', userId)
+            .eq('owner_id', user.id)
             .maybeSingle();
           
-          // If profile doesn't exist, this is a placeholder helper
-          if (!profileCheck) {
+          if (teamMember) {
             const helperName = teamMember.helper_name || 'This helper';
             const helperEmail = teamMember.helper_email;
-            const isTempEmail = helperEmail.endsWith('@temp.helper');
+            const isTempEmail = helperEmail?.endsWith('@temp.helper');
             
             if (isTempEmail) {
               throw new Error(
@@ -2464,16 +2556,63 @@ export function useSupabaseData() {
             } else {
               throw new Error(
                 `"${helperName}" needs to sign up first before you can assign jobs. ` +
-                `They're already added to your team! Once they create an account with ${helperEmail}, you'll be able to assign jobs immediately.`
+                `They're already added to your team! Once they create an account with ${helperEmail || 'their email'}, you'll be able to assign jobs immediately.`
               );
             }
+          } else {
+            // Helper not in team_members either - data inconsistency
+            console.error('[Assign Job] Helper not found in profiles or team_members', {
+              userId,
+              profileError,
+              profileCheck,
+              jobId
+            });
+            
+            // Check if userId is actually a jobId (common mistake)
+            const { data: jobCheck } = await supabase
+              .from('jobs')
+              .select('id')
+              .eq('id', userId)
+              .maybeSingle();
+            
+            if (jobCheck) {
+              throw new Error(
+                `Invalid helper ID. It looks like a job ID was passed instead of a helper ID. ` +
+                `Please try selecting the helper again.`
+              );
+            }
+            
+            throw new Error(
+              `This helper account (ID: ${userId.slice(0, 8)}...) doesn't exist in the system. ` +
+              `They may need to sign up first, or there may be a data inconsistency. ` +
+              `Please remove and re-add this helper from your team.`
+            );
+          }
+        }
+        
+        // Helper exists in auth.users, now check team_members for additional validation
+        const { data: teamMember } = await supabase
+          .from('team_members')
+          .select('helper_id, helper_name, helper_email, is_active')
+          .eq('helper_id', userId)
+          .eq('owner_id', user.id)
+          .maybeSingle();
+        
+        if (teamMember) {
+          // Check if helper is active - inactive helpers cannot be assigned to jobs
+          if (teamMember.is_active === false) {
+            throw new Error('This helper is inactive and cannot be assigned to jobs.');
           }
         }
         // If not in team_members, that's OK - they'll be auto-added
-        // But we can still proceed with assignment
+        // But we can still proceed with assignment since they exist in auth.users
       } catch (validationError) {
         // If it's our custom error, re-throw it
-        if (validationError instanceof Error && validationError.message.includes('needs to sign up')) {
+        if (validationError instanceof Error && (
+          validationError.message.includes('needs to sign up') ||
+          validationError.message.includes('inactive and cannot be assigned') ||
+          validationError.message.includes('doesn\'t exist or hasn\'t been set up')
+        )) {
           throw validationError;
         }
         // Other errors are non-critical - proceed with assignment anyway
@@ -2490,12 +2629,20 @@ export function useSupabaseData() {
           assigned_to_user_id: userId,
           assigned_by_user_id: user.id,
         }, {
-          onConflict: 'job_assignments_job_user_unique' // Use constraint name for reliability
+          onConflict: 'job_id,assigned_to_user_id' // Use column names for unique constraint
         })
         .select();
 
       if (error) {
-        console.error('[Assign Job Error]', error);
+        console.error('[Assign Job Error]', {
+          error,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          jobId,
+          userId
+        });
         // Check if it's a foreign key constraint error (helper doesn't exist in auth.users)
         if (error.code === '23503' || error.message.includes('foreign key') || error.message.includes('violates foreign key')) {
           // Check if this is a placeholder helper (exists in team_members but not in auth.users)
@@ -2531,7 +2678,20 @@ export function useSupabaseData() {
         throw error;
       }
 
-      console.log('[Assign Job] Assignment successful', { data });
+      console.log('[Assign Job] Assignment successful', { 
+        data, 
+        jobId, 
+        userId,
+        assignmentId: data?.[0]?.id 
+      });
+      
+      // Verify assignment was actually created
+      if (!data || data.length === 0) {
+        console.warn('[Assign Job] WARNING: Upsert returned no data!', {
+          jobId,
+          userId
+        });
+      }
 
       // Auto-populate team_members if not already there
       // This auto-discovers helpers and adds them to the team
@@ -2556,19 +2716,25 @@ export function useSupabaseData() {
           const helperEmail = existingHelper?.helper_email || userId.slice(0, 8) + '...';
           const helperName = existingHelper?.helper_name || null;
           
-          await supabase
-            .from('team_members')
-            .insert({
-              owner_id: user.id,
-              helper_id: userId,
-              helper_email: helperEmail,
-              helper_name: helperName
-            })
-            .catch(err => {
+          try {
+            const { error: insertError } = await supabase
+              .from('team_members')
+              .insert({
+                owner_id: user.id,
+                helper_id: userId,
+                helper_email: helperEmail,
+                helper_name: helperName
+              });
+            if (insertError) {
               // Ignore errors - might already exist or RLS issue
               // This is non-critical, just log
-              console.warn('[Auto-add team member]', err);
-            });
+              console.warn('[Auto-add team member]', insertError);
+            }
+          } catch (insertErr) {
+            // Ignore errors - might already exist or RLS issue
+            // This is non-critical, just log
+            console.warn('[Auto-add team member]', insertErr);
+          }
         }
       } catch (err) {
         // Non-critical - just log
@@ -2672,6 +2838,7 @@ export function useSupabaseData() {
       }
     },
     onSuccess: () => {
+      console.log('[Assign Job] Invalidating queries after successful assignment');
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
       queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
       queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
@@ -2697,6 +2864,23 @@ export function useSupabaseData() {
         throw new Error('Invalid helper ID(s)');
       }
       
+      // Pre-flight check: Verify all helpers are active before attempting assignment
+      const { data: teamMembers } = await supabase
+        .from('team_members')
+        .select('helper_id, helper_name, is_active')
+        .eq('owner_id', user.id)
+        .in('helper_id', userIds);
+      
+      if (teamMembers && teamMembers.length > 0) {
+        const inactiveHelpers = teamMembers.filter(tm => tm.is_active === false);
+        if (inactiveHelpers.length > 0) {
+          const names = inactiveHelpers.map(h => h.helper_name || 'Helper').join(', ');
+          throw new Error(
+            `The following helper${inactiveHelpers.length > 1 ? 's' : ''} ${inactiveHelpers.length > 1 ? 'are' : 'is'} inactive and cannot be assigned to jobs: ${names}.`
+          );
+        }
+      }
+      
       // Insert all assignments (upsert to prevent duplicates)
       const assignments = userIds.map(userId => ({
         job_id: jobId,
@@ -2704,16 +2888,25 @@ export function useSupabaseData() {
         assigned_by_user_id: user.id,
       }));
       
-      console.log('[Assign Multiple Users] Attempting to assign job to multiple users', { jobId, userIds, assignedBy: user.id });
+      console.log('[Assign Multiple Users] Attempting to assign job to multiple users', { jobId, userIds, assignedBy: user.id, assignments });
       const { data, error } = await supabase
         .from('job_assignments')
         .upsert(assignments, {
-          onConflict: 'job_assignments_job_user_unique' // Use constraint name for reliability
+          onConflict: 'job_id,assigned_to_user_id' // Use column names for unique constraint
         })
         .select();
 
       if (error) {
-        console.error('[Assign Multiple Users Error]', error);
+        console.error('[Assign Multiple Users Error]', {
+          error,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          jobId,
+          userIds,
+          assignments
+        });
         // Check for foreign key constraint errors (placeholder helpers)
         if (error.code === '23503' || error.message.includes('foreign key')) {
           // Find which helpers are placeholders (exist in team_members but not in auth.users)
@@ -2752,7 +2945,27 @@ export function useSupabaseData() {
         throw error;
       }
 
-      console.log('[Assign Multiple Users] Assignments successful', { data });
+      console.log('[Assign Multiple Users] Assignments successful', { 
+        data, 
+        jobId, 
+        userIds, 
+        assignmentCount: data?.length || 0 
+      });
+      
+      // Verify assignments were actually created
+      if (!data || data.length === 0) {
+        console.warn('[Assign Multiple Users] WARNING: Upsert returned no data!', {
+          jobId,
+          userIds,
+          assignments
+        });
+      } else {
+        console.log('[Assign Multiple Users] Created assignments:', data.map(a => ({
+          id: a.id,
+          job_id: a.job_id,
+          assigned_to_user_id: a.assigned_to_user_id
+        })));
+      }
       
       // Auto-populate team_members for any new helpers
       // (non-critical, can fail silently)
@@ -2776,17 +2989,23 @@ export function useSupabaseData() {
             const helperEmail = existingHelper?.helper_email || userId.slice(0, 8) + '...';
             const helperName = existingHelper?.helper_name || null;
             
-            await supabase
-              .from('team_members')
-              .insert({
-                owner_id: user.id,
-                helper_id: userId,
-                helper_email: helperEmail,
-                helper_name: helperName
-              })
-              .catch(() => {
+            try {
+              const { error: insertError } = await supabase
+                .from('team_members')
+                .insert({
+                  owner_id: user.id,
+                  helper_id: userId,
+                  helper_email: helperEmail,
+                  helper_name: helperName
+                });
+              if (insertError) {
                 // Ignore errors - non-critical
-              });
+                console.warn('[Auto-add team member (multiple)]', insertError);
+              }
+            } catch (insertErr) {
+              // Ignore errors - non-critical
+              console.warn('[Auto-add team member (multiple)]', insertErr);
+            }
           }
         } catch (err) {
           // Ignore errors - non-critical
@@ -2873,6 +3092,7 @@ export function useSupabaseData() {
       console.error('[Assign Multiple Users] Optimistic update rollback:', err);
     },
     onSuccess: () => {
+      console.log('[Assign Multiple Users] Invalidating queries after successful assignment');
       queryClient.invalidateQueries({ queryKey: ['pendingJobs'] });
       queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] });
       queryClient.invalidateQueries({ queryKey: ['assignedJobs'] });
@@ -2912,6 +3132,7 @@ export function useSupabaseData() {
 
       const previousPending = queryClient.getQueryData(['pendingJobs', user?.id, today]);
       const previousUpcoming = queryClient.getQueryData(['upcomingJobs', user?.id, today]);
+      const previousAssigned = queryClient.getQueryData(['assignedJobs', user?.id, today]);
 
       // Remove assignment(s) from pending jobs
       queryClient.setQueryData(['pendingJobs', user?.id, today], (old: JobWithCustomerAndAssignment[] = []) => {
@@ -3267,7 +3488,58 @@ export function useSupabaseData() {
 
   const businessName = profile?.business_name || 'Welcome';
   const googleReviewLink = profile?.google_review_link;
-  const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading || archivedLoading || allArchivedLoading;
+  // Fetch expenses with job links
+  const { data: expenses = [], isLoading: expensesLoading } = useQuery<ExpenseWithJob[]>({
+    queryKey: ['expenses', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      
+      const { data, error } = await supabase
+        .from('expenses')
+        .select(`
+          *,
+          job:jobs(
+            *,
+            customer:customers(*)
+          )
+        `)
+        .eq('owner_id', user.id)
+        .order('date', { ascending: false })
+        .limit(100);
+      
+      // Handle 404 gracefully - table doesn't exist yet
+      if (error && (error.code === 'PGRST116' || error.message?.includes('404') || error.message?.includes('does not exist'))) {
+        console.log('[useSupabaseData] Expenses table does not exist yet, returning empty array');
+        return [];
+      }
+      
+      if (error) {
+        console.warn('[useSupabaseData] Failed to fetch expenses (non-critical):', error);
+        return []; // Return empty array instead of throwing
+      }
+      
+      return (data || []).map(expense => ({
+        ...expense,
+        job: expense.job ? {
+          ...expense.job,
+          customer: expense.job.customer as Customer,
+        } : undefined,
+      })) as ExpenseWithJob[];
+    },
+    enabled: !!user,
+  });
+
+  // Calculate total expenses this month
+  const totalExpensesThisMonth = useMemo(() => {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    return expenses
+      .filter(expense => new Date(expense.date) >= startOfMonth)
+      .reduce((sum, expense) => sum + expense.amount, 0);
+  }, [expenses]);
+
+  const isLoading = customersLoading || jobsLoading || completedLoading || upcomingLoading || weeklyLoading || unpaidLoading || paidLoading || archivedLoading || allArchivedLoading || expensesLoading;
 
   const refetchAll = async () => {
     await Promise.all([
@@ -3277,6 +3549,9 @@ export function useSupabaseData() {
       queryClient.invalidateQueries({ queryKey: ['completedToday'] }),
       queryClient.invalidateQueries({ queryKey: ['upcomingJobs'] }),
       queryClient.invalidateQueries({ queryKey: ['unpaidJobs'] }),
+      queryClient.invalidateQueries({ queryKey: ['helpers'] }),
+      queryClient.invalidateQueries({ queryKey: ['teamMemberships'] }),
+      queryClient.invalidateQueries({ queryKey: ['expenses'] }),
     ]);
   };
 
@@ -3298,6 +3573,8 @@ export function useSupabaseData() {
     helpers,
     helpersLoading,
     teamMemberships,
+    expenses,
+    totalExpensesThisMonth,
     completeJob,
     addCustomer,
     updateCustomer,

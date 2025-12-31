@@ -150,6 +150,7 @@ export type Database = {
           gocardless_organisation_id: string | null
           google_review_link: string | null
           id: string
+          role: 'owner' | 'helper' | 'both' | null
           stripe_customer_id: string | null
           subscription_ends_at: string | null
           subscription_id: string | null
@@ -163,6 +164,7 @@ export type Database = {
           gocardless_organisation_id?: string | null
           google_review_link?: string | null
           id: string
+          role?: 'owner' | 'helper' | 'both' | null
           stripe_customer_id?: string | null
           subscription_ends_at?: string | null
           subscription_id?: string | null
@@ -176,6 +178,7 @@ export type Database = {
           gocardless_organisation_id?: string | null
           google_review_link?: string | null
           id?: string
+          role?: 'owner' | 'helper' | 'both' | null
           stripe_customer_id?: string | null
           subscription_ends_at?: string | null
           subscription_id?: string | null

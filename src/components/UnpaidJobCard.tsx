@@ -1,11 +1,12 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Phone, MessageSquare, PoundSterling, CreditCard, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { MapPin, Phone, MessageSquare, PoundSterling, CreditCard, Clock, AlertTriangle, CheckCircle, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { JobWithCustomer } from '@/types/database';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useSMSTemplateContext } from '@/contexts/SMSTemplateContext';
 import { openSMSApp, prepareSMSContext } from '@/utils/openSMS';
+import { useAuth } from '@/hooks/useAuth';
 
 interface UnpaidJobCardProps {
   job: JobWithCustomer;
@@ -14,11 +15,13 @@ interface UnpaidJobCardProps {
   onMarkPaid: () => void;
   onCollectNow?: (job: JobWithCustomer) => void;
   onSyncPayment?: (job: JobWithCustomer) => void;
+  onReceiptSent?: (jobId: string) => void;
   isProcessing?: boolean;
   isCollecting?: boolean;
   isOverdue?: boolean;
   daysSince?: number;
   showSuccessAnimation?: boolean;
+  receiptSent?: boolean;
 }
 
 export function UnpaidJobCard({ 
@@ -28,17 +31,20 @@ export function UnpaidJobCard({
   onMarkPaid,
   onCollectNow,
   onSyncPayment,
+  onReceiptSent,
   isProcessing = false,
   isCollecting = false,
   isOverdue = false,
   daysSince = 0,
-  showSuccessAnimation = false
+  showSuccessAnimation = false,
+  receiptSent = false
 }: UnpaidJobCardProps) {
   const firstName = job.customer.name.split(' ')[0];
   const completedDate = job.completed_at ? format(new Date(job.completed_at), 'd MMM') : 'recently';
   const amount = (job.amount_collected || 0).toFixed(2);
   
   const { showTemplatePicker } = useSMSTemplateContext();
+  const { user } = useAuth();
 
   const handleSendReminder = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -64,6 +70,86 @@ export function UnpaidJobCard({
     showTemplatePicker('unpaid_reminder', context, (message) => {
       openSMSApp(phone, message, undefined, job.id);
     });
+  };
+
+  const handleSendReceipt = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    // Only show receipt for completed jobs
+    if (job.status !== 'completed' || !job.completed_at) return;
+    
+    // Get customer data for receipt SMS
+    const customerName = job.customer?.name || 'Customer';
+    const fullAddress = job.customer?.address || '';
+    
+    // Use actual job amount_collected, fallback to customer price
+    const jobAmount = (job.amount_collected && job.amount_collected > 0) 
+      ? job.amount_collected 
+      : ((job.customer?.price && job.customer.price > 0) ? job.customer.price : undefined);
+    
+    // Format completed date for receipt
+    const completedDateFormatted = job.completed_at 
+      ? format(new Date(job.completed_at), 'd MMM yyyy')
+      : '';
+    
+    // Handle photo URL shortening if needed
+    let photoUrl = job.photo_url;
+    if (photoUrl) {
+      try {
+        const encodedUrl = encodeURIComponent(photoUrl);
+        const tinyUrlResponse = await fetch(`https://tinyurl.com/api-create.php?url=${encodedUrl}`, {
+          method: 'GET',
+          headers: { 'Accept': 'text/plain' }
+        });
+        
+        if (tinyUrlResponse.ok) {
+          const shortUrl = await tinyUrlResponse.text();
+          if (shortUrl && !shortUrl.toLowerCase().includes('error') && shortUrl.startsWith('http')) {
+            photoUrl = shortUrl.trim();
+          }
+        }
+      } catch (error) {
+        console.warn('[Receipt SMS] Failed to shorten photo URL, using original:', error);
+      }
+    }
+    
+    // Format payment method for receipt
+    const formatPaymentMethod = (method: string | null, preferredMethod: string | null): string => {
+      if (method) {
+        if (method === 'gocardless') return 'Direct Debit';
+        if (method === 'cash') return 'Cash';
+        if (method === 'transfer') return 'Bank Transfer';
+        return method.charAt(0).toUpperCase() + method.slice(1);
+      }
+      
+      if (preferredMethod === 'gocardless') return 'Direct Debit (Expected)';
+      if (preferredMethod === 'cash') return 'Cash (Expected)';
+      if (preferredMethod === 'transfer') return 'Bank Transfer (Expected)';
+      
+      return 'Not specified';
+    };
+    
+    // Prepare context for receipt template
+    const context = prepareSMSContext({
+      customerName,
+      customerAddress: fullAddress,
+      price: jobAmount,
+      jobTotal: jobAmount,
+      completedDate: completedDateFormatted,
+      photoUrl: photoUrl,
+      businessName,
+      paymentMethod: formatPaymentMethod(job.payment_method, job.customer.preferred_payment_method),
+    });
+    
+    const phone = job.customer.mobile_phone || '';
+    if (phone) {
+      showTemplatePicker('receipt_sms', context, (message) => {
+        if (onReceiptSent) {
+          onReceiptSent(job.id);
+        }
+        openSMSApp(phone, message, user?.id, job.id);
+      });
+    }
   };
 
   const handleCall = (e: React.MouseEvent) => {
@@ -265,6 +351,22 @@ export function UnpaidJobCard({
               <div className="flex gap-2">
                 {job.customer.mobile_phone && (
                   <>
+                    {/* Service Receipt button - only show for completed jobs */}
+                    {job.status === 'completed' && job.completed_at && (
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="flex-1 touch-sm min-h-[44px] gap-2"
+                        onClick={handleSendReceipt}
+                        disabled={receiptSent}
+                      >
+                        <FileText className="w-4 h-4 shrink-0" />
+                        <span className="text-sm">
+                          {receiptSent ? 'Receipt Sent' : job.photo_url ? 'Receipt + Photo' : 'Receipt'}
+                        </span>
+                      </Button>
+                    )}
+                    {/* Payment Chase button */}
                     <Button
                       variant="outline"
                       size="lg"

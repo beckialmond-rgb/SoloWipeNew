@@ -40,7 +40,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Trigger to auto-update updated_at
+-- Trigger to auto-update updated_at (drop first if exists)
+DROP TRIGGER IF EXISTS update_usage_counters_updated_at ON public.usage_counters;
 CREATE TRIGGER update_usage_counters_updated_at
   BEFORE UPDATE ON public.usage_counters
   FOR EACH ROW
@@ -51,6 +52,11 @@ CREATE TRIGGER update_usage_counters_updated_at
 -- ============================================================================
 
 ALTER TABLE public.usage_counters ENABLE ROW LEVEL SECURITY;
+
+-- Drop policies if they exist (to allow re-running migration)
+DROP POLICY IF EXISTS "Users can view their own usage counters" ON public.usage_counters;
+DROP POLICY IF EXISTS "Users can insert their own usage counters" ON public.usage_counters;
+DROP POLICY IF EXISTS "Users can update their own usage counters" ON public.usage_counters;
 
 CREATE POLICY "Users can view their own usage counters"
   ON public.usage_counters FOR SELECT

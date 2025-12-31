@@ -1,11 +1,22 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Search, UserPlus, Check, X, Plus } from 'lucide-react';
+import { Search, UserPlus, Check, X, Plus, Mail } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { JobAssignmentWithUser } from '@/types/database';
 import { useToast } from '@/hooks/use-toast';
 import { getUserFriendlyError } from '@/lib/errorMessages';
+import { InviteHelperDialog } from '@/components/InviteHelperDialog';
+import { 
+  isPlaceholderHelper, 
+  getHelperStatus, 
+  getHelperStatusLabel, 
+  getHelperStatusBadgeVariant,
+  formatHelperName,
+  getHelperInitials,
+  type HelperStatus 
+} from '@/utils/helperUtils';
 
 interface Helper {
   id: string;
@@ -13,6 +24,8 @@ interface Helper {
   name?: string;
   initials: string;
   isPlaceholder?: boolean; // True if helper hasn't signed up yet
+  hasPendingInvite?: boolean; // True if invite sent but not accepted
+  inviteExpiresAt?: string | null; // When invite expires
 }
 
 interface HelperListProps {
@@ -25,6 +38,7 @@ interface HelperListProps {
   onAssignToMe?: () => void;
   onCreateHelper?: (name: string, email?: string) => Promise<Helper>;
   onRemoveHelper?: (helperId: string) => Promise<void>;
+  onInviteSent?: () => void; // Callback when invite is sent (to refresh list)
   currentUserId?: string;
   isLoading?: boolean;
   recentlyCreatedHelperIds?: Set<string>; // Track recently created helpers for better UX
@@ -40,6 +54,7 @@ export function HelperList({
   onAssignToMe,
   onCreateHelper,
   onRemoveHelper,
+  onInviteSent,
   currentUserId,
   isLoading = false,
   recentlyCreatedHelperIds = new Set()
@@ -49,6 +64,7 @@ export function HelperList({
   const [isCreating, setIsCreating] = useState(false);
   const [removingHelperId, setRemovingHelperId] = useState<string | null>(null);
   const [showEmailField, setShowEmailField] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const { toast } = useToast();
   
   // Detect if search query looks like an email
@@ -211,6 +227,34 @@ export function HelperList({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Header with Invite Button */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm font-medium text-foreground">Team Members</div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setInviteDialogOpen(true)}
+          className="gap-2"
+        >
+          <Mail className="w-4 h-4" />
+          Invite Helper
+        </Button>
+      </div>
+
+      {/* Invite Helper Dialog */}
+      <InviteHelperDialog
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
+        onInviteSent={() => {
+          // Call parent callback to refresh helper list
+          if (onInviteSent) {
+            onInviteSent();
+          }
+          // Clear search to show new helper
+          setSearchQuery('');
+        }}
+      />
+
       {/* Search bar */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -359,10 +403,24 @@ export function HelperList({
               const assigned = isAssigned(helper.id);
               const selected = isSelected(helper.id);
               const isCurrentUser = helper.id === currentUserId;
-              const isPlaceholder = helper.isPlaceholder || helper.email.endsWith('@temp.helper');
+              // Use utility function for placeholder detection
+              const isPlaceholder = isPlaceholderHelper(
+                helper.id,
+                helper.email,
+                !helper.isPlaceholder // If isPlaceholder flag is false, they have auth user
+              );
               const isRecentlyCreated = recentlyCreatedHelperIds.has(helper.id);
               const canRemove = onRemoveHelper && (isPlaceholder || isRecentlyCreated) && !isCurrentUser;
               const isRemoving = removingHelperId === helper.id;
+              
+              // Get helper status using utility function
+              const statusInfo = getHelperStatus(
+                true, // Assume active if not specified (will be improved with actual data)
+                null, // billingStartedAt - not available in this component
+                null, // billingStoppedAt - not available in this component
+                helper.hasPendingInvite || false,
+                isPlaceholder
+              );
 
               return (
                 <div
@@ -391,7 +449,7 @@ export function HelperList({
                         <AvatarFallback className={cn(
                           assigned ? "bg-primary text-primary-foreground" : selected ? "bg-primary/70 text-primary-foreground" : "bg-muted"
                         )}>
-                          {helper.initials || getInitials(helper.email, helper.name)}
+                          {helper.initials || getHelperInitials(helper.name, helper.email)}
                         </AvatarFallback>
                       </Avatar>
                       {assigned && (
@@ -406,24 +464,34 @@ export function HelperList({
                       )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium text-foreground truncate flex items-center gap-2">
-                        {helper.name || helper.email.split('@')[0]}
+                      <div className="font-medium text-foreground truncate flex items-center gap-2 flex-wrap">
+                        {formatHelperName(helper.name, helper.email)}
                         {isCurrentUser && ' (You)'}
-                        {isPlaceholder && (
-                          <span 
-                            className="text-xs px-1.5 py-0.5 bg-muted text-muted-foreground rounded border border-border"
-                            title="This helper needs to sign up before receiving job assignments"
-                          >
-                            Pending Signup
-                          </span>
-                        )}
-                        {isRecentlyCreated && !isPlaceholder && (
-                          <span 
-                            className="text-xs px-1.5 py-0.5 bg-green-500/10 text-green-600 dark:text-green-400 rounded border border-green-500/20"
+                        {/* Helper Status Badge */}
+                        <Badge 
+                          variant={getHelperStatusBadgeVariant(statusInfo.status)}
+                          className="text-xs"
+                          title={
+                            statusInfo.status === 'pending_invite' && helper.inviteExpiresAt
+                              ? `Invitation sent (expires ${new Date(helper.inviteExpiresAt).toLocaleDateString('en-GB')})`
+                              : statusInfo.status === 'pending_signup'
+                              ? 'This helper needs to sign up before receiving job assignments'
+                              : undefined
+                          }
+                        >
+                          {statusInfo.status === 'pending_invite' && (
+                            <Mail className="w-3 h-3 mr-1" />
+                          )}
+                          {getHelperStatusLabel(statusInfo.status)}
+                        </Badge>
+                        {isRecentlyCreated && !isPlaceholder && !helper.hasPendingInvite && (
+                          <Badge 
+                            variant="outline"
+                            className="text-xs bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
                             title="Recently added"
                           >
                             New
-                          </span>
+                          </Badge>
                         )}
                       </div>
                       <div className="text-sm text-muted-foreground truncate">

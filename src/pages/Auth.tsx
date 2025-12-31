@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Building, Loader2, Mail, Lock, CheckCircle } from 'lucide-react';
+import { Building, Loader2, Mail, Lock, CheckCircle, UserPlus } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +16,8 @@ import { cn } from '@/lib/utils';
 import { RATE_LIMIT_COOLDOWN_MS } from '@/constants/app';
 import { analytics } from '@/lib/analytics';
 import { validateEmailWithSuggestions } from '@/utils/emailValidation';
+import { supabase } from '@/integrations/supabase/client';
+import { EmailContext, InviteData } from '@/types/database';
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
@@ -38,8 +40,14 @@ const Auth = () => {
   // New states for email-first magic link flow
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [usePassword, setUsePassword] = useState(false); // Toggle between magic link and password
-  const [emailContext, setEmailContext] = useState<{ isHelper?: boolean; isPlaceholder?: boolean; ownerName?: string; isNewUser?: boolean } | null>(null);
+  const [emailContext, setEmailContext] = useState<EmailContext | null>(null);
   const [checkingEmail, setCheckingEmail] = useState(false);
+  
+  // Helper invite token states
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [inviteData, setInviteData] = useState<InviteData | null>(null);
+  const [validatingInvite, setValidatingInvite] = useState(false);
+  const inviteValidatedRef = useRef(false);
   
   const passwordsMatch = password === confirmPassword;
   const { user, loading: authLoading, supabaseError, signIn, signUp, signInWithMagicLink, checkEmailExists, signInWithOAuth, resendVerificationEmail } = useAuth();
@@ -174,6 +182,123 @@ const Auth = () => {
       }, 3000);
     }
   }, [searchParams, authLoading, toast, navigate]);
+
+  // Validate invite token from URL on mount
+  useEffect(() => {
+    const token = searchParams.get('token');
+    
+    if (!token || inviteValidatedRef.current) {
+      return;
+    }
+
+    const validateInviteToken = async () => {
+      inviteValidatedRef.current = true;
+      setValidatingInvite(true);
+      setInviteToken(token);
+
+      try {
+        // Call RPC function instead of direct query (bypasses RLS)
+        const { data, error } = await supabase.rpc('get_invite_details', {
+          token_input: token
+        });
+
+        if (error) {
+          console.error('[Auth] Error validating invite token:', error);
+          setInviteData({ isValid: false });
+          toast({
+            title: 'Invalid invitation',
+            description: 'This invitation link is invalid. Please request a new one.',
+            variant: 'destructive',
+          });
+          // Clean up URL
+          const newSearchParams = new URLSearchParams(searchParams);
+          newSearchParams.delete('token');
+          navigate(`/auth?${newSearchParams.toString()}`, { replace: true });
+          return;
+        }
+
+        // RPC returns null if token not found
+        if (!data) {
+          setInviteData({ isValid: false });
+          toast({
+            title: 'Invitation not found',
+            description: 'This invitation link is invalid or has been revoked.',
+            variant: 'destructive',
+          });
+          // Clean up URL
+          const newSearchParams = new URLSearchParams(searchParams);
+          newSearchParams.delete('token');
+          navigate(`/auth?${newSearchParams.toString()}`, { replace: true });
+          return;
+        }
+
+        // Check if invite is invalid (expired or already accepted)
+        if (!data.is_valid) {
+          const reason = data.reason || 'invalid';
+          setInviteData({ 
+            isValid: false, 
+            isExpired: reason === 'expired' 
+          });
+          
+          if (reason === 'expired') {
+            toast({
+              title: 'Invitation expired',
+              description: 'This invitation has expired. Please request a new one.',
+              variant: 'destructive',
+            });
+          } else if (reason === 'already_accepted') {
+            toast({
+              title: 'Invitation already used',
+              description: 'This invitation has already been accepted.',
+              variant: 'destructive',
+            });
+          } else {
+            toast({
+              title: 'Invalid invitation',
+              description: 'This invitation link is invalid.',
+              variant: 'destructive',
+            });
+          }
+          
+          // Clean up URL
+          const newSearchParams = new URLSearchParams(searchParams);
+          newSearchParams.delete('token');
+          navigate(`/auth?${newSearchParams.toString()}`, { replace: true });
+          return;
+        }
+
+        // Valid invite - set data and pre-fill email
+        setInviteData({
+          isValid: true,
+          ownerName: data.owner_name || 'Your team',
+          helperEmail: data.helper_email,
+        });
+
+        // Pre-fill email and switch to signup mode
+        setEmail(data.helper_email);
+        setIsLogin(false);
+
+        // Track invite validation
+        analytics.track('helper_invite_validated', {
+          ownerName: data.owner_name,
+        });
+
+      } catch (err) {
+        console.error('[Auth] Exception validating invite token:', err);
+        setInviteData({ isValid: false });
+        toast({
+          title: 'Error validating invitation',
+          description: 'Unable to validate invitation. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setValidatingInvite(false);
+      }
+    };
+
+    validateInviteToken();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Check email context when email changes (for role detection)
   useEffect(() => {
@@ -394,13 +519,194 @@ const Auth = () => {
           navigate('/dashboard');
         }
       } else {
+        // Check if this is an invite acceptance flow
+        if (inviteToken && inviteData?.isValid) {
+          // Use the accept-invite Edge Function instead of signUp
+          try {
+            // Call function directly with fetch (no auth required - user isn't logged in yet)
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+            
+            if (!supabaseUrl || !supabaseKey) {
+              throw new Error('Supabase configuration missing');
+            }
+
+            const response = await fetch(
+              `${supabaseUrl}/functions/v1/accept-invite`,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': supabaseKey,
+                  'Authorization': `Bearer ${supabaseKey}`, // Required for Supabase Edge Functions
+                },
+                body: JSON.stringify({
+                  invite_token: inviteToken,
+                  password: password,
+                }),
+              }
+            );
+
+            const acceptResult = await response.json();
+
+            // Add better error logging
+            console.log('[Auth] Accept invite response:', {
+              status: response.status,
+              ok: response.ok,
+              result: acceptResult
+            });
+
+            if (!response.ok || !acceptResult?.success) {
+              const errorMessage = acceptResult?.error || 'Failed to activate account';
+              
+              // Log the full error for debugging
+              console.error('[Auth] Accept invite failed:', {
+                status: response.status,
+                error: acceptResult?.error,
+                fullResponse: acceptResult
+              });
+              
+              // Check for specific error types
+              if (errorMessage.toLowerCase().includes('expired')) {
+                toast({
+                  title: 'Invitation expired',
+                  description: 'This invitation has expired. Please request a new one.',
+                  variant: 'destructive',
+                });
+                // Clean up URL
+                const newSearchParams = new URLSearchParams(searchParams);
+                newSearchParams.delete('token');
+                navigate(`/auth?${newSearchParams.toString()}`, { replace: true });
+                return;
+              }
+              
+              if (errorMessage.toLowerCase().includes('already been accepted') || 
+                  errorMessage.toLowerCase().includes('already accepted')) {
+                toast({
+                  title: 'Invitation already used',
+                  description: 'This invitation has already been accepted.',
+                  variant: 'destructive',
+                });
+                // Clean up URL
+                const newSearchParams = new URLSearchParams(searchParams);
+                newSearchParams.delete('token');
+                navigate(`/auth?${newSearchParams.toString()}`, { replace: true });
+                return;
+              }
+
+              toast({
+                title: 'Activation failed',
+                description: errorMessage,
+                variant: 'destructive',
+              });
+              
+              analytics.track('helper_invite_acceptance_failed', {
+                reason: errorMessage,
+              });
+              
+              return;
+            }
+
+            // Account activated successfully - now sign in
+            console.log('[Auth] Account activated, signing in', { email: acceptResult.email });
+            
+            const { error: signInError } = await signIn(acceptResult.email || email, password);
+            
+            if (signInError) {
+              toast({
+                title: 'Account activated',
+                description: 'Your account has been activated. Please sign in with your password.',
+                variant: 'default',
+              });
+              setIsLogin(true);
+              setUsePassword(true);
+              setPassword('');
+              setConfirmPassword('');
+              
+              analytics.track('helper_invite_accepted', {
+                ownerName: inviteData.ownerName,
+                signin_required: true,
+              });
+              
+              return;
+            }
+
+            // Successfully signed in
+            // Store in session for helper welcome celebration
+            sessionStorage.setItem('helper_matched', 'true');
+            sessionStorage.setItem('helper_owner_id', inviteData.ownerName || '');
+            
+            analytics.track('helper_invite_accepted', {
+              ownerName: inviteData.ownerName,
+              signin_required: false,
+            });
+            
+            toast({
+              title: `Welcome to ${inviteData.ownerName}'s team!`,
+              description: 'Your account has been activated.',
+            });
+            
+            // Navigate to dashboard
+            setTimeout(() => {
+              navigate('/dashboard');
+            }, 500);
+            
+          } catch (err) {
+            console.error('[Auth] Exception accepting invite:', err);
+            toast({
+              title: 'Activation failed',
+              description: 'An unexpected error occurred. Please try again.',
+              variant: 'destructive',
+            });
+          }
+          
+          return; // Exit early - don't proceed with normal signup
+        }
+
+        // Normal signup flow (no invite token)
         const { error, needsEmailConfirmation } = await signUp(email, password, businessName || undefined);
         if (error) {
           console.error('[SignUp] Error details:', {
             message: error.message,
             name: error.name,
+            status: (error as any).status,
             stack: error.stack,
           });
+          
+          // Check for 422 status code (User already registered) or error message patterns
+          const isUserAlreadyExists = 
+            (error as any).status === 422 ||
+            error.message?.toLowerCase().includes('email already registered') ||
+            error.message?.toLowerCase().includes('user already registered');
+          
+          // If user already exists, switch to login mode automatically
+          if (isUserAlreadyExists) {
+            setIsLogin(true);
+            setUsePassword(true); // Ensure password mode is enabled for login
+            setPassword(''); // Clear password field
+            setConfirmPassword(''); // Clear confirm password field
+            setBusinessName(''); // Clear business name
+            
+            toast({
+              title: 'Account already exists',
+              description: 'This email is already registered. Please sign in with your password.',
+              variant: 'default',
+            });
+            
+            // Track the switch to login
+            analytics.track('signup_switched_to_login', {
+              reason: 'user_already_exists',
+              has_invite_token: !!inviteToken,
+            });
+            
+            // Focus on password field after a brief delay
+            setTimeout(() => {
+              const passwordInput = document.querySelector('input[type="password"]') as HTMLInputElement;
+              passwordInput?.focus();
+            }, 100);
+            
+            return; // Exit early - don't show additional error toast
+          }
           
           // Check for rate limiting
           if (error.message?.toLowerCase().includes('rate limit') || 
@@ -413,11 +719,7 @@ const Auth = () => {
           let errorTitle = 'Sign up failed';
           let errorDescription = error.message || 'An unexpected error occurred';
           
-          if (error.message?.toLowerCase().includes('email already registered') ||
-              error.message?.toLowerCase().includes('user already registered')) {
-            errorTitle = 'Email already in use';
-            errorDescription = 'This email is already registered. Try signing in instead, or use the magic link option for passwordless access.';
-          } else if (error.message?.toLowerCase().includes('invalid email')) {
+          if (error.message?.toLowerCase().includes('invalid email')) {
             errorTitle = 'Invalid email address';
             errorDescription = 'Please check your email address. Make sure it includes an @ symbol and a valid domain (e.g., example.com).';
           } else if (error.message?.toLowerCase().includes('password') && 
@@ -444,12 +746,103 @@ const Auth = () => {
             variant: 'destructive',
           });
         } else {
+          // Auto-link helper invite if token exists (for non-invite signups that happen to have a token)
+          if (inviteToken && inviteData?.isValid) {
+            try {
+              // Wait a moment for auth state to update
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              // Get current user (should be available after signup)
+              const { data: { user: currentUser } } = await supabase.auth.getUser();
+              
+              if (currentUser) {
+                // Update team_members to link helper_id to real user
+                const { error: linkError } = await supabase
+                  .from('team_members')
+                  .update({
+                    helper_id: currentUser.id,
+                    invite_accepted_at: new Date().toISOString(),
+                  })
+                  .eq('invite_token', inviteToken);
+
+                if (linkError) {
+                  console.error('[Auth] Failed to link helper invite:', linkError);
+                  // Don't fail signup - helper can be linked manually later
+                  toast({
+                    title: 'Account created',
+                    description: 'Your account was created, but we couldn\'t link your invitation. Please contact support.',
+                    variant: 'default',
+                  });
+                } else {
+                  console.log('[Auth] Helper invite linked successfully');
+                  
+                  // Get team_member record to retrieve owner_id and team_member.id for billing activation
+                  const { data: teamMember, error: teamMemberError } = await supabase
+                    .from('team_members')
+                    .select('id, owner_id')
+                    .eq('invite_token', inviteToken)
+                    .single();
+                  
+                  if (teamMember && !teamMemberError) {
+                    // Activate billing for this helper
+                    try {
+                      const { data: billingResult, error: billingError } = await supabase.functions.invoke(
+                        'manage-helper-billing',
+                        {
+                          body: {
+                            action: 'activate',
+                            helper_id: teamMember.id, // team_members.id, not helper_id column
+                          },
+                        }
+                      );
+                      
+                      if (billingError || !billingResult?.success) {
+                        // Log error but don't fail signup - billing can be activated later
+                        console.error('[Auth] Billing activation failed:', billingError || billingResult?.error);
+                        // Show informative message to user
+                        toast({
+                          title: 'Account created',
+                          description: 'Your account was created, but billing activation failed. The owner will be notified.',
+                          variant: 'default',
+                        });
+                      } else {
+                        console.log('[Auth] Billing activated successfully', { subscriptionItemId: billingResult.subscription_item_id });
+                      }
+                    } catch (billingErr) {
+                      console.error('[Auth] Exception activating billing:', billingErr);
+                      // Non-critical - user is signed up, billing can be activated later
+                      toast({
+                        title: 'Account created',
+                        description: 'Your account was created. Billing activation will be completed shortly.',
+                        variant: 'default',
+                      });
+                    }
+                  } else {
+                    console.warn('[Auth] Could not retrieve team_member record for billing activation:', teamMemberError);
+                  }
+                  
+                  // Store in session for helper welcome celebration
+                  sessionStorage.setItem('helper_matched', 'true');
+                  sessionStorage.setItem('helper_owner_id', inviteData.ownerName || '');
+                  
+                  analytics.track('helper_invite_accepted', {
+                    ownerName: inviteData.ownerName,
+                  });
+                }
+              }
+            } catch (linkErr) {
+              console.error('[Auth] Exception linking helper invite:', linkErr);
+              // Don't fail signup - non-critical
+            }
+          }
+
           if (needsEmailConfirmation) {
             // Track email verification sent
             analytics.track('signup_email_verification_sent');
             analytics.track('signup_completed', {
               method: 'password',
               needs_verification: true,
+              is_helper_invite: !!(inviteToken && inviteData?.isValid),
             });
             
             toast({
@@ -463,10 +856,13 @@ const Auth = () => {
             analytics.track('signup_completed', {
               method: 'password',
               needs_verification: false,
+              is_helper_invite: !!(inviteToken && inviteData?.isValid),
             });
             
             toast({
-              title: 'Welcome to SoloWipe!',
+              title: inviteToken && inviteData?.isValid 
+                ? `Welcome to ${inviteData.ownerName}'s team!`
+                : 'Welcome to SoloWipe!',
               description: 'Your account has been created.',
             });
             // Add small delay to ensure profile is created by trigger
@@ -604,8 +1000,43 @@ const Auth = () => {
                 ? 'Sign in to manage your rounds' 
                 : 'Start managing your window cleaning business'}
             </p>
-            {/* Contextual helper message */}
-            {emailContext?.isHelper && emailContext.ownerName && (
+            {/* Helper invite banner */}
+            {inviteToken && inviteData?.isValid && inviteData.ownerName && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-3 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"
+              >
+                <div className="flex items-start gap-3">
+                  <UserPlus className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                      You've been invited by {inviteData.ownerName}
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                      Create your password to join their team and start managing assigned jobs.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+            
+            {/* Loading state while validating invite */}
+            {validatingInvite && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-3 p-3 rounded-lg bg-muted border border-border"
+              >
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Validating invitation...</p>
+                </div>
+              </motion.div>
+            )}
+            
+            {/* Contextual helper message (for non-invite helper detection) */}
+            {!inviteToken && emailContext?.isHelper && emailContext.ownerName && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -785,60 +1216,6 @@ const Auth = () => {
                   </div>
                 )}
               </>
-            )}
-
-            <div className="space-y-2">
-              <PasswordInput
-                id={isLogin ? "login-password" : "signup-password"}
-                name={isLogin ? "login-password" : "signup-password"}
-                placeholder="Password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onFocus={() => !isLogin && setShowPasswordFeedback(true)}
-                onBlur={() => setShowPasswordFeedback(false)}
-                required
-                minLength={8}
-                autoComplete={isLogin ? "current-password" : "new-password"}
-                aria-label="Password"
-                aria-required="true"
-                aria-invalid={!isLogin && password.length > 0 && passwordStrength.score < 3}
-                aria-describedby={!isLogin && password.length > 0 ? "password-strength" : undefined}
-              />
-              
-              {/* Password Strength Indicator - only show on signup */}
-              {!isLogin && password.length > 0 && (
-                <div id="password-strength" role="region" aria-live="polite" aria-label="Password strength">
-                  <PasswordStrengthIndicator 
-                    passwordStrength={passwordStrength}
-                    showChecklist={showPasswordFeedback || passwordStrength.score < 4}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Confirm Password - only show on signup */}
-            {!isLogin && (
-              <div className="space-y-1">
-                <PasswordInput
-                  id="confirm-password"
-                  name="confirm-password"
-                  placeholder="Confirm Password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  hasError={confirmPassword.length > 0 && !passwordsMatch}
-                  required={!isLogin}
-                  autoComplete="new-password"
-                  aria-label="Confirm password"
-                  aria-required="true"
-                  aria-invalid={confirmPassword.length > 0 && !passwordsMatch}
-                  aria-describedby={confirmPassword.length > 0 && !passwordsMatch ? "confirm-password-error" : undefined}
-                />
-                {confirmPassword.length > 0 && !passwordsMatch && (
-                  <p id="confirm-password-error" className="text-xs text-destructive pl-1" role="alert">
-                    Passwords do not match
-                  </p>
-                )}
-              </div>
             )}
 
             {/* Remember me checkbox - only show on password login */}
