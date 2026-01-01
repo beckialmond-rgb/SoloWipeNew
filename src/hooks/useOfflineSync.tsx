@@ -6,6 +6,10 @@ import { useOnlineStatus } from './useOnlineStatus';
 import { useHaptics } from './useHaptics';
 import { toast } from '@/hooks/use-toast';
 import { format, addWeeks } from 'date-fns';
+import { detectConflict, autoResolveConflict, applyConflictResolution, Conflict } from '@/utils/conflictDetection';
+import { retryWithBackoff, isRetryableFinancialError } from '@/lib/retryLogic';
+import { errorTracker } from '@/lib/errorTracker';
+import { performanceMetrics } from '@/lib/performanceMetrics';
 
 export function useOfflineSync() {
   const queryClient = useQueryClient();
@@ -41,8 +45,99 @@ export function useOfflineSync() {
     }
   }, [isOnline, pendingCount]);
 
-  // Process a single mutation
+  // Validate financial mutation to prevent corruption
+  const validateFinancialMutation = useCallback(async (mutation: OfflineMutation): Promise<{ valid: boolean; reason?: string }> => {
+    // Financial mutations need extra validation
+    if (mutation.type === 'markJobPaid' || mutation.type === 'batchMarkPaid' || mutation.type === 'completeJob') {
+      const jobIds = mutation.type === 'completeJob'
+        ? [(mutation.payload as { jobId: string }).jobId]
+        : mutation.type === 'markJobPaid'
+        ? [(mutation.payload as { jobId: string }).jobId]
+        : (mutation.payload as { jobIds: string[] }).jobIds;
+      
+      // Verify jobs still exist and are in valid state
+      for (const jobId of jobIds) {
+        const { data: job, error } = await supabase
+          .from('jobs')
+          .select('id, status, payment_status')
+          .eq('id', jobId)
+          .maybeSingle();
+        
+        if (error) {
+          return { valid: false, reason: `Failed to validate job ${jobId}: ${error.message}` };
+        }
+        
+        if (!job) {
+          return { valid: false, reason: `Job ${jobId} no longer exists` };
+        }
+        
+        // For payment mutations, ensure job is not already paid
+        if ((mutation.type === 'markJobPaid' || mutation.type === 'batchMarkPaid') && job.payment_status === 'paid') {
+          return { valid: false, reason: `Job ${jobId} is already paid` };
+        }
+        
+        // For completion mutations, ensure job is not already completed
+        if (mutation.type === 'completeJob' && job.status === 'completed') {
+          return { valid: false, reason: `Job ${jobId} is already completed` };
+        }
+      }
+    }
+    
+    return { valid: true };
+  }, []);
+
+  // Process a single mutation with retry logic (assumes conflicts already handled)
   const processMutation = useCallback(async (mutation: OfflineMutation): Promise<boolean> => {
+    // Validate financial mutations before processing
+    const validation = await validateFinancialMutation(mutation);
+    if (!validation.valid) {
+      console.warn(`[Offline Sync] Mutation validation failed: ${validation.reason}`);
+      errorTracker.captureMessage(`Offline mutation validation failed: ${validation.reason}`, {
+        component: 'useOfflineSync',
+        action: 'validate_mutation',
+        extra: { mutationType: mutation.type, mutationId: mutation.id },
+      });
+      return false;
+    }
+    
+    // Track performance
+    const tracker = performanceMetrics.startFlow('data_sync', undefined, {
+      mutationType: mutation.type,
+      mutationId: mutation.id,
+      retryCount: mutation.retryCount,
+    });
+    
+    try {
+      const result = await retryWithBackoff(
+        async () => {
+          return await executeMutation(mutation);
+        },
+        {
+          maxRetries: mutation.retryCount < 3 ? 3 : 1, // Reduce retries if already retried many times
+          initialDelay: 1000,
+          maxDelay: 10000,
+          retryableErrors: isRetryableFinancialError,
+        }
+      );
+      
+      if (result.success) {
+        tracker.complete({ attempts: result.attempts, duration: result.totalDuration });
+        return true;
+      } else {
+        tracker.fail(result.error || new Error('Mutation failed'), {
+          attempts: result.attempts,
+          duration: result.totalDuration,
+        });
+        return false;
+      }
+    } catch (error) {
+      tracker.fail(error instanceof Error ? error : new Error(String(error)));
+      return false;
+    }
+  }, [validateFinancialMutation]);
+
+  // Execute mutation (extracted for retry logic)
+  const executeMutation = useCallback(async (mutation: OfflineMutation): Promise<void> => {
     try {
       switch (mutation.type) {
         case 'completeJob': {
@@ -118,7 +213,22 @@ export function useOfflineSync() {
             // Continue with helperPaymentAmount = null (no payment)
           }
 
-          // Update current job
+          // CRITICAL: Double-check job status before completing to prevent double-completion
+          const { data: jobCheck, error: checkError } = await supabase
+            .from('jobs')
+            .select('status, payment_status')
+            .eq('id', jobId)
+            .single();
+          
+          if (checkError) throw checkError;
+          
+          if (jobCheck.status === 'completed') {
+            // Already completed - skip silently (conflict resolution should have caught this)
+            console.log(`[Offline Sync] Job ${jobId} already completed, skipping completion mutation`);
+            return;
+          }
+          
+          // Update current job with double-check constraint
           const { error: updateError } = await supabase
             .from('jobs')
             .update({
@@ -132,9 +242,16 @@ export function useOfflineSync() {
               helper_payment_amount: helperPaymentAmount,
             })
             .eq('id', jobId)
-            .eq('status', 'pending');
+            .eq('status', 'pending'); // Double-check with database constraint
 
-          if (updateError) throw updateError;
+          if (updateError) {
+            // Check if error is due to already being completed
+            if (updateError.message?.includes('already') || updateError.message?.toLowerCase().includes('completed')) {
+              console.log(`[Offline Sync] Job ${jobId} was completed concurrently, skipping`);
+              return; // Don't throw - this is expected in concurrent scenarios
+            }
+            throw updateError;
+          }
 
           // Clean up assignment - job is completed, assignment no longer needed
           try {
@@ -203,6 +320,22 @@ export function useOfflineSync() {
 
         case 'markJobPaid': {
           const { jobId, method } = mutation.payload as { jobId: string; method: 'cash' | 'transfer' };
+          
+          // CRITICAL: Double-check payment status before updating to prevent double-payment
+          const { data: jobCheck, error: checkError } = await supabase
+            .from('jobs')
+            .select('payment_status')
+            .eq('id', jobId)
+            .single();
+          
+          if (checkError) throw checkError;
+          
+          if (jobCheck.payment_status === 'paid' || jobCheck.payment_status === 'processing') {
+            // Already paid - skip silently (conflict resolution should have caught this)
+            console.log(`[Offline Sync] Job ${jobId} already paid, skipping payment mutation`);
+            return;
+          }
+          
           const { error } = await supabase
             .from('jobs')
             .update({
@@ -211,25 +344,69 @@ export function useOfflineSync() {
               payment_date: new Date().toISOString(),
             })
             .eq('id', jobId)
-            .eq('payment_status', 'unpaid');
+            .eq('payment_status', 'unpaid'); // Double-check with database constraint
 
-          if (error) throw error;
+          if (error) {
+            // Check if error is due to already being paid
+            if (error.message?.includes('already') || error.message?.toLowerCase().includes('paid')) {
+              console.log(`[Offline Sync] Job ${jobId} was paid concurrently, skipping`);
+              return; // Don't throw - this is expected in concurrent scenarios
+            }
+            throw error;
+          }
           break;
         }
 
         case 'batchMarkPaid': {
           const { jobIds, method } = mutation.payload as { jobIds: string[]; method: 'cash' | 'transfer' };
-          const { error } = await supabase
-            .from('jobs')
-            .update({
-              payment_status: 'paid',
-              payment_method: method,
-              payment_date: new Date().toISOString(),
+          
+          // CRITICAL: Process batch payments individually to track failures
+          // This prevents one failed payment from blocking others
+          const results = await Promise.allSettled(
+            jobIds.map(async (jobId) => {
+              // Double-check each job before updating
+              const { data: jobCheck } = await supabase
+                .from('jobs')
+                .select('payment_status')
+                .eq('id', jobId)
+                .maybeSingle();
+              
+              if (jobCheck?.payment_status === 'paid' || jobCheck?.payment_status === 'processing') {
+                return { jobId, skipped: true };
+              }
+              
+              const { error } = await supabase
+                .from('jobs')
+                .update({
+                  payment_status: 'paid',
+                  payment_method: method,
+                  payment_date: new Date().toISOString(),
+                })
+                .eq('id', jobId)
+                .eq('payment_status', 'unpaid');
+              
+              if (error) {
+                // Check if already paid (concurrent update)
+                if (error.message?.includes('already') || error.message?.toLowerCase().includes('paid')) {
+                  return { jobId, skipped: true };
+                }
+                throw error;
+              }
+              
+              return { jobId, success: true };
             })
-            .in('id', jobIds)
-            .eq('payment_status', 'unpaid');
-
-          if (error) throw error;
+          );
+          
+          // Log any failures but don't fail entire batch
+          const failures = results.filter(r => r.status === 'rejected');
+          if (failures.length > 0) {
+            console.warn(`[Offline Sync] ${failures.length} jobs failed in batch payment:`, failures);
+            // If all failed, throw error
+            if (failures.length === jobIds.length) {
+              throw new Error('All jobs in batch failed to update');
+            }
+          }
+          
           break;
         }
 
@@ -268,13 +445,21 @@ export function useOfflineSync() {
 
         default:
           console.warn('Unknown mutation type:', mutation.type);
-          return false;
+          throw new Error(`Unknown mutation type: ${mutation.type}`);
       }
 
-      return true;
+      return;
     } catch (error) {
-      console.error('Failed to process mutation:', mutation.type, error);
-      return false;
+      console.error('[Offline Sync] Failed to execute mutation:', mutation.type, error);
+      errorTracker.captureError(
+        error instanceof Error ? error : new Error(String(error)),
+        {
+          component: 'useOfflineSync',
+          action: 'execute_mutation',
+          extra: { mutationType: mutation.type, mutationId: mutation.id },
+        }
+      );
+      throw error; // Re-throw for retry logic
     }
   }, []);
 
@@ -296,8 +481,36 @@ export function useOfflineSync() {
 
       let successCount = 0;
       let failCount = 0;
+      let conflictCount = 0;
 
       for (const mutation of mutations) {
+        // Check for conflicts before processing
+        const conflict = await detectConflict(mutation);
+        
+        if (conflict) {
+          conflictCount++;
+          // Auto-resolve if possible
+          if (conflict.autoResolvable) {
+            const resolution = autoResolveConflict(conflict);
+            const shouldApply = await applyConflictResolution(mutation, conflict, resolution);
+            
+            if (!shouldApply) {
+              // Conflict resolved by skipping - remove from queue
+              await mutationQueue.remove(mutation.id);
+              if ('jobId' in mutation.payload) {
+                await localData.removeOptimisticJob(mutation.payload.jobId as string);
+              }
+              continue; // Skip to next mutation
+            }
+            // Continue to process mutation (with merged data if applicable)
+          } else {
+            // Non-auto-resolvable - skip for now
+            await mutationQueue.remove(mutation.id);
+            continue;
+          }
+        }
+        
+        // Process mutation (no conflict or conflict resolved)
         const success = await processMutation(mutation);
         
         if (success) {
@@ -308,12 +521,28 @@ export function useOfflineSync() {
           }
           successCount++;
         } else {
+          // Increment retry count
           await mutationQueue.updateRetryCount(mutation.id);
           
-          // Remove mutations that have failed too many times
-          if (mutation.retryCount >= 3) {
+          // Get updated mutation to check retry count
+          const updatedMutations = await mutationQueue.getAll();
+          const updatedMutation = updatedMutations.find(m => m.id === mutation.id);
+          
+          // Remove mutations that have failed too many times (max 5 retries)
+          if (updatedMutation && updatedMutation.retryCount >= 5) {
             await mutationQueue.remove(mutation.id);
             failCount++;
+            
+            // Log failed mutation for debugging
+            errorTracker.captureMessage('Offline mutation failed after max retries', {
+              component: 'useOfflineSync',
+              action: 'max_retries_exceeded',
+              extra: {
+                mutationType: mutation.type,
+                mutationId: mutation.id,
+                retryCount: updatedMutation.retryCount,
+              },
+            });
           }
         }
       }
@@ -322,12 +551,18 @@ export function useOfflineSync() {
       await queryClient.invalidateQueries();
       await updatePendingCount();
 
-      if (successCount > 0) {
+      if (successCount > 0 || conflictCount > 0) {
         syncStatus.setLastSynced(new Date().toISOString());
         success(); // Haptic feedback on successful sync
+        
+        let description = 'Your data is now up to date.';
+        if (conflictCount > 0) {
+          description = `${conflictCount} conflict${conflictCount > 1 ? 's' : ''} resolved automatically.`;
+        }
+        
         toast({
-          title: `Synced ${successCount} offline change${successCount > 1 ? 's' : ''}`,
-          description: 'Your data is now up to date.',
+          title: `Synced ${successCount} offline change${successCount > 1 ? 's' : ''}${conflictCount > 0 ? `, resolved ${conflictCount} conflict${conflictCount > 1 ? 's' : ''}` : ''}`,
+          description,
         });
       }
 

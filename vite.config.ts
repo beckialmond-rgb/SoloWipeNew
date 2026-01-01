@@ -111,7 +111,7 @@ export default defineConfig(({ mode }) => ({
       '@tanstack/query-async-storage-persister',
     ],
     // Exclude problematic packages from optimization if needed
-    exclude: [],
+    exclude: ['@sentry/react'], // Sentry is optional and may not be installed
     // Ensure proper dependency resolution
     esbuildOptions: {
       // Ensure proper hoisting of React

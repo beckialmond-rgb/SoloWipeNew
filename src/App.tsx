@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +8,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminProtectedRoute } from "@/components/AdminProtectedRoute";
 import { SoftPaywallProvider } from "@/hooks/useSoftPaywall";
 import { KeyboardShortcutsProvider } from "@/components/KeyboardShortcutsProvider";
 import { OfflineProvider } from "@/contexts/OfflineContext";
@@ -15,7 +16,10 @@ import { ReloadPrompt } from "@/components/ReloadPrompt";
 import { LoadingState } from "@/components/LoadingState";
 import { queryPersister, CACHE_TIME, STALE_TIME } from "@/lib/queryPersister";
 import { Layout } from "@/components/Layout";
+import { MarketingLayout } from "@/components/MarketingLayout";
 import { SMSTemplateProvider } from "@/contexts/SMSTemplateContext";
+import { errorTracker } from "@/lib/errorTracker";
+import { useAuth } from "@/hooks/useAuth";
 
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 
@@ -55,6 +59,7 @@ const Legal = lazy(() => import("./pages/Legal"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const JobShowcaseExample = lazy(() => import("./components/JobShowcase/JobShowcaseExample"));
 const GoCardlessCallback = lazy(() => import("./pages/GoCardlessCallback").then(m => ({ default: m.GoCardlessCallback })));
+const Admin = lazy(() => import("./pages/Admin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -75,6 +80,21 @@ const queryClient = new QueryClient({
   },
 });
 
+// Component to sync user context with error tracker
+function ErrorTrackingSync() {
+  const { user } = useAuth();
+  
+  useEffect(() => {
+    if (user) {
+      errorTracker.setUser(user.id, user.email);
+    } else {
+      errorTracker.setUser(null);
+    }
+  }, [user]);
+  
+  return null;
+}
+
 const App = () => {
   return (
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
@@ -92,6 +112,7 @@ const App = () => {
         }}
       >
         <AuthProvider>
+          <ErrorTrackingSync />
           <SoftPaywallProvider>
             <OfflineProvider>
               <SMSTemplateProvider>
@@ -110,18 +131,23 @@ const App = () => {
                   <KeyboardShortcutsProvider>
                     <Suspense fallback={<LoadingState message="Loading..." />}>
                       <Routes>
-                        <Route path="/" element={<Landing />} />
-                        <Route path="/auth" element={<Auth />} />
-                        <Route path="/forgot-password" element={<ForgotPassword />} />
-                        <Route path="/reset-password" element={<ResetPassword />} />
+                        {/* Marketing routes - forced dark mode */}
+                        <Route element={<MarketingLayout />}>
+                          <Route path="/" element={<Landing />} />
+                          <Route path="/auth" element={<Auth />} />
+                          <Route path="/forgot-password" element={<ForgotPassword />} />
+                          <Route path="/reset-password" element={<ResetPassword />} />
+                          <Route path="/terms" element={<Terms />} />
+                          <Route path="/privacy" element={<Privacy />} />
+                          <Route path="/legal" element={<Legal />} />
+                          <Route path="/cookies" element={<CookiePolicy />} />
+                          <Route path="/roi-calculator" element={<ROICalculator />} />
+                        </Route>
+                        
+                        {/* Non-marketing public routes (no forced dark mode) */}
                         <Route path="/install" element={<Install />} />
-                        <Route path="/terms" element={<Terms />} />
-                        <Route path="/privacy" element={<Privacy />} />
-                        <Route path="/legal" element={<Legal />} />
-                        <Route path="/cookies" element={<CookiePolicy />} />
                         <Route path="/showcase" element={<JobShowcaseExample />} />
                         <Route path="/gocardless-callback" element={<GoCardlessCallback />} />
-                        <Route path="/roi-calculator" element={<ROICalculator />} />
                         <Route path="/setup-checklist" element={<SetupChecklistPage />} />
 
                         <Route element={<Layout />}>
@@ -235,6 +261,14 @@ const App = () => {
                               <ProtectedRoute>
                                 <SMSTemplates />
                               </ProtectedRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin"
+                            element={
+                              <AdminProtectedRoute>
+                                <Admin />
+                              </AdminProtectedRoute>
                             }
                           />
                           <Route path="*" element={<NotFound />} />
